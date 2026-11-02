@@ -25,7 +25,7 @@ body.wk header{display:none}
 #scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain}
 main{padding:6px 16px 28px;max-width:640px;margin:0 auto}
 body.wk main{padding-top:calc(12px + env(safe-area-inset-top));padding-bottom:calc(24px + env(safe-area-inset-bottom))}
-nav{flex:none;display:flex;background:#0c0f13;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:5}
+nav{flex:none;display:flex;background:#0c0f13;border-top:1px solid var(--line);padding-bottom:min(env(safe-area-inset-bottom),34px);z-index:5}
 body.wk nav{display:none}
 nav button{flex:1;position:relative;display:flex;flex-direction:column;align-items:center;gap:5px;background:none;border:0;color:var(--mute);padding:12px 0 10px;font-size:12px;font-weight:700;letter-spacing:.2px;transition:color .2s}
 nav button svg{width:27px;height:27px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;transition:transform .25s var(--ease)}
@@ -760,9 +760,19 @@ function syncCard(){
     <input id="tok" type="password" autocomplete="off" autocapitalize="off" placeholder="github_pat_…" style="margin-top:12px">
     <div class="tools2"><button class="btn sm" data-act="connect">Connect</button></div></div>`;
 }
+function diagHtml(){
+  const probe=document.createElement('div');
+  probe.style.cssText='position:fixed;top:0;left:0;visibility:hidden;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom) 0';
+  document.body.appendChild(probe); const cs=getComputedStyle(probe), t=cs.paddingTop, b=cs.paddingBottom; probe.remove();
+  const nav=document.querySelector('nav').getBoundingClientRect(), sh=document.getElementById('shell').getBoundingClientRect(), vv=window.visualViewport;
+  const rows=[['Home Screen app',navigator.standalone===true?'yes':(navigator.standalone===false?'no':'n/a')],
+    ['Window height',innerHeight],['Visual viewport',vv?Math.round(vv.height):'n/a'],['Screen height',screen.height],
+    ['Safe area top / bottom',t+' / '+b],['App shell height',Math.round(sh.height)],['Tab bar top / bottom',Math.round(nav.top)+' / '+Math.round(nav.bottom)]];
+  return `<div class="card"><h3 style="margin:0 0 6px">Display check</h3><div class="note">If the tab bar looks off, screenshot this card.</div><table style="margin-top:8px">${rows.map(r=>`<tr><td>${r[0]}</td><td style="text-align:right">${r[1]}</td></tr>`).join('')}</table></div>`;
+}
 function viewPlan(){
   const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  let h = syncCard() + `<div class="card"><h3 style="margin:0 0 6px">Week</h3><table>${[1,2,3,4,5,6,0].map(d=>`<tr><td>${days[d]}</td><td>${esc(d===6?'Run (optional)':PLAN.sessions[PLAN.week[d]].name)}</td></tr>`).join('')}</table></div>`;
+  let h = syncCard() + diagHtml() + `<div class="card"><h3 style="margin:0 0 6px">Week</h3><table>${[1,2,3,4,5,6,0].map(d=>`<tr><td>${days[d]}</td><td>${esc(d===6?'Run (optional)':PLAN.sessions[PLAN.week[d]].name)}</td></tr>`).join('')}</table></div>`;
   ['upperA','lowerA','upperB','lowerB'].forEach(k=>{const s=PLAN.sessions[k];
     h+=`<div class="card"><h3 style="margin:0 0 6px">${esc(s.name)}</h3>${s.ex.map(e=>`<div class="ln"><b>${esc(e.name)}</b><span>${e.sets} × ${e.reps[0]===e.reps[1]?e.reps[0]:e.reps[0]+'–'+e.reps[1]}</span></div>`).join('')}</div>`});
   return h+`<div class="card"><h3 style="margin:0 0 6px">Progression</h3><div class="note">Work up to the top of the rep range on every set, then add 5 lb (2.5 lb on small lifts) and restart at the bottom. Leave 1–2 reps in reserve on most sets. Deload every 6th week (about 60% of normal weight).</div></div>`;
