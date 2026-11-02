@@ -169,6 +169,9 @@ table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:6px 4px;b
 @keyframes fade{from{opacity:0}}
 .dl{border-color:#5a4a14;background:#221d0d}
 .tools2{display:flex;gap:8px;margin-top:10px}
+.set summary{list-style:none;display:flex;justify-content:space-between;align-items:center;cursor:pointer}
+.set summary::-webkit-details-marker{display:none}
+.set summary span{color:var(--mute);font-size:14px}
 .kicker2{color:var(--mute);font-size:13px;font-weight:600;letter-spacing:.4px;text-transform:uppercase}
 .wbig{font-size:15px;color:var(--mute)}
 .wbig b{font-size:36px;color:var(--text);letter-spacing:-1px}
@@ -748,10 +751,10 @@ function chart(pts){
     <text x="${W-P}" y="${H-8}" fill="#8b97a5" font-size="11" text-anchor="end">${fmtDate(pts[pts.length-1].date)}</text></svg>`;
 }
 function syncCard(){
-  if(getToken()) return `<div class="card"><h3 style="margin:0 0 4px">GitHub sync is on ✅</h3>
+  if(getToken()) return `<div><b>GitHub sync is on ✅</b>
     <div class="note">Workouts save to ${OWNER}/${REPO} when you finish.${st.local.length?` ${st.local.length} waiting to sync.`:' Everything is synced.'}</div>
     <div class="tools2"><button class="btn sm" data-act="sync">Sync now</button><button class="btn ghost sm" data-act="disconnect">Disconnect</button></div></div>`;
-  return `<div class="card steps"><h3 style="margin:0 0 4px">Turn on auto-sync</h3>
+  return `<div class="steps"><b>Turn on auto-sync</b>
     <div class="note">So you never have to copy and paste workouts. The token only lives on this phone.</div>
     <ol><li>Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">GitHub token settings</a></li>
     <li>Repository access: <b>Only select repositories</b>, pick <b>${REPO}</b></li>
@@ -760,22 +763,13 @@ function syncCard(){
     <input id="tok" type="password" autocomplete="off" autocapitalize="off" placeholder="github_pat_…" style="margin-top:12px">
     <div class="tools2"><button class="btn sm" data-act="connect">Connect</button></div></div>`;
 }
-function diagHtml(){
-  const probe=document.createElement('div');
-  probe.style.cssText='position:fixed;top:0;left:0;visibility:hidden;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom) 0';
-  document.body.appendChild(probe); const cs=getComputedStyle(probe), t=cs.paddingTop, b=cs.paddingBottom; probe.remove();
-  const nav=document.querySelector('nav').getBoundingClientRect(), sh=document.getElementById('shell').getBoundingClientRect(), vv=window.visualViewport;
-  const rows=[['Home Screen app',navigator.standalone===true?'yes':(navigator.standalone===false?'no':'n/a')],
-    ['Window height',innerHeight],['Visual viewport',vv?Math.round(vv.height):'n/a'],['Screen height',screen.height],
-    ['Safe area top / bottom',t+' / '+b],['App shell height',Math.round(sh.height)],['Tab bar top / bottom',Math.round(nav.top)+' / '+Math.round(nav.bottom)]];
-  return `<div class="card"><h3 style="margin:0 0 6px">Display check</h3><div class="note">If the tab bar looks off, screenshot this card.</div><table style="margin-top:8px">${rows.map(r=>`<tr><td>${r[0]}</td><td style="text-align:right">${r[1]}</td></tr>`).join('')}</table></div>`;
-}
 function viewPlan(){
   const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  let h = syncCard() + diagHtml() + `<div class="card"><h3 style="margin:0 0 6px">Week</h3><table>${[1,2,3,4,5,6,0].map(d=>`<tr><td>${days[d]}</td><td>${esc(d===6?'Run (optional)':PLAN.sessions[PLAN.week[d]].name)}</td></tr>`).join('')}</table></div>`;
+  let h = `<div class="card"><h3 style="margin:0 0 6px">Week</h3><table>${[1,2,3,4,5,6,0].map(d=>`<tr><td>${days[d]}</td><td>${esc(d===6?'Run (optional)':PLAN.sessions[PLAN.week[d]].name)}</td></tr>`).join('')}</table></div>`;
   ['upperA','lowerA','upperB','lowerB'].forEach(k=>{const s=PLAN.sessions[k];
     h+=`<div class="card"><h3 style="margin:0 0 6px">${esc(s.name)}</h3>${s.ex.map(e=>`<div class="ln"><b>${esc(e.name)}</b><span>${e.sets} × ${e.reps[0]===e.reps[1]?e.reps[0]:e.reps[0]+'–'+e.reps[1]}</span></div>`).join('')}</div>`});
-  return h+`<div class="card"><h3 style="margin:0 0 6px">Progression</h3><div class="note">Work up to the top of the rep range on every set, then add 5 lb (2.5 lb on small lifts) and restart at the bottom. Leave 1–2 reps in reserve on most sets. Deload every 6th week (about 60% of normal weight).</div></div>`;
+  h+=`<div class="card"><h3 style="margin:0 0 6px">Progression</h3><div class="note">Work up to the top of the rep range on every set, then add 5 lb (2.5 lb on small lifts) and restart at the bottom. Leave 1–2 reps in reserve on most sets. Deload every 6th week (about 60% of normal weight).</div></div>`;
+  return h+`<details class="card set"><summary><b>Settings</b><span>GitHub sync: ${getToken()?'on':'off'}</span></summary><div style="margin-top:12px">${syncCard()}</div></details>`;
 }
 
 /* ---------- events ---------- */
