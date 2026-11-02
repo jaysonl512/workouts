@@ -250,6 +250,9 @@ details[open]>summary .chev{transform:rotate(90deg)}
 .recap>summary::-webkit-details-marker{display:none}
 .recap .wbody{padding:0 0 4px;border-top:0}
 .editlink{display:block;margin:6px auto 0;background:none;border:0;color:var(--mute);font-size:14px;text-decoration:underline;padding:10px}
+.upd{flex:none;display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--acc);color:#fff;padding:calc(10px + env(safe-area-inset-top)) 16px 10px;font-weight:700;z-index:6}
+.upd[hidden]{display:none}
+.upd button{background:#fff;color:#b91c1c;border:0;border-radius:99px;padding:7px 16px;font-weight:800;font-size:14px}
 .kicker2{color:var(--mute);font-size:13px;font-weight:600;letter-spacing:.4px;text-transform:uppercase}
 .wbig{font-size:15px;color:var(--mute)}
 .wbig b{font-size:36px;color:var(--text);letter-spacing:-1px}
@@ -263,7 +266,7 @@ details[open]>summary .chev{transform:rotate(90deg)}
 </style>
 </head>
 <body>
-<div id="shell"><div id="scroll">
+<div id="shell"><div id="upd" class="upd" hidden><span>A new version is ready</span><button id="updBtn">Update</button></div><div id="scroll">
 <header><h1 id="ttl">Today</h1><span id="sub"></span></header>
 <main id="app"></main>
 </div>
@@ -320,6 +323,7 @@ const SESS_KEYS = ['upperA','run','lowerA','upperB','lowerB','run2','yoga','rest
 const sessBase = k => k==='run2' ? 'run' : k;
 const sessName = k => k==='run2' ? 'Run (Saturday, optional)' : PLAN.sessions[k].name;
 const CHEERS = ['Nice one','Solid set','Strong','Locked in','Clean rep','Beast mode','Smooth'];
+const APP_VERSION='2026-11-02.10';
 const OWNER='jaysonl512', REPO='workouts', LOGPATH='data/log.json';
 
 /* alternatives per exercise: each alternative keeps its own history so weights stay comparable */
@@ -910,7 +914,7 @@ function viewPlan(){
   });
   h += `<details class="card pl"><summary><div class="ttl"><b>Running build-up</b><span>Tuesday, plus Saturday if you feel like it</span></div><span class="chev">›</span></summary><div class="body"><ul class="bul" style="margin-bottom:6px"><li><b>Weeks 1–2:</b> 20–25 min easy</li><li><b>Weeks 3–4:</b> 30 min easy</li><li><b>Weeks 5–8:</b> build to 40–45 min, add one interval session (6 × 2 min hard / 2 min easy)</li></ul></div></details>`;
   h += `<div class="sect">How to progress</div><div class="card" style="padding:6px 16px"><ul class="bul"><li>Work up to the top of the rep range on every set, then add 5 lb (2.5 on small lifts) and start back at the bottom.</li><li>Leave 1–2 reps in reserve on most sets.</li><li>Take a deload week about every 6th week, at roughly 60% of your usual weights.</li><li>Tap ⇄ Swap on any exercise to use an alternative. Each one keeps its own history.</li></ul></div>`;
-  return h+`<div class="sect">Settings</div><details class="card set"><summary><b>Settings</b><span>Sync ${getToken()?'on':'off'} · Timer ${restOn()?'on':'off'}</span></summary><div style="margin-top:12px"><div class="row2"><div><b>Rest timer</b><div class="note">Counts down after each set</div></div><button class="btn sm ${restOn()?'':'ghost'}" data-act="resttoggle">${restOn()?'On':'Off'}</button></div><div class="sep"></div>${syncCard()}</div></details>`;
+  return h+`<div class="sect">Settings</div><details class="card set"><summary><b>Settings</b><span>Sync ${getToken()?'on':'off'} · Timer ${restOn()?'on':'off'}</span></summary><div style="margin-top:12px"><div class="row2"><div><b>Rest timer</b><div class="note">Counts down after each set</div></div><button class="btn sm ${restOn()?'':'ghost'}" data-act="resttoggle">${restOn()?'On':'Off'}</button></div><div class="sep"></div>${syncCard()}<div class="sep"></div><div class="row2"><div><b>App version</b><div class="note">${APP_VERSION}</div></div><button class="btn ghost sm" data-act="refresh">Refresh app</button></div></div></details>`;
 }
 
 /* ---------- events ---------- */
@@ -983,6 +987,7 @@ app.addEventListener('click',e=>{
   else if(act==='connect') connectToken();
   else if(act==='disconnect'){ try{localStorage.removeItem('wt.token')}catch(err){} toast('Disconnected'); render() }
   else if(act==='sync') syncNow(true);
+  else if(act==='refresh') refreshApp();
   else if(act==='resttoggle'){ SS('wt.rest',!restOn()); if(restOn()===false) clearRest(); render() }
   else if(act==='save') save();
   else if(act==='copy') copyUnsynced();
@@ -1026,7 +1031,17 @@ async function copyUnsynced(){
 }
 
 ['gesturestart','gesturechange','gestureend'].forEach(ev=>document.addEventListener(ev,e=>e.preventDefault()));
-render(); loadRepo();
+async function checkUpdate(){
+  try{
+    const r=await fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'}); const t=await r.text();
+    const m=/const APP_VERSION='([0-9.\-]+)'/.exec(t);
+    if(m && m[1]!==APP_VERSION) document.getElementById('upd').hidden=false;
+  }catch(e){}
+}
+function refreshApp(){ location.replace(location.pathname+'?r='+Date.now()) }
+document.getElementById('updBtn').addEventListener('click',refreshApp);
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') checkUpdate() });
+render(); loadRepo(); checkUpdate();
 </script>
 </body>
 </html>
