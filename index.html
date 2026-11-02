@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0f1216">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="Lift & Run">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -882,15 +882,6 @@ async function copyUnsynced(){
   catch(e){prompt('Copy this:',txt)}
 }
 
-/* iOS Home Screen apps report a window shorter than the screen (status bar height missing), which leaves a gap under the tab bar. Size the shell to the full screen there. */
-function sizeShell(){
-  const sh=document.getElementById('shell'); if(!sh) return;
-  if(navigator.standalone===true){
-    const portrait=innerHeight>=innerWidth, big=Math.max(screen.width,screen.height), small=Math.min(screen.width,screen.height);
-    sh.style.bottom='auto'; sh.style.height=Math.max(innerHeight, portrait?big:small)+'px';
-  } else { sh.style.bottom=''; sh.style.height='' }
-}
-sizeShell(); addEventListener('resize',sizeShell); addEventListener('orientationchange',()=>setTimeout(sizeShell,250));
 ['gesturestart','gesturechange','gestureend'].forEach(ev=>document.addEventListener(ev,e=>e.preventDefault()));
 render(); loadRepo();
 </script>
