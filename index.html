@@ -670,7 +670,7 @@ function viewToday(){
     h += `<div class="hero doneh"><div class="chk">✓</div><h2>${esc(sessName(st.sess))}</h2>
       <div class="meta">Completed${st.date===todayStr()?' today':' on '+fmtDate(st.date)}${mood}</div>
       <div class="sum sum3">${sessStats(lg).map(([b,l])=>`<div class="stat"><b>${b}</b><span>${l}</span></div>`).join('')}</div>
-      <details class="recap"><summary><span>Workout details</span><span class="chev">›</span></summary><div class="wbody">${woBody(lg, lg.yoga?'yoga':lg.run?'run':'lift')}</div></details>
+      <details class="recap"><summary><span>Workout details</span><span class="chev">›</span></summary><div class="wbody">${woBody(lg, lg.yoga?'yoga':lg.run?'run':'lift', true)}</div></details>
       <button class="editlink" data-act="edit">Edit this workout</button></div>`;
     return h;
   }
@@ -790,15 +790,15 @@ function viewSummary(cls){
     <div class="nav3"><button class="btn ghost sm" data-act="back">‹ Back</button></div></div>`;
 }
 
-function woBody(x,kind){
+function woBody(x,kind,compact){
   let body='';
   if(kind==='lift'){
     const st3=sessStats(x);
-    body += `<div class="wsum"><span><b>${st3[0][0]}</b> sets</span><span><b>${st3[1][0]}</b> lb lifted</span>${x.deload?'<span>deload week</span>':''}</div>`;
+    if(!compact) body += `<div class="wsum"><span><b>${st3[0][0]}</b> sets</span><span><b>${st3[1][0]}</b> lb lifted</span>${x.deload?'<span>deload week</span>':''}</div>`;
     body += (x.entries||[]).map(e=>`<div class="wex"><b>${esc(e.name)}</b><div class="chips2">${e.sets.map(t=>`<span class="sc">${esc(fmtSet(t))}</span>`).join('')}</div></div>`).join('');
   } else if(kind==='run'){
-    body += `<div class="wsum"><span><b>${x.run.distanceKm??'—'}</b> km</span><span><b>${x.run.minutes??'—'}</b> min</span>${paceStr(x.run)?`<span><b>${paceStr(x.run).replace(/[() ]/g,'')}</b></span>`:''}</div>`;
-  } else body += `<div class="wsum"><span><b>${x.yoga.minutes??'—'}</b> minutes of hot yoga</span></div>`;
+    if(!compact) body += `<div class="wsum"><span><b>${x.run.distanceKm??'—'}</b> km</span><span><b>${x.run.minutes??'—'}</b> min</span>${paceStr(x.run)?`<span><b>${paceStr(x.run).replace(/[() ]/g,'')}</b></span>`:''}</div>`;
+  } else if(!compact) body += `<div class="wsum"><span><b>${x.yoga.minutes??'—'}</b> minutes of hot yoga</span></div>`;
   if(x.notes) body += `<div class="wnote">${esc(x.notes)}</div>`;
   return body;
 }
