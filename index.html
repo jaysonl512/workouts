@@ -175,6 +175,68 @@ table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:6px 4px;b
 .set summary{list-style:none;display:flex;justify-content:space-between;align-items:center;cursor:pointer}
 .set summary::-webkit-details-marker{display:none}
 .set summary span{color:var(--mute);font-size:14px}
+
+.sect{font-size:13px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;color:var(--mute);margin:26px 4px 8px}
+.sect:first-child{margin-top:8px}
+.dayrow{display:flex;align-items:center;gap:12px;padding:12px 10px;border-top:1px solid var(--line)}
+.dayrow:first-child{border-top:0}
+.dayrow .dn{width:36px;font-weight:800;color:var(--mute);font-size:12px;text-transform:uppercase;letter-spacing:.4px}
+.dayrow .dt{flex:1;font-weight:600}
+.dayrow.now{background:rgba(239,68,68,.09);border-radius:12px;border-top-color:transparent}
+.dayrow.now+.dayrow{border-top-color:transparent}
+.dayrow.now .dn{color:var(--acc)}
+.tag{font-size:11px;font-weight:800;padding:3px 10px;border-radius:99px;background:#222a33;color:var(--mute)}
+.tag.lift{background:rgba(239,68,68,.16);color:#ff8f8f}
+.tag.run{background:rgba(251,146,60,.16);color:var(--acc2)}
+.pl{padding:0}
+.pl>summary{list-style:none;display:flex;align-items:center;gap:12px;padding:16px;cursor:pointer}
+.pl>summary::-webkit-details-marker{display:none}
+.pl .ttl{flex:1}
+.pl .ttl b{display:block;font-size:17px}
+.pl .ttl span{color:var(--mute);font-size:13px}
+.chev{color:var(--mute);font-size:22px;line-height:1;transition:transform .25s var(--ease)}
+details[open]>summary .chev{transform:rotate(90deg)}
+.pl .body{padding:0 16px 8px}
+.exr{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:12px 0;border-top:1px solid var(--line)}
+.exn{font-weight:600;line-height:1.3}
+.exn i{display:inline-block;font-style:normal;font-size:10px;color:var(--acc);border:1px solid rgba(239,68,68,.5);border-radius:99px;padding:1px 7px;margin-left:6px;font-weight:800;letter-spacing:.3px;vertical-align:middle}
+.exs{text-align:right;white-space:nowrap;font-weight:800}
+.exs small{display:block;color:var(--mute);font-weight:500;font-size:12px;margin-top:1px}
+.bul{margin:0;padding:0;list-style:none}
+.bul li{padding:10px 0 10px 22px;position:relative;color:var(--text);border-top:1px solid var(--line);font-size:15px}
+.bul li:first-child{border-top:0}
+.bul li::before{content:"";position:absolute;left:4px;top:17px;width:7px;height:7px;border-radius:50%;background:var(--acc)}
+.wkhead{display:flex;justify-content:space-between;align-items:baseline;margin:26px 4px 8px}
+.wkhead:first-child{margin-top:8px}
+.wkhead b{font-size:13px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;color:var(--mute)}
+.wkhead span{font-size:13px;color:var(--mute)}
+.wo{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--acc);border-radius:16px;margin:10px 0;overflow:hidden}
+.wo.run{border-left-color:var(--acc2)}
+.wo.yoga{border-left-color:var(--warn)}
+.wo>details>summary{list-style:none;display:flex;align-items:center;gap:14px;padding:14px;cursor:pointer}
+.wo>details>summary::-webkit-details-marker{display:none}
+.wdate{flex:none;width:46px;text-align:center;background:#0f1318;border:1px solid var(--line);border-radius:12px;padding:6px 0}
+.wdate small{display:block;font-size:10px;font-weight:800;color:var(--mute);text-transform:uppercase;letter-spacing:.5px}
+.wdate b{font-size:20px;line-height:1.1}
+.wmain{flex:1;min-width:0}
+.wt{font-weight:700;font-size:16px}
+.wm{color:var(--mute);font-size:13px;margin-top:2px}
+.wbody{padding:2px 14px 14px;border-top:1px solid var(--line)}
+.wex{padding:11px 0;border-top:1px solid var(--line)}
+.wex:first-child{border-top:0}
+.wex b{display:block;font-size:14px;margin-bottom:6px}
+.chips2{display:flex;flex-wrap:wrap;gap:6px}
+.sc{background:#0f1318;border:1px solid var(--line);border-radius:9px;padding:4px 9px;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
+.wnote{margin-top:10px;border-left:3px solid var(--line);padding:2px 0 2px 12px;color:var(--mute);font-size:14px;font-style:italic}
+.wsum{display:flex;gap:16px;color:var(--mute);font-size:13px;padding:10px 0 4px}
+.wsum b{color:var(--text)}
+.hero.doneh{background:linear-gradient(160deg,#2a1416,#171c22 65%);border-color:rgba(239,68,68,.55)}
+.chk{width:48px;height:48px;border-radius:50%;background:var(--acc);color:#fff;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;margin-bottom:12px;animation:badge .6s cubic-bezier(.3,1.7,.5,1);box-shadow:0 6px 20px rgba(239,68,68,.35)}
+.sum3{grid-template-columns:repeat(3,1fr);margin:14px 0 18px}
+.sum3 .stat b{font-size:22px}
+.donebar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:12px 14px}
+.donebar>span{color:var(--mute);font-size:13px;font-weight:700;margin-right:2px}
+.donebar em{font-style:normal;font-size:13px;font-weight:700;background:rgba(239,68,68,.14);color:#ff9a9a;border-radius:99px;padding:4px 11px}
 .kicker2{color:var(--mute);font-size:13px;font-weight:600;letter-spacing:.4px;text-transform:uppercase}
 .wbig{font-size:15px;color:var(--mute)}
 .wbig b{font-size:36px;color:var(--text);letter-spacing:-1px}
@@ -561,10 +623,18 @@ function render(){
   if(st.wk){ st.wk.anim=false; st.wk.just=null }
 }
 
+const MOODS=['😫','😕','😐','🙂','🔥'];
+function sessStats(x){
+  if(x.yoga) return [[x.yoga.minutes??'—','minutes']];
+  if(x.run){ const p=(x.run.distanceKm&&x.run.minutes)?x.run.minutes/x.run.distanceKm:null; return [[x.run.distanceKm??'—','km'],[x.run.minutes??'—','minutes'],[p?`${Math.floor(p)}:${String(Math.round((p%1)*60)).padStart(2,'0')}`:'—','/km']] }
+  let sets=0,vol=0; (x.entries||[]).forEach(e=>e.sets.forEach(t=>{sets++;vol+=(t.w||0)*(t.r||0)}));
+  return [[sets,'sets'],[vol>=1000?(vol/1000).toFixed(1)+'k':vol,'lb lifted'],[x.durationMin??'—','minutes']];
+}
 function viewToday(){
   if(st.wk) return viewWorkout();
   const base=sessBase(st.sess), S=PLAN.sessions[base], d=getDraft();
-  let h = weekStrip() + `<div class="card"><label class="f">Session</label><select id="sess" class="big">${SESS_KEYS.map(k=>`<option value="${k}" ${k===st.sess?'selected':''}>${esc(sessName(k))}</option>`).join('')}</select></div>`;
+  const dayDone = allSessions().filter(x=>x.date===st.date), lg = dayDone.find(x=>x.id===sid());
+  let h = weekStrip() + (dayDone.length ? `<div class="card donebar"><span>Logged ${st.date===todayStr()?'today':fmtDate(st.date)}</span>${dayDone.map(x=>`<em>✓ ${esc(x.name.split(' · ')[0])}</em>`).join('')}</div>` : '') + `<div class="card"><label class="f">Session</label><select id="sess" class="big">${SESS_KEYS.map(k=>`<option value="${k}" ${k===st.sess?'selected':''}>${esc(sessName(k))}</option>`).join('')}</select></div>`;
   if(S.type==='rest') return h+`<div class="empty">Rest day. Recover, eat, sleep. 😴</div>`;
   const steps=stepsFor(), resume=hasDraftData(d);
   const done = e => (e.run||e.yoga) ? (d.run.dist!==''||d.run.min!=='') : (d.ex[e.id]||[]).length>0;
@@ -574,6 +644,15 @@ function viewToday(){
     if(dl.recommended||d.deload) h += `<div class="card dl"><b>${d.deload?'Deload mode is on':'Deload week 🧘'}</b>
       <div class="note">${d.deload?'Targets are about 60% of your usual weights. Easy week, let your body catch up.':`You've trained ${dl.streak} weeks in a row. This week, drop to about 60% of your usual weights.`}</div>
       <div style="margin-top:10px"><button class="btn sm ${d.deload?'ghost':''}" data-act="deload">${d.deload?'Turn off':'Use deload weights'}</button></div></div>`;
+  }
+  if(lg){
+    const mood = lg.energy ? ` · feeling ${MOODS[lg.energy-1]}` : '';
+    h += `<div class="hero doneh"><div class="chk">✓</div><h2>${esc(sessName(st.sess))}</h2>
+      <div class="meta">Completed${st.date===todayStr()?' today':' on '+fmtDate(st.date)}${mood}</div>
+      <div class="sum sum3">${sessStats(lg).map(([b,l])=>`<div class="stat"><b>${b}</b><span>${l}</span></div>`).join('')}</div>
+      <button class="btn ghost" data-act="start" data-resume="1">View or edit workout</button>
+      <div class="note" style="margin-top:12px;text-align:center">Did something else too? Pick another session above.</div></div>`;
+    return h;
   }
   h += `<div class="hero"><h2>${esc(sessName(st.sess))}</h2>
     <div class="meta">${S.type==='run'?'Distance and time':S.type==='yoga'?'Class length':steps.length+' exercises'} · about ${mins} min</div>
@@ -698,14 +777,31 @@ function viewHistory(){
     <div class="note">${getToken()?'It will sync to GitHub when you are online.':'Turn on auto-sync in the Plan tab, or copy them and paste into chat.'}</div>
     <div class="tools2">${getToken()?`<button class="btn sm" data-act="sync">Sync now</button>`:''}<button class="btn ghost sm" data-act="copy">Copy unsynced</button></div></div>`;
   if(!all.length) return h+`<div class="empty">No workouts logged yet.<br>Log your first one on the Today tab.</div>`;
-  return h + all.map(s=>{
-    const loc = st.local.some(l=>l.id===s.id);
-    const sum = s.yoga ? `${s.yoga.minutes??'?'} min` : s.run ? `${s.run.distanceKm??'?'} km · ${s.run.minutes??'?'} min` : `${(s.entries||[]).length} exercises${s.durationMin?' · '+s.durationMin+' min':''}`;
-    const body = s.yoga ? `<div class="ln"><b>Hot yoga</b><span>${s.yoga.minutes??'—'} min</span></div>` : s.run ? `<div class="ln"><b>Run</b><span>${s.run.distanceKm??'—'} km in ${s.run.minutes??'—'} min${paceStr(s.run)}</span></div>`
-      : (s.entries||[]).map(e=>`<div class="ln"><b>${esc(e.name)}</b><span>${e.sets.map(fmtSet).join(', ')}</span></div>`).join('');
-    return `<div class="card hist"><details><summary><div class="top"><h3>${esc(s.name)}<span class="pill ${loc?'loc':''}">${loc?'local':'synced'}</span></h3><span class="d">${fmtDate(s.date)}</span></div>
-      <div class="d">${sum}${s.energy?' · energy '+s.energy+'/5':''}</div></summary>${body}${s.notes?`<div class="note" style="margin-top:8px">${esc(s.notes)}</div>`:''}</details></div>`;
-  }).join('');
+  const thisMon=monOf(todayStr()), lastMon=addDays(thisMon,-7), groups=new Map();
+  all.forEach(x=>{ const k=monOf(x.date); if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(x) });
+  const rng = m => { const f=d=>new Date(d+'T12:00:00').toLocaleDateString(undefined,{month:'short',day:'numeric'}); return f(m)+' – '+f(addDays(m,6)) };
+  groups.forEach((list,mon)=>{
+    const label = mon===thisMon ? 'This week' : mon===lastMon ? 'Last week' : rng(mon);
+    h += `<div class="wkhead"><b>${label}</b><span>${mon===thisMon||mon===lastMon?rng(mon)+' · ':''}${list.length} workout${list.length>1?'s':''}</span></div>`;
+    list.forEach(x=>{
+      const kind = x.yoga?'yoga':x.run?'run':'lift', loc = st.local.some(l=>l.id===x.id);
+      const dt = new Date(x.date+'T12:00:00');
+      const meta = x.yoga ? `${x.yoga.minutes??'?'} min` : x.run ? `${x.run.distanceKm??'?'} km · ${x.run.minutes??'?'} min${paceStr(x.run)}` : `${(x.entries||[]).length} exercises${x.durationMin?' · '+x.durationMin+' min':''}`;
+      const mood = x.energy ? ' · '+MOODS[x.energy-1] : '';
+      let body='';
+      if(kind==='lift'){
+        const st3=sessStats(x);
+        body += `<div class="wsum"><span><b>${st3[0][0]}</b> sets</span><span><b>${st3[1][0]}</b> lb lifted</span>${x.deload?'<span>deload week</span>':''}</div>`;
+        body += (x.entries||[]).map(e=>`<div class="wex"><b>${esc(e.name)}</b><div class="chips2">${e.sets.map(t=>`<span class="sc">${esc(fmtSet(t))}</span>`).join('')}</div></div>`).join('');
+      } else if(kind==='run'){
+        body += `<div class="wsum"><span><b>${x.run.distanceKm??'—'}</b> km</span><span><b>${x.run.minutes??'—'}</b> min</span>${paceStr(x.run)?`<span><b>${paceStr(x.run).replace(/[() ]/g,'')}</b></span>`:''}</div>`;
+      } else body += `<div class="wsum"><span><b>${x.yoga.minutes??'—'}</b> minutes of hot yoga</span></div>`;
+      if(x.notes) body += `<div class="wnote">${esc(x.notes)}</div>`;
+      h += `<div class="wo ${kind}"><details><summary><div class="wdate"><small>${dt.toLocaleDateString(undefined,{weekday:'short'})}</small><b>${dt.getDate()}</b></div>
+        <div class="wmain"><div class="wt">${esc(x.name)}${loc?'<span class="pill loc">local</span>':''}</div><div class="wm">${meta}${mood}</div></div><span class="chev">›</span></summary><div class="wbody">${body}</div></details></div>`;
+    });
+  });
+  return h;
 }
 const paceStr = r => (r.distanceKm&&r.minutes) ? (()=>{const p=r.minutes/r.distanceKm;return ` (${Math.floor(p)}:${String(Math.round((p%1)*60)).padStart(2,'0')}/km)`})() : '';
 
@@ -777,12 +873,20 @@ function syncCard(){
     <div class="tools2"><button class="btn sm" data-act="connect">Connect</button></div></div>`;
 }
 function viewPlan(){
-  const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  let h = `<div class="card"><h3 style="margin:0 0 6px">Week</h3><table>${[1,2,3,4,5,6,0].map(d=>`<tr><td>${days[d]}</td><td>${esc(d===6?'Run (optional)':PLAN.sessions[PLAN.week[d]].name)}</td></tr>`).join('')}</table></div>`;
-  ['upperA','lowerA','upperB','lowerB'].forEach(k=>{const s=PLAN.sessions[k];
-    h+=`<div class="card"><h3 style="margin:0 0 6px">${esc(s.name)}</h3>${s.ex.map(e=>`<div class="ln"><b>${esc(e.name)}</b><span>${e.sets} × ${e.reps[0]===e.reps[1]?e.reps[0]:e.reps[0]+'–'+e.reps[1]}</span></div>`).join('')}</div>`});
-  h+=`<div class="card"><h3 style="margin:0 0 6px">Progression</h3><div class="note">Work up to the top of the rep range on every set, then add 5 lb (2.5 lb on small lifts) and restart at the bottom. Leave 1–2 reps in reserve on most sets. Deload every 6th week (about 60% of normal weight).</div></div>`;
-  return h+`<details class="card set"><summary><b>Settings</b><span>Sync ${getToken()?'on':'off'} · Timer ${restOn()?'on':'off'}</span></summary><div style="margin-top:12px"><div class="row2"><div><b>Rest timer</b><div class="note">Counts down after each set</div></div><button class="btn sm ${restOn()?'':'ghost'}" data-act="resttoggle">${restOn()?'On':'Off'}</button></div><div class="sep"></div>${syncCard()}</div></details>`;
+  const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], todayDow=new Date(todayStr()+'T12:00:00').getDay();
+  const tag = t => t==='lift'?'<span class="tag lift">Lift</span>':t==='run'?'<span class="tag run">Run</span>':'<span class="tag">Rest</span>';
+  let h = `<div class="sect">This week</div><div class="card" style="padding:6px">${[1,2,3,4,5,6,0].map(d=>{
+    const opt = d===6, S=PLAN.sessions[PLAN.week[d]];
+    return `<div class="dayrow ${d===todayDow?'now':''}"><span class="dn">${days[d]}</span><span class="dt">${esc(opt?'Run · optional':S.name)}</span>${tag(opt?'run':S.type)}</div>`;
+  }).join('')}</div>`;
+  h += `<div class="sect">Workouts</div>`;
+  ['upperA','lowerA','upperB','lowerB'].forEach(k=>{
+    const S=PLAN.sessions[k];
+    h += `<details class="card pl"><summary><div class="ttl"><b>${esc(S.name)}</b><span>${S.ex.length} exercises · about ${S.ex.length*7} min</span></div><span class="chev">›</span></summary><div class="body">${S.ex.map(e=>`<div class="exr"><div class="exn">${esc(e.name)}${/Main lift/.test(e.note||'')?'<i>MAIN</i>':''}</div><div class="exs">${e.sets} × ${e.reps[0]===e.reps[1]?e.reps[0]:e.reps[0]+'–'+e.reps[1]}<small>rest ${e.rest}</small></div></div>`).join('')}</div></details>`;
+  });
+  h += `<details class="card pl"><summary><div class="ttl"><b>Running build-up</b><span>Tuesday, plus Saturday if you feel like it</span></div><span class="chev">›</span></summary><div class="body"><ul class="bul" style="margin-bottom:6px"><li><b>Weeks 1–2:</b> 20–25 min easy</li><li><b>Weeks 3–4:</b> 30 min easy</li><li><b>Weeks 5–8:</b> build to 40–45 min, add one interval session (6 × 2 min hard / 2 min easy)</li></ul></div></details>`;
+  h += `<div class="sect">How to progress</div><div class="card" style="padding:6px 16px"><ul class="bul"><li>Work up to the top of the rep range on every set, then add 5 lb (2.5 on small lifts) and start back at the bottom.</li><li>Leave 1–2 reps in reserve on most sets.</li><li>Take a deload week about every 6th week, at roughly 60% of your usual weights.</li><li>Tap ⇄ Swap on any exercise to use an alternative. Each one keeps its own history.</li></ul></div>`;
+  return h+`<div class="sect">Settings</div><details class="card set"><summary><b>Settings</b><span>Sync ${getToken()?'on':'off'} · Timer ${restOn()?'on':'off'}</span></summary><div style="margin-top:12px"><div class="row2"><div><b>Rest timer</b><div class="note">Counts down after each set</div></div><button class="btn sm ${restOn()?'':'ghost'}" data-act="resttoggle">${restOn()?'On':'Off'}</button></div><div class="sep"></div>${syncCard()}</div></details>`;
 }
 
 /* ---------- events ---------- */
