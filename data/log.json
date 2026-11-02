@@ -91,8 +91,8 @@
     ]
    },
    {
-    "id": "pushdown",
-    "name": "Triceps pushdown",
+    "id": "pushdown~seated-triceps-press-machine",
+    "name": "Seated triceps press machine",
     "sets": [
      {
       "w": 140,
@@ -106,7 +106,8 @@
       "w": 160,
       "r": 12
      }
-    ]
+    ],
+    "slot": "pushdown"
    },
    {
     "id": "db-curl",

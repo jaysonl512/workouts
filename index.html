@@ -169,6 +169,9 @@ table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:6px 4px;b
 @keyframes fade{from{opacity:0}}
 .dl{border-color:#5a4a14;background:#221d0d}
 .tools2{display:flex;gap:8px;margin-top:10px}
+.row2{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.row2 .btn{flex:none;min-width:64px}
+.sep{height:1px;background:var(--line);margin:14px 0}
 .set summary{list-style:none;display:flex;justify-content:space-between;align-items:center;cursor:pointer}
 .set summary::-webkit-details-marker{display:none}
 .set summary span{color:var(--mute);font-size:14px}
@@ -208,7 +211,6 @@ const PLAN = {
       {id:'row',name:'Chest-supported / barbell row',sets:4,reps:[6,10],rest:'2 min'},
       {id:'ohp-db',name:'Seated dumbbell shoulder press',sets:3,reps:[8,10],rest:'90 sec'},
       {id:'pulldown',name:'Lat pulldown / pull-ups',sets:3,reps:[8,12],rest:'90 sec'},
-      {id:'lat-raise',name:'Lateral raise',sets:3,reps:[12,15],rest:'60 sec',small:1},
       {id:'pushdown',name:'Triceps pushdown',sets:2,reps:[10,12],rest:'60 sec',small:1},
       {id:'db-curl',name:'Dumbbell curl',sets:2,reps:[10,12],rest:'60 sec',small:1}]},
     lowerA:{name:'Lower A · squat',type:'lift',ex:[
@@ -253,8 +255,7 @@ const ALTS = {
   row:['Seated cable row','T-bar row','One-arm dumbbell row'],
   'ohp-db':['Machine shoulder press','Arnold press','Barbell overhead press'],
   pulldown:['Pull-ups','Assisted pull-ups','Close-grip pulldown'],
-  'lat-raise':['Cable lateral raise','Machine lateral raise'],
-  pushdown:['Rope pushdown','Overhead triceps extension','Dips'],
+  pushdown:['Seated triceps press machine','Rope pushdown','Overhead triceps extension','Dips'],
   'db-curl':['EZ-bar curl','Cable curl','Hammer curl'],
   squat:['Leg press','Hack squat','Goblet squat','Smith machine squat'],
   rdl:['Dumbbell RDL','Good morning','Back extension'],
@@ -268,7 +269,7 @@ const ALTS = {
   fly:['Pec deck','Dumbbell fly','Cable crossover'],
   rear:['Face pull','Reverse pec deck','Rear delt cable fly'],
   'ss-curl':['Dumbbell curl','Cable curl','Preacher curl'],
-  'ss-tri':['Triceps pushdown','Skull crushers','Dips'],
+  'ss-tri':['Seated triceps press machine','Triceps pushdown','Skull crushers','Dips'],
   deadlift:['Trap-bar deadlift','Rack pull','Sumo deadlift'],
   'front-sq':['Hack squat','Leg press','Goblet squat'],
   'hip-thrust':['Glute bridge','Cable pull-through','Back extension'],
@@ -434,6 +435,7 @@ function weekStats(mon){
 
 /* ---------- GitHub sync ---------- */
 const getToken = () => LS('wt.token','');
+const restOn = () => LS('wt.rest', false);
 const b64enc = str => { const bytes=new TextEncoder().encode(str); let bin=''; for(let i=0;i<bytes.length;i+=8192) bin+=String.fromCharCode(...bytes.subarray(i,i+8192)); return btoa(bin) };
 const b64dec = b64 => new TextDecoder().decode(Uint8Array.from(atob(b64.replace(/\s/g,'')),c=>c.charCodeAt(0)));
 const ghHeaders = tok => ({Authorization:'Bearer '+tok, Accept:'application/vnd.github+json'});
@@ -538,7 +540,7 @@ function logSet(){
   wk.editing=null; wk.just=idx;
   if(isPR){ wk.prs[e.id]=true; burstAt(btn,44); buzz([30,40,30]); toast('New PR 🏆') }
   else { burstAt(btn,10); buzz(15); toast(CHEERS[Math.floor(Math.random()*CHEERS.length)]) }
-  if(!wasEdit && a.length<e.sets) startRest(restSecs(e.rest)); else clearRest();
+  if(!wasEdit && a.length<e.sets && restOn()) startRest(restSecs(e.rest)); else clearRest();
   wk.cur={w,r};
   render();
   const nb=$('#logBtn'); if(nb){nb.classList.add('ok')}
@@ -779,7 +781,7 @@ function viewPlan(){
   ['upperA','lowerA','upperB','lowerB'].forEach(k=>{const s=PLAN.sessions[k];
     h+=`<div class="card"><h3 style="margin:0 0 6px">${esc(s.name)}</h3>${s.ex.map(e=>`<div class="ln"><b>${esc(e.name)}</b><span>${e.sets} × ${e.reps[0]===e.reps[1]?e.reps[0]:e.reps[0]+'–'+e.reps[1]}</span></div>`).join('')}</div>`});
   h+=`<div class="card"><h3 style="margin:0 0 6px">Progression</h3><div class="note">Work up to the top of the rep range on every set, then add 5 lb (2.5 lb on small lifts) and restart at the bottom. Leave 1–2 reps in reserve on most sets. Deload every 6th week (about 60% of normal weight).</div></div>`;
-  return h+`<details class="card set"><summary><b>Settings</b><span>GitHub sync: ${getToken()?'on':'off'}</span></summary><div style="margin-top:12px">${syncCard()}</div></details>`;
+  return h+`<details class="card set"><summary><b>Settings</b><span>Sync ${getToken()?'on':'off'} · Timer ${restOn()?'on':'off'}</span></summary><div style="margin-top:12px"><div class="row2"><div><b>Rest timer</b><div class="note">Counts down after each set</div></div><button class="btn sm ${restOn()?'':'ghost'}" data-act="resttoggle">${restOn()?'On':'Off'}</button></div><div class="sep"></div>${syncCard()}</div></details>`;
 }
 
 /* ---------- events ---------- */
@@ -850,6 +852,7 @@ app.addEventListener('click',e=>{
   else if(act==='connect') connectToken();
   else if(act==='disconnect'){ try{localStorage.removeItem('wt.token')}catch(err){} toast('Disconnected'); render() }
   else if(act==='sync') syncNow(true);
+  else if(act==='resttoggle'){ SS('wt.rest',!restOn()); if(restOn()===false) clearRest(); render() }
   else if(act==='save') save();
   else if(act==='copy') copyUnsynced();
 });
