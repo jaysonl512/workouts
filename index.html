@@ -14,16 +14,18 @@
 <style>
 :root{--bg:#0f1216;--card:#171c22;--line:#262d36;--text:#e8edf2;--mute:#8b97a5;--acc:#ef4444;--acc2:#fb923c;--warn:#fbbf24;--r:16px;--ease:cubic-bezier(.2,.9,.3,1)}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;background:var(--bg);color:var(--text);font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;touch-action:manipulation;-webkit-text-size-adjust:100%;overscroll-behavior-y:none;-webkit-touch-callout:none}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;touch-action:manipulation;-webkit-text-size-adjust:100%;overscroll-behavior-y:none;-webkit-touch-callout:none}
 body{-webkit-user-select:none;user-select:none}
 input,textarea{-webkit-user-select:text;user-select:text}
 header{padding:calc(20px + env(safe-area-inset-top)) 20px 10px;max-width:640px;margin:0 auto}
 header h1{font-size:32px;font-weight:800;margin:0;letter-spacing:-.8px;line-height:1.1}
 header span{display:block;color:var(--mute);font-size:14px;margin-top:4px;min-height:20px}
 body.wk header{display:none}
-main{padding:6px 16px 130px;max-width:640px;margin:0 auto}
+#shell{position:fixed;inset:0;display:flex;flex-direction:column;background:var(--bg)}
+#scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain}
+main{padding:6px 16px 28px;max-width:640px;margin:0 auto}
 body.wk main{padding-top:calc(12px + env(safe-area-inset-top));padding-bottom:calc(24px + env(safe-area-inset-bottom))}
-nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:#0c0f13;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:5}
+nav{flex:none;display:flex;background:#0c0f13;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:5}
 body.wk nav{display:none}
 nav button{flex:1;position:relative;display:flex;flex-direction:column;align-items:center;gap:5px;background:none;border:0;color:var(--mute);padding:12px 0 10px;font-size:12px;font-weight:700;letter-spacing:.2px;transition:color .2s}
 nav button svg{width:27px;height:27px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;transition:transform .25s var(--ease)}
@@ -180,14 +182,17 @@ table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:6px 4px;b
 </style>
 </head>
 <body>
+<div id="shell"><div id="scroll">
 <header><h1 id="ttl">Today</h1><span id="sub"></span></header>
 <main id="app"></main>
+</div>
 <nav>
   <button data-tab="today"><svg viewBox="0 0 24 24"><path d="M6.5 6.5v11M17.5 6.5v11M3.5 9v6M20.5 9v6M6.5 12h11"/></svg>Today</button>
   <button data-tab="history"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>History</button>
   <button data-tab="progress"><svg viewBox="0 0 24 24"><path d="M4 4v16h16M8 15l4-4 3 3 5-6"/></svg>Progress</button>
   <button data-tab="plan"><svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></svg>Plan</button>
 </nav>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -276,6 +281,7 @@ Object.values(PLAN.sessions).forEach(S=>(S.ex||[]).forEach(e=>{
 
 /* ---------- helpers ---------- */
 const $ = s => document.querySelector(s);
+const toTop = () => { const el=document.getElementById('scroll'); if(el) el.scrollTop=0 };
 const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const LS = (k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}};
 const SS = (k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
@@ -484,13 +490,13 @@ function startWorkout(resume){
   let first=0;
   if(resume){ const i=steps.findIndex(e=>!e.run && (d.ex[e.id]||[]).length<e.sets); first = i<0? steps.length : i }
   st.wk={step:first,dir:1,anim:true,editing:null,just:null,rest:null,cur:null,prs:{}};
-  initCur(); document.body.classList.add('wk'); render(); scrollTo(0,0);
+  initCur(); document.body.classList.add('wk'); render(); toTop();
 }
-function exitWorkout(){ clearRest(); st.wk=null; document.body.classList.remove('wk'); render(); scrollTo(0,0) }
+function exitWorkout(){ clearRest(); st.wk=null; document.body.classList.remove('wk'); render(); toTop() }
 function goStep(i,dir){
   const steps=stepsFor(); const n=steps.length;
   st.wk.step=Math.max(0,Math.min(n,i)); st.wk.dir=dir; st.wk.anim=true; st.wk.editing=null; st.wk.just=null;
-  clearRest(); initCur(); render(); scrollTo(0,0);
+  clearRest(); initCur(); render(); toTop();
 }
 function initCur(){
   const e=stepsFor()[st.wk.step]; if(!e||e.run){st.wk.cur=null;return}
@@ -763,7 +769,7 @@ function viewPlan(){
 }
 
 /* ---------- events ---------- */
-document.querySelector('nav').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;st.tab=b.dataset.tab;render();scrollTo(0,0)});
+document.querySelector('nav').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;st.tab=b.dataset.tab;render();toTop()});
 const app=$('#app');
 app.addEventListener('change',e=>{
   const t=e.target;
@@ -858,7 +864,7 @@ function save(){
   st.local=st.local.filter(x=>x.id!==rec.id); st.local.push(rec); SS('wt.local.v1',st.local);
   delete st.draft[rec.id]; saveDraft();
   clearRest(); st.wk=null; st.tab='history';
-  setTimeout(()=>{render();scrollTo(0,0);toast('Saved 🎉'); if(getToken()) setTimeout(()=>syncNow(),900)},350);
+  setTimeout(()=>{render();toTop();toast('Saved 🎉'); if(getToken()) setTimeout(()=>syncNow(),900)},350);
 }
 async function copyUnsynced(){
   const txt='Log these workouts into the tracker repo:\n'+JSON.stringify(st.local,null,1);
