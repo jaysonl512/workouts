@@ -535,6 +535,7 @@ function logSet(){
   const idx = wk.editing!=null ? wk.editing : a.length;
   const prior = Math.max(bestEver(e.id), ...a.filter((_,i)=>i!==idx).map(x=>x.w||0), 0);
   const isPR = w>0 && prior>0 && w>prior;
+  const nowT=Date.now(); if(!d.firstAt) d.firstAt=nowT; d.lastAt=nowT;
   a[idx]={w,r}; saveDraft();
   const wasEdit = wk.editing!=null;
   wk.editing=null; wk.just=idx;
@@ -675,7 +676,7 @@ function viewSummary(cls){
   const d=getDraft(), steps=stepsFor();
   let sets=0,vol=0,prs=Object.keys(st.wk.prs).length;
   steps.forEach(e=>{ (d.ex[e.id]||[]).forEach(s=>{sets++;vol+=(s.w||0)*(s.r||0)}) });
-  const mins=d.startedAt?Math.max(1,Math.round((Date.now()-d.startedAt)/60000)):null;
+  const mins=(d.firstAt&&d.lastAt)?Math.max(1,Math.round((d.lastAt-d.firstAt)/60000)):null;
   const isRun=steps[0]&&steps[0].run, isYoga=steps[0]&&steps[0].yoga;
   const stats = isYoga ? [[d.run.min||'—','minutes']] : isRun
     ? [[d.run.dist||'—','km'],[d.run.min||'—','minutes']]
@@ -861,7 +862,7 @@ function save(){
   const base=sessBase(st.sess), S=PLAN.sessions[base], d=getDraft();
   const rec={id:sid(), date:st.date, session:st.sess, name:sessName(st.sess), type:S.type,
     energy:num(d.energy), notes:(d.notes||'').trim()||undefined, savedAt:new Date().toISOString()};
-  if(d.startedAt){const m=Math.round((Date.now()-d.startedAt)/60000); if(m>0&&m<300) rec.durationMin=m}
+  if(S.type==='lift' && d.firstAt && d.lastAt){const m=Math.max(1,Math.round((d.lastAt-d.firstAt)/60000)); if(m<300) rec.durationMin=m}
   if(S.type==='yoga'){
     const min=num(d.run.min);
     if(min==null) return toast('Enter the class length');
