@@ -28,5 +28,6 @@ A small static web app for tracking workouts: weight and reps for every set, run
 ```
 
 Runs use `"type": "run"` and `"run": { "distanceKm": 5, "minutes": 30 }` instead of `entries`.
+Hot yoga uses `"type": "yoga"` and `"yoga": { "minutes": 60 }`; it is tracked separately and does not count toward the 5 planned weekly sessions.
 Weights are in lb. The `id` is `date-session`, and a later entry with the same `id` replaces the earlier one.
-Session keys: `upperA`, `lowerA`, `upperB`, `lowerB`, `run`, `run2`.
+Session keys: `upperA`, `lowerA`, `upperB`, `lowerB`, `run`, `run2`, `yoga`.
