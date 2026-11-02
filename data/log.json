@@ -1,1 +1,127 @@
-[]
+[
+ {
+  "id": "2026-11-02-upperA",
+  "date": "2026-11-02",
+  "session": "upperA",
+  "name": "Upper A · heavy",
+  "type": "lift",
+  "energy": 3,
+  "notes": "Skipped lateral raises. Can’t do them due to a pinching nerve",
+  "savedAt": "2026-11-02T20:37:33.312Z",
+  "durationMin": 51,
+  "entries": [
+   {
+    "id": "bench",
+    "name": "Bench press",
+    "sets": [
+     {
+      "w": 55,
+      "r": 8
+     },
+     {
+      "w": 60,
+      "r": 8
+     },
+     {
+      "w": 65,
+      "r": 8
+     },
+     {
+      "w": 70,
+      "r": 5
+     }
+    ]
+   },
+   {
+    "id": "row",
+    "name": "Chest-supported / barbell row",
+    "sets": [
+     {
+      "w": 95,
+      "r": 10
+     },
+     {
+      "w": 115,
+      "r": 10
+     },
+     {
+      "w": 135,
+      "r": 8
+     },
+     {
+      "w": 140,
+      "r": 7
+     }
+    ]
+   },
+   {
+    "id": "ohp-db",
+    "name": "Seated dumbbell shoulder press",
+    "sets": [
+     {
+      "w": 35,
+      "r": 10
+     },
+     {
+      "w": 47.5,
+      "r": 8
+     },
+     {
+      "w": 50,
+      "r": 7
+     }
+    ]
+   },
+   {
+    "id": "pulldown",
+    "name": "Lat pulldown / pull-ups",
+    "sets": [
+     {
+      "w": 115,
+      "r": 12
+     },
+     {
+      "w": 130,
+      "r": 9
+     },
+     {
+      "w": 135,
+      "r": 8
+     }
+    ]
+   },
+   {
+    "id": "pushdown",
+    "name": "Triceps pushdown",
+    "sets": [
+     {
+      "w": 140,
+      "r": 12
+     },
+     {
+      "w": 155,
+      "r": 12
+     },
+     {
+      "w": 160,
+      "r": 12
+     }
+    ]
+   },
+   {
+    "id": "db-curl",
+    "name": "Dumbbell curl",
+    "sets": [
+     {
+      "w": 32.5,
+      "r": 12
+     },
+     {
+      "w": 32.5,
+      "r": 10
+     }
+    ]
+   }
+  ]
+ }
+]
