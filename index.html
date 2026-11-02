@@ -237,6 +237,19 @@ details[open]>summary .chev{transform:rotate(90deg)}
 .donebar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:12px 14px}
 .donebar>span{color:var(--mute);font-size:13px;font-weight:700;margin-right:2px}
 .donebar em{font-style:normal;font-size:13px;font-weight:700;background:rgba(239,68,68,.14);color:#ff9a9a;border-radius:99px;padding:4px 11px}
+.schhd{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin:18px 4px 8px}
+.schhd b{font-size:13px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;color:var(--mute)}
+.schhd span{font-size:13px;color:var(--mute);text-align:right}
+.schips{display:flex;gap:8px;overflow-x:auto;margin:0 -16px 4px;padding:2px 16px 8px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.schips::-webkit-scrollbar{display:none}
+.sch{flex:none;border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:99px;padding:11px 17px;font-size:15px;font-weight:700;white-space:nowrap}
+.sch.on{background:var(--acc);border-color:var(--acc);color:#fff;box-shadow:0 4px 16px rgba(239,68,68,.3)}
+.sch.done:not(.on){border-color:rgba(239,68,68,.45);color:#ff9a9a}
+.recap{margin:4px 0 2px;border-top:1px solid rgba(255,255,255,.08)}
+.recap>summary{list-style:none;display:flex;justify-content:space-between;align-items:center;padding:14px 0;cursor:pointer;font-weight:700}
+.recap>summary::-webkit-details-marker{display:none}
+.recap .wbody{padding:0 0 4px;border-top:0}
+.editlink{display:block;margin:6px auto 0;background:none;border:0;color:var(--mute);font-size:14px;text-decoration:underline;padding:10px}
 .kicker2{color:var(--mute);font-size:13px;font-weight:600;letter-spacing:.4px;text-transform:uppercase}
 .wbig{font-size:15px;color:var(--mute)}
 .wbig b{font-size:36px;color:var(--text);letter-spacing:-1px}
@@ -429,20 +442,18 @@ function bestEver(exId){
 
 /* ---------- draft ---------- */
 function getDraft(){
-  const id=sid();
-  if(!st.draft[id]){
-    const ex = allSessions().find(s=>s.id===id);
-    st.draft[id] = ex ? fromSession(ex) : {ex:{},energy:'',notes:'',run:{dist:'',min:''},swaps:{},deload:false};
-  }
+  const id=sid(), ex=allSessions().find(s=>s.id===id);
+  // A draft the user has not touched is rebuilt from the saved session, so a log that loads after first render is never hidden by an empty cached draft.
+  if(!st.draft[id] || (ex && !st.draft[id].touched)) st.draft[id] = ex ? fromSession(ex) : {ex:{},energy:'',notes:'',run:{dist:'',min:''},swaps:{},deload:false};
   st.draft[id].swaps ||= {};
   return st.draft[id];
 }
 function fromSession(s){
-  const d={ex:{},energy:s.energy??'',notes:s.notes||'',run:{dist:s.run?.distanceKm??'',min:s.run?.minutes??s.yoga?.minutes??''},swaps:{},deload:!!s.deload};
+  const d={ex:{},energy:s.energy??'',notes:s.notes||'',run:{dist:s.run?.distanceKm??'',min:s.run?.minutes??s.yoga?.minutes??''},swaps:{},deload:!!s.deload,dur:s.durationMin,savedAt:s.savedAt};
   (s.entries||[]).forEach(e=>{d.ex[e.id]=e.sets.map(x=>({w:x.w??0,r:x.r})); if(e.slot) d.swaps[e.slot]=e.id});
   return d;
 }
-const saveDraft = () => SS('wt.draft.v1', st.draft);
+const saveDraft = () => { const d0=st.draft[sid()]; if(d0) d0.touched=true; SS('wt.draft.v1', st.draft) };
 const hasDraftData = d => d.run.dist!==''||d.run.min!==''||Object.values(d.ex).some(a=>a.length);
 
 /* ---------- smart targets, deload, weekly stats ---------- */
@@ -630,11 +641,20 @@ function sessStats(x){
   let sets=0,vol=0; (x.entries||[]).forEach(e=>e.sets.forEach(t=>{sets++;vol+=(t.w||0)*(t.r||0)}));
   return [[sets,'sets'],[vol>=1000?(vol/1000).toFixed(1)+'k':vol,'lb lifted'],[x.durationMin??'—','minutes']];
 }
+function sessionChips(dayDone){
+  const planned = defaultSession(st.date), done = new Set(dayDone.map(x=>x.session));
+  const label = k => k==='run2' ? (planned==='run2'?'Run':'Run #2') : k==='yoga' ? 'Hot yoga' : PLAN.sessions[k].name.split(' · ')[0];
+  const keys=[planned]; ['run','yoga','upperA','lowerA','upperB','lowerB'].forEach(k=>{ if(!keys.includes(k)) keys.push(k) });
+  if(!keys.includes('run2') && (done.has('run')||done.has('run2')||st.sess==='run2')) keys.splice(keys.indexOf('run')+1,0,'run2');
+  const pn = planned==='rest' ? 'Rest day' : sessName(planned);
+  return `<div class="schhd"><b>${st.date===todayStr()?"Today's plan":'Plan for '+fmtDate(st.date)}</b><span>${esc(pn)}</span></div>
+    <div class="schips">${keys.map(k=>`<button class="sch ${k===st.sess?'on':''} ${done.has(k)?'done':''}" data-act="sess" data-k="${k}">${esc(label(k))}${done.has(k)?' ✓':''}</button>`).join('')}</div>`;
+}
 function viewToday(){
   if(st.wk) return viewWorkout();
   const base=sessBase(st.sess), S=PLAN.sessions[base], d=getDraft();
   const dayDone = allSessions().filter(x=>x.date===st.date), lg = dayDone.find(x=>x.id===sid());
-  let h = weekStrip() + (dayDone.length ? `<div class="card donebar"><span>Logged ${st.date===todayStr()?'today':fmtDate(st.date)}</span>${dayDone.map(x=>`<em>✓ ${esc(x.name.split(' · ')[0])}</em>`).join('')}</div>` : '') + `<div class="card"><label class="f">Session</label><select id="sess" class="big">${SESS_KEYS.map(k=>`<option value="${k}" ${k===st.sess?'selected':''}>${esc(sessName(k))}</option>`).join('')}</select></div>`;
+  let h = weekStrip() + sessionChips(dayDone) ;
   if(S.type==='rest') return h+`<div class="empty">Rest day. Recover, eat, sleep. 😴</div>`;
   const steps=stepsFor(), resume=hasDraftData(d);
   const done = e => (e.run||e.yoga) ? (d.run.dist!==''||d.run.min!=='') : (d.ex[e.id]||[]).length>0;
@@ -650,8 +670,8 @@ function viewToday(){
     h += `<div class="hero doneh"><div class="chk">✓</div><h2>${esc(sessName(st.sess))}</h2>
       <div class="meta">Completed${st.date===todayStr()?' today':' on '+fmtDate(st.date)}${mood}</div>
       <div class="sum sum3">${sessStats(lg).map(([b,l])=>`<div class="stat"><b>${b}</b><span>${l}</span></div>`).join('')}</div>
-      <button class="btn ghost" data-act="start" data-resume="1">View or edit workout</button>
-      <div class="note" style="margin-top:12px;text-align:center">Did something else too? Pick another session above.</div></div>`;
+      <details class="recap"><summary><span>Workout details</span><span class="chev">›</span></summary><div class="wbody">${woBody(lg, lg.yoga?'yoga':lg.run?'run':'lift')}</div></details>
+      <button class="editlink" data-act="edit">Edit this workout</button></div>`;
     return h;
   }
   h += `<div class="hero"><h2>${esc(sessName(st.sess))}</h2>
@@ -755,7 +775,7 @@ function viewSummary(cls){
   const d=getDraft(), steps=stepsFor();
   let sets=0,vol=0,prs=Object.keys(st.wk.prs).length;
   steps.forEach(e=>{ (d.ex[e.id]||[]).forEach(s=>{sets++;vol+=(s.w||0)*(s.r||0)}) });
-  const mins=(d.firstAt&&d.lastAt)?Math.max(1,Math.round((d.lastAt-d.firstAt)/60000)):null;
+  const mins=(d.firstAt&&d.lastAt)?Math.max(1,Math.round((d.lastAt-d.firstAt)/60000)):(d.dur||null);
   const isRun=steps[0]&&steps[0].run, isYoga=steps[0]&&steps[0].yoga;
   const stats = isYoga ? [[d.run.min||'—','minutes']] : isRun
     ? [[d.run.dist||'—','km'],[d.run.min||'—','minutes']]
@@ -770,6 +790,18 @@ function viewSummary(cls){
     <div class="nav3"><button class="btn ghost sm" data-act="back">‹ Back</button></div></div>`;
 }
 
+function woBody(x,kind){
+  let body='';
+  if(kind==='lift'){
+    const st3=sessStats(x);
+    body += `<div class="wsum"><span><b>${st3[0][0]}</b> sets</span><span><b>${st3[1][0]}</b> lb lifted</span>${x.deload?'<span>deload week</span>':''}</div>`;
+    body += (x.entries||[]).map(e=>`<div class="wex"><b>${esc(e.name)}</b><div class="chips2">${e.sets.map(t=>`<span class="sc">${esc(fmtSet(t))}</span>`).join('')}</div></div>`).join('');
+  } else if(kind==='run'){
+    body += `<div class="wsum"><span><b>${x.run.distanceKm??'—'}</b> km</span><span><b>${x.run.minutes??'—'}</b> min</span>${paceStr(x.run)?`<span><b>${paceStr(x.run).replace(/[() ]/g,'')}</b></span>`:''}</div>`;
+  } else body += `<div class="wsum"><span><b>${x.yoga.minutes??'—'}</b> minutes of hot yoga</span></div>`;
+  if(x.notes) body += `<div class="wnote">${esc(x.notes)}</div>`;
+  return body;
+}
 function viewHistory(){
   const all = allSessions(), unsynced = st.local.length;
   let h = '';
@@ -788,15 +820,7 @@ function viewHistory(){
       const dt = new Date(x.date+'T12:00:00');
       const meta = x.yoga ? `${x.yoga.minutes??'?'} min` : x.run ? `${x.run.distanceKm??'?'} km · ${x.run.minutes??'?'} min${paceStr(x.run)}` : `${(x.entries||[]).length} exercises${x.durationMin?' · '+x.durationMin+' min':''}`;
       const mood = x.energy ? ' · '+MOODS[x.energy-1] : '';
-      let body='';
-      if(kind==='lift'){
-        const st3=sessStats(x);
-        body += `<div class="wsum"><span><b>${st3[0][0]}</b> sets</span><span><b>${st3[1][0]}</b> lb lifted</span>${x.deload?'<span>deload week</span>':''}</div>`;
-        body += (x.entries||[]).map(e=>`<div class="wex"><b>${esc(e.name)}</b><div class="chips2">${e.sets.map(t=>`<span class="sc">${esc(fmtSet(t))}</span>`).join('')}</div></div>`).join('');
-      } else if(kind==='run'){
-        body += `<div class="wsum"><span><b>${x.run.distanceKm??'—'}</b> km</span><span><b>${x.run.minutes??'—'}</b> min</span>${paceStr(x.run)?`<span><b>${paceStr(x.run).replace(/[() ]/g,'')}</b></span>`:''}</div>`;
-      } else body += `<div class="wsum"><span><b>${x.yoga.minutes??'—'}</b> minutes of hot yoga</span></div>`;
-      if(x.notes) body += `<div class="wnote">${esc(x.notes)}</div>`;
+      const body = woBody(x,kind);
       h += `<div class="wo ${kind}"><details><summary><div class="wdate"><small>${dt.toLocaleDateString(undefined,{weekday:'short'})}</small><b>${dt.getDate()}</b></div>
         <div class="wmain"><div class="wt">${esc(x.name)}${loc?'<span class="pill loc">local</span>':''}</div><div class="wm">${meta}${mood}</div></div><span class="chev">›</span></summary><div class="wbody">${body}</div></details></div>`;
     });
@@ -918,6 +942,8 @@ app.addEventListener('click',e=>{
   const act=b.dataset.act, wk=st.wk;
   if(act==='day'){ st.date=b.dataset.d; st.sess=defaultSession(st.date); render() }
   else if(act==='wk'){ st.date=addDays(st.date,+b.dataset.n); st.sess=defaultSession(st.date); render() }
+  else if(act==='sess'){ st.sess=b.dataset.k; render() }
+  else if(act==='edit') startWorkout(false);
   else if(act==='start') startWorkout(b.dataset.resume==='1');
   else if(act==='exit') exitWorkout();
   else if(act==='jump') goStep(+b.dataset.i, +b.dataset.i>=wk.step?1:-1);
@@ -966,7 +992,8 @@ function save(){
   const base=sessBase(st.sess), S=PLAN.sessions[base], d=getDraft();
   const rec={id:sid(), date:st.date, session:st.sess, name:sessName(st.sess), type:S.type,
     energy:num(d.energy), notes:(d.notes||'').trim()||undefined, savedAt:new Date().toISOString()};
-  if(S.type==='lift' && d.firstAt && d.lastAt){const m=Math.max(1,Math.round((d.lastAt-d.firstAt)/60000)); if(m<300) rec.durationMin=m}
+  if(S.type==='lift'){ if(d.firstAt && d.lastAt){const m=Math.max(1,Math.round((d.lastAt-d.firstAt)/60000)); if(m<300) rec.durationMin=m} else if(d.dur) rec.durationMin=d.dur }
+  if(d.savedAt) rec.savedAt=d.savedAt;
   if(S.type==='yoga'){
     const min=num(d.run.min);
     if(min==null) return toast('Enter the class length');
