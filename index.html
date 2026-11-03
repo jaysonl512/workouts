@@ -285,35 +285,35 @@ const PLAN = {
   week: {1:'upperA',2:'run',3:'lowerA',4:'upperB',5:'lowerB',6:'run',0:'rest'},
   sessions: {
     upperA:{name:'Upper A · heavy',type:'lift',ex:[
-      {id:'bench',name:'Bench press',sets:4,reps:[5,8],rest:'2-3 min',note:'Main lift (barbell or dumbbell)'},
-      {id:'row',name:'Chest-supported / barbell row',sets:4,reps:[6,10],rest:'2 min'},
-      {id:'ohp-db',name:'Seated dumbbell shoulder press',sets:3,reps:[8,10],rest:'90 sec'},
-      {id:'pulldown',name:'Lat pulldown / pull-ups',sets:3,reps:[8,12],rest:'90 sec'},
-      {id:'pushdown',name:'Triceps pushdown',sets:2,reps:[10,12],rest:'60 sec',small:1},
-      {id:'db-curl',name:'Dumbbell curl',sets:2,reps:[10,12],rest:'60 sec',small:1}]},
+      {id:'bench',name:'Bench press',sets:4,reps:[5,8],rest:'2 min',note:'Main lift (barbell or dumbbell)'},
+      {id:'row',name:'Chest-supported / barbell row',sets:4,reps:[6,10],rest:'90 sec'},
+      {id:'ohp-db',name:'Seated dumbbell shoulder press',sets:3,reps:[8,10],rest:'75 sec'},
+      {id:'pulldown',name:'Lat pulldown / pull-ups',sets:3,reps:[8,12],rest:'75 sec'},
+      {id:'pushdown',name:'Triceps pushdown',sets:2,reps:[10,12],rest:'45 sec',small:1},
+      {id:'db-curl',name:'Dumbbell curl',sets:2,reps:[10,12],rest:'45 sec',small:1}]},
     lowerA:{name:'Lower A · squat',type:'lift',ex:[
-      {id:'squat',name:'Back squat / leg press',sets:4,reps:[5,8],rest:'2-3 min',note:'Main lift'},
-      {id:'rdl',name:'Romanian deadlift',sets:3,reps:[8,10],rest:'2 min'},
-      {id:'lunge',name:'Walking lunge / Bulgarian split squat (per leg)',sets:3,reps:[8,10],rest:'90 sec'},
-      {id:'leg-curl',name:'Leg curl',sets:3,reps:[10,12],rest:'60 sec',small:1},
-      {id:'calf-st',name:'Standing calf raise',sets:4,reps:[10,15],rest:'60 sec',small:1}]},
+      {id:'squat',name:'Back squat / leg press',sets:4,reps:[5,8],rest:'2 min',note:'Main lift'},
+      {id:'rdl',name:'Romanian deadlift',sets:3,reps:[8,10],rest:'90 sec'},
+      {id:'lunge',name:'Walking lunge / Bulgarian split squat (per leg)',sets:3,reps:[8,10],rest:'75 sec'},
+      {id:'leg-curl',name:'Leg curl',sets:3,reps:[10,12],rest:'45 sec',small:1},
+      {id:'calf-st',name:'Standing calf raise',sets:4,reps:[10,15],rest:'45 sec',small:1}]},
     upperB:{name:'Upper B · volume',type:'lift',ex:[
-      {id:'inc-db',name:'Incline dumbbell press',sets:4,reps:[8,12],rest:'2 min',note:'Main lift'},
-      {id:'cable-row',name:'Seated cable row',sets:4,reps:[8,12],rest:'90 sec'},
-      {id:'ohp',name:'Overhead press (barbell / machine)',sets:3,reps:[6,10],rest:'2 min'},
-      {id:'pullup',name:'Pull-ups / assisted (AMRAP)',sets:3,reps:[6,12],rest:'2 min',note:'Stop 1-2 reps shy of failure'},
-      {id:'fly',name:'Cable fly / pec deck',sets:3,reps:[12,15],rest:'60 sec',small:1},
-      {id:'rear',name:'Rear delt fly / face pull',sets:3,reps:[15,15],rest:'60 sec',small:1},
-      {id:'ss-curl',name:'Superset: EZ-bar curl',sets:3,reps:[10,12],rest:'60 sec',small:1},
-      {id:'ss-tri',name:'Superset: overhead triceps extension',sets:3,reps:[10,12],rest:'60 sec',small:1}]},
+      {id:'inc-db',name:'Incline dumbbell press',sets:4,reps:[8,12],rest:'90 sec',note:'Main lift'},
+      {id:'cable-row',name:'Seated cable row',sets:4,reps:[8,12],rest:'75 sec'},
+      {id:'ohp',name:'Overhead press (barbell / machine)',sets:3,reps:[6,10],rest:'90 sec'},
+      {id:'pullup',name:'Pull-ups / assisted (AMRAP)',sets:3,reps:[6,12],rest:'90 sec',note:'Stop 1-2 reps shy of failure'},
+      {id:'fly',name:'Cable fly / pec deck',sets:3,reps:[12,15],rest:'45 sec',small:1},
+      {id:'rear',name:'Rear delt fly / face pull',sets:3,reps:[15,15],rest:'45 sec',small:1},
+      {id:'ss-curl',name:'Superset: EZ-bar curl',sets:3,reps:[10,12],rest:'45 sec',small:1},
+      {id:'ss-tri',name:'Superset: overhead triceps extension',sets:3,reps:[10,12],rest:'45 sec',small:1}]},
     lowerB:{name:'Lower B · hinge + core',type:'lift',ex:[
-      {id:'deadlift',name:'Deadlift (conventional / trap-bar)',sets:3,reps:[4,6],rest:'3 min',note:'Main lift. Keep 1-2 reps in reserve'},
-      {id:'front-sq',name:'Front squat / hack squat / leg press',sets:3,reps:[8,10],rest:'2 min'},
-      {id:'hip-thrust',name:'Hip thrust',sets:3,reps:[8,12],rest:'90 sec'},
-      {id:'leg-ext',name:'Leg extension',sets:3,reps:[12,15],rest:'60 sec',small:1},
-      {id:'calf-seat',name:'Seated calf raise',sets:3,reps:[12,15],rest:'60 sec',small:1},
-      {id:'knee-raise',name:'Hanging knee raise / cable crunch',sets:3,reps:[10,15],rest:'60 sec'},
-      {id:'plank',name:'Plank (seconds in the reps box)',sets:3,reps:[45,60],rest:'45 sec'}]},
+      {id:'deadlift',name:'Deadlift (conventional / trap-bar)',sets:3,reps:[4,6],rest:'2.5 min',note:'Main lift. Keep 1-2 reps in reserve'},
+      {id:'front-sq',name:'Front squat / hack squat / leg press',sets:3,reps:[8,10],rest:'90 sec'},
+      {id:'hip-thrust',name:'Hip thrust',sets:3,reps:[8,12],rest:'75 sec'},
+      {id:'leg-ext',name:'Leg extension',sets:3,reps:[12,15],rest:'45 sec',small:1},
+      {id:'calf-seat',name:'Seated calf raise',sets:3,reps:[12,15],rest:'45 sec',small:1},
+      {id:'knee-raise',name:'Hanging knee raise / cable crunch',sets:3,reps:[10,15],rest:'45 sec'},
+      {id:'plank',name:'Plank (seconds in the reps box)',sets:3,reps:[45,60],rest:'30 sec'}]},
     run:{name:'Run',type:'run',note:'Weeks 1-2: 20-25 min easy. Weeks 3-4: 30 min. Weeks 5-8: build to 40-45 min, add a weekly interval session (6 x 2 min hard / 2 min easy).'},
     yoga:{name:'Hot yoga',type:'yoga',note:'Log the class length. How it felt goes on the next screen.'},
     rest:{name:'Rest day',type:'rest'}
@@ -323,7 +323,7 @@ const SESS_KEYS = ['upperA','run','lowerA','upperB','lowerB','run2','yoga','rest
 const sessBase = k => k==='run2' ? 'run' : k;
 const sessName = k => k==='run2' ? 'Run (Saturday, optional)' : PLAN.sessions[k].name;
 const CHEERS = ['Nice one','Solid set','Strong','Locked in','Clean rep','Beast mode','Smooth'];
-const APP_VERSION='2026-11-03.1';
+const APP_VERSION='2026-11-03.2';
 const OWNER='jaysonl512', REPO='workouts', LOGPATH='data/log.json';
 
 /* alternatives per exercise: each alternative keeps its own history so weights stay comparable */
@@ -393,7 +393,7 @@ function burst(x,y,n=30){
 }
 function burstAt(el,n){ const r=(el||document.body).getBoundingClientRect(); burst(r.left+r.width/2, r.top+r.height/2, n) }
 function restSecs(txt){
-  const m=/(\d+)(?:-(\d+))?\s*(min|sec)/.exec(txt||''); if(!m) return 90;
+  const m=/(\d+(?:\.\d+)?)(?:-(\d+(?:\.\d+)?))?\s*(min|sec)/.exec(txt||''); if(!m) return 90;
   const a=+m[1], b=m[2]?+m[2]:a, v=(a+b)/2; return Math.round(m[3]==='min'? v*60 : v);
 }
 const mmss = s => Math.floor(s/60)+':'+String(Math.max(0,s)%60).padStart(2,'0');
