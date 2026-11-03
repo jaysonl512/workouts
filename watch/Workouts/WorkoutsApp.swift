@@ -15,7 +15,10 @@ struct WorkoutsApp: App {
                 .environmentObject(AppModel.shared.run)
         }
         .onChange(of: phase) { _, p in
-            if p == .active { AppModel.shared.sync.flush() }
+            if p == .active {
+                AppModel.shared.sync.flush()
+                AppModel.shared.sync.refreshHistory()
+            }
         }
     }
 }

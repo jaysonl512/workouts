@@ -25,9 +25,10 @@ final class SyncStore: ObservableObject {
         if let d = try? Data(contentsOf: historyURL), let h = try? JSONDecoder().decode([HistoryRow].self, from: d) { history = h }
     }
 
+    /// Only reports a problem while something is actually waiting to upload. A failed history download
+    /// at launch (common before the Watch reaches the phone) is not a sync problem.
     var statusText: String {
-        if !pending.isEmpty { return "\(pending.count) waiting to sync" }
-        if let lastError { return "Sync: \(lastError)" }
+        if !pending.isEmpty { return "\(pending.count) waiting to sync" + (lastError.map { " · \($0)" } ?? "") }
         if lastSynced != nil { return "Synced" }
         return ""
     }
