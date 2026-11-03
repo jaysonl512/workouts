@@ -124,5 +124,29 @@
     ]
    }
   ]
+ },
+ {
+  "hk": {
+   "avgHR": 174,
+   "maxHR": 189,
+   "endedAt": "2026-11-03T20:15:25.788Z",
+   "startedAt": "2026-11-03T20:02:33.982Z",
+   "activeKcal": 179,
+   "workoutUUID": "0EBCB919-A685-4C51-89E7-B3D4B1E2F6F7"
+  },
+  "run": {
+   "minutes": 12.9,
+   "distanceKm": 2.26
+  },
+  "updatedAt": "2026-11-03T20:15:29.273Z",
+  "elevationGainM": 17.9,
+  "avgPaceSecPerKm": 342,
+  "id": "2026-11-03-run",
+  "date": "2026-11-03",
+  "session": "run",
+  "name": "Run",
+  "type": "run",
+  "source": "watch",
+  "savedAt": "2026-11-03T20:15:29.273+00:00"
  }
 ]
