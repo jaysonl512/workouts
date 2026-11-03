@@ -67,8 +67,19 @@ Watch app:
 - `WorkoutManager`: `HKWorkoutSession` and `HKLiveWorkoutBuilder` (heart rate, active energy; distance and GPS for runs with `HKWorkoutRouteBuilder`).
 - Rest timer built on a timestamp end time (survives screen sleep), with `WKInterfaceDevice.current().play(.notification)`.
 
-Web app (small change):
-- History and Today read sessions from Supabase and merge them with the GitHub log (Supabase wins on the same id). Add a Supabase login in Settings.
+Web app: DONE (2026-11-03, app version 2026-11-03.1)
+- Plan > Settings > Cloud account: Supabase email/password sign-in (plain REST, publishable key, tokens refresh automatically).
+- On load it reads `status = complete` rows from Supabase and merges them with the GitHub log; the newer copy wins (`data.updatedAt`, else `saved_at` / `updated_at`).
+- Saving on the web upserts to Supabase and still commits to GitHub.
+- Sessions that exist only in Supabase (for example Watch-logged) are exported to `data/log.json` the next time the web app opens with a GitHub token. Phase 2 replaces this with an automatic Edge Function export.
+- Existing history (2026-11-02 Upper A) was imported into Supabase.
+
+What the Watch must write so the web app picks it up:
+- Row columns: `id`, `user_id` (the signed-in user's id, from the JWT `sub`), `date`, `session`, `name`, `type`, `status`, `source = 'watch'`, `saved_at`, and `data`.
+- `data.updatedAt` (ISO timestamp) on every write, so newest-wins merging works.
+- `status = 'in_progress'` while logging; the web app ignores those rows until `status = 'complete'`.
+
+Supabase project: "Workout Tracker", URL `https://hgqlyhvkwggdioehwdpo.supabase.co`. Use the publishable key from Project Settings > API Keys. Never the secret key.
 
 Done when: a lift and a run logged entirely on the Watch show up in the web app and in Apple Health.
 
