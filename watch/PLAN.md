@@ -41,7 +41,7 @@ Rules:
 1. **Today:** shows today's planned session (Mon Upper A, Tue Run, Wed Lower A, Thu Upper B, Fri Lower B, Sat optional run, Sun rest) plus a way to pick another session (Run, Hot yoga, any lift).
 2. **Start:** starts the HealthKit workout.
 3. **Exercise screen:** name, target (sets x reps), last time's sets. Digital Crown changes the focused value. Tap to switch between weight and reps. Big **Log Set** button.
-4. **Rest:** after each logged set, a rest ring counts down using that exercise's rest time and plays a haptic at zero. Skip button.
+4. **Rest:** after each logged set, a rest ring counts down using that exercise's rest time (max 90 sec, from the plan) and plays a haptic at zero. Buttons: **-15s**, **+15s** (adjust this rest only, never below 0) and **Skip**. Adjustments are not saved to the plan.
 5. **Navigation:** next / previous exercise. Swap exercise (alternatives list). Skip exercise.
 6. **Finish:** ends the HealthKit workout, saves to Health, shows a short summary (sets, volume, duration, avg HR), sets `status = complete`.
 7. **Run:** Start run, then live time, distance, pace and heart rate, pause/resume, end. Saves distance, time, pace, elevation, heart rate and the GPS route to Health, and the summary to Supabase.
@@ -84,7 +84,7 @@ Supabase project: "Workout Tracker", URL `https://hgqlyhvkwggdioehwdpo.supabase.
 Done when: a lift and a run logged entirely on the Watch show up in the web app and in Apple Health.
 
 ### Phase 2
-- Shared `plan.json` read by the web app and the Watch.
+- Shared `plan.json` read by the web app and the Watch, editable from the web app: rest per exercise, sets and rep ranges, weight increments per exercise, custom alternatives, which day each workout falls on, default timer on/off, units.
 - Progression targets on the Watch, matching the web app.
 - Exercise swap on the Watch (alternatives from the plan).
 - Web app writes to Supabase (replacing the GitHub token sync).
