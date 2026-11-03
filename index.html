@@ -228,6 +228,8 @@ details[open]>summary .chev{transform:rotate(90deg)}
 .chips2{display:flex;flex-wrap:wrap;gap:6px}
 .sc{background:#0f1318;border:1px solid var(--line);border-radius:9px;padding:4px 9px;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
 .wnote{margin-top:10px;border-left:3px solid var(--line);padding:2px 0 2px 12px;color:var(--mute);font-size:14px;font-style:italic}
+.rstats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px 8px;padding:12px 0 4px}
+.rstats div{display:flex;flex-direction:column}.rstats b{font-size:18px}.rstats span{color:var(--mute);font-size:12px}
 .wsum{display:flex;gap:16px;color:var(--mute);font-size:13px;padding:10px 0 4px}
 .wsum b{color:var(--text)}
 .hero.doneh{background:linear-gradient(160deg,#2a1416,#171c22 65%);border-color:rgba(239,68,68,.55)}
@@ -328,7 +330,7 @@ const SESS_KEYS = ['upperA','run','lowerA','upperB','lowerB','run2','yoga','rest
 const sessBase = k => k==='run2' ? 'run' : k;
 const sessName = k => k==='run2' ? 'Run (Saturday, optional)' : PLAN.sessions[k].name;
 const CHEERS = ['Nice one','Solid set','Strong','Locked in','Clean rep','Beast mode','Smooth'];
-const APP_VERSION='2026-11-03.4';
+const APP_VERSION='2026-11-03.5';
 const OWNER='jaysonl512', REPO='workouts', LOGPATH='data/log.json';
 
 /* alternatives per exercise: each alternative keeps its own history so weights stay comparable */
@@ -906,10 +908,21 @@ function woBody(x,kind,compact){
     if(!compact) body += `<div class="wsum"><span><b>${st3[0][0]}</b> sets</span><span><b>${st3[1][0]}</b> lb lifted</span>${x.deload?'<span>deload week</span>':''}</div>`;
     body += (x.entries||[]).map(e=>`<div class="wex"><b>${esc(e.name)}</b><div class="chips2">${e.sets.map(t=>`<span class="sc">${esc(fmtSet(t))}</span>`).join('')}</div></div>`).join('');
   } else if(kind==='run'){
-    if(!compact) body += `<div class="wsum"><span><b>${x.run.distanceKm??'—'}</b> km</span><span><b>${x.run.minutes??'—'}</b> min</span>${paceStr(x.run)?`<span><b>${paceStr(x.run).replace(/[() ]/g,'')}</b></span>`:''}</div>`;
+    body += runStats(x);
   } else if(!compact) body += `<div class="wsum"><span><b>${x.yoga.minutes??'—'}</b> minutes of hot yoga</span></div>`;
   if(x.notes) body += `<div class="wnote">${esc(x.notes)}</div>`;
   return body;
+}
+/* Run stats grid: always shown, including Watch extras (heart rate, energy, climb) when present. */
+function runStats(x){
+  const r=x.run||{}, hk=x.hk||{}, cells=[];
+  const pace = x.avgPaceSecPerKm || ((r.distanceKm&&r.minutes) ? Math.round(r.minutes*60/r.distanceKm) : null);
+  cells.push([r.distanceKm??'—','km'],[r.minutes!=null?mmss(Math.round(r.minutes*60)):'—','time'],[pace?mmss(pace):'—','/km pace']);
+  if(hk.avgHR) cells.push([hk.avgHR,'avg bpm']);
+  if(hk.maxHR) cells.push([hk.maxHR,'max bpm']);
+  if(hk.activeKcal) cells.push([hk.activeKcal,'kcal']);
+  if(x.elevationGainM!=null) cells.push([Math.round(x.elevationGainM),'m climb']);
+  return `<div class="rstats">${cells.map(([v,l])=>`<div><b>${esc(v)}</b><span>${l}</span></div>`).join('')}</div>`;
 }
 function viewHistory(){
   const all = allSessions(), unsynced = st.local.length;
