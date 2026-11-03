@@ -1,0 +1,10 @@
+# Never commit secrets or build output
+Secrets.xcconfig
+*.xcconfig.local
+.env
+.env.*
+xcuserdata/
+DerivedData/
+build/
+.DS_Store
+*.xcworkspace/xcuserdata/
