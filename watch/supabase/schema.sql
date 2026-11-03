@@ -1,4 +1,5 @@
--- Workout tracker: live session storage (run in the Supabase SQL Editor).
+-- Workout tracker: live session storage.
+-- Applied to the 'Workout Tracker' Supabase project on 2026-11-03 as migration create_sessions.
 -- One row per session. `data` holds the same JSON the web app logs (entries, run, yoga, energy, notes, deload, durationMin, hk, ...).
 
 create table if not exists public.sessions (
@@ -22,6 +23,7 @@ create index if not exists sessions_user_date_idx on public.sessions (user_id, d
 create or replace function public.touch_updated_at()
 returns trigger
 language plpgsql
+set search_path = ''
 as $$
 begin
   new.updated_at = now();
@@ -39,19 +41,19 @@ alter table public.sessions enable row level security;
 
 drop policy if exists "sessions_select_own" on public.sessions;
 create policy "sessions_select_own" on public.sessions
-  for select to authenticated using (auth.uid() = user_id);
+  for select to authenticated using ((select auth.uid()) = user_id);
 
 drop policy if exists "sessions_insert_own" on public.sessions;
 create policy "sessions_insert_own" on public.sessions
-  for insert to authenticated with check (auth.uid() = user_id);
+  for insert to authenticated with check ((select auth.uid()) = user_id);
 
 drop policy if exists "sessions_update_own" on public.sessions;
 create policy "sessions_update_own" on public.sessions
-  for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for update to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 
 drop policy if exists "sessions_delete_own" on public.sessions;
 create policy "sessions_delete_own" on public.sessions
-  for delete to authenticated using (auth.uid() = user_id);
+  for delete to authenticated using ((select auth.uid()) = user_id);
 
 -- After creating your single user in Authentication > Users, turn OFF
 -- Authentication > Sign In / Providers > "Allow new users to sign up".
