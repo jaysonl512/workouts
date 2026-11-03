@@ -155,5 +155,40 @@
   "type": "lift",
   "source": "watch",
   "savedAt": "2026-11-03T19:03:08.108+00:00"
+ },
+ {
+  "hk": {
+   "avgHR": 77,
+   "maxHR": 79,
+   "endedAt": "2026-11-03T19:17:52.596Z",
+   "startedAt": "2026-11-03T19:16:39.272Z",
+   "activeKcal": 4,
+   "workoutUUID": "EA623F03-D87C-4A5B-9C63-3A0AEFE06215"
+  },
+  "entries": [
+   {
+    "id": "deadlift",
+    "name": "Deadlift (conventional / trap-bar)",
+    "sets": [
+     {
+      "r": 5,
+      "w": 27.5
+     },
+     {
+      "r": 5,
+      "w": 32.5
+     }
+    ]
+   }
+  ],
+  "updatedAt": "2026-11-03T19:17:53.142Z",
+  "durationMin": 1,
+  "id": "2026-11-03-lowerB",
+  "date": "2026-11-03",
+  "session": "lowerB",
+  "name": "Lower B · hinge + core",
+  "type": "lift",
+  "source": "watch",
+  "savedAt": "2026-11-03T19:17:53.142+00:00"
  }
 ]
