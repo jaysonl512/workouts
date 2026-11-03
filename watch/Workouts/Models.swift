@@ -46,6 +46,7 @@ struct SessionData: Codable {
     var run: RunData?
     var avgPaceSecPerKm: Int?
     var elevationGainM: Double?
+    var route: String?
     var hk: HKInfo?
     var updatedAt: String
 }

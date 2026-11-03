@@ -106,6 +106,23 @@ actor Supabase {
         return try JSONDecoder().decode([HistoryRow].self, from: data)
     }
 
+    /// Watch runs saved before routes were synced: id plus the raw `data` object, newest first.
+    func runsWithoutRoute() async throws -> [(id: String, data: [String: Any])] {
+        let raw = try await request("/rest/v1/sessions?select=id,data&type=eq.run&status=eq.complete&source=eq.watch&data->>route=is.null&order=date.desc&limit=10")
+        let rows = (try JSONSerialization.jsonObject(with: raw) as? [[String: Any]]) ?? []
+        return rows.compactMap { r in
+            guard let id = r["id"] as? String, let d = r["data"] as? [String: Any] else { return nil }
+            return (id, d)
+        }
+    }
+
+    /// Replaces one session's `data` (the caller passes the full object, with a fresh updatedAt).
+    func replaceData(id: String, data: [String: Any]) async throws {
+        let body = try JSONSerialization.data(withJSONObject: ["data": data])
+        let q = id.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? id
+        _ = try await request("/rest/v1/sessions?id=eq.\(q)", method: "PATCH", body: body, prefer: "return=minimal")
+    }
+
     static func jwtSub(_ jwt: String) -> String? {
         let parts = jwt.split(separator: ".")
         guard parts.count > 1 else { return nil }

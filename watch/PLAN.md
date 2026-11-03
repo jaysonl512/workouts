@@ -73,11 +73,14 @@ Watch app: BUILT (2026-11-03). Lift logging verified end to end (Watch → Supab
 - Plan: `node watch/tools/gen-plan.mjs` regenerates `Plan.swift` from `index.html`. Run it after any PLAN or ALTS change.
 - Install: build for `generic/platform=watchOS`, then `xcrun devicectl device install app --device <watch id> watch/build/Build/Products/Debug-watchos/Workouts.app`. The Watch must be on the same Wi-Fi as the Mac (2.4 GHz). Xcode's debugger setup (`dyld_shared_cache_extract_dylibs`) can fail over Wi-Fi; the install works without it.
 - Exercise screen: stacked weight and reps with − / + (5 lb, 2.5 on small lifts; 1 rep, 5 sec plank). Digital Crown: 0.25 lb per click on weight. Swipe left for Prev / Next, Swap, Undo, Finish, Discard.
+- Runs: the Watch keeps the accepted GPS points, simplifies them (Douglas-Peucker, at most 400 points) and stores a Google encoded polyline in `data.route`. On launch it fills in `data.route` for older Watch runs from the route saved in Apple Health.
+- Strava: not possible through Apple Health. Strava only imports workouts recorded by Apple's own Workout app.
 - Simulator layout check: launch with `-demo lift|rest|next|finish|done` (Debug builds only).
 
 Web app: delete and pull to refresh (2026-11-03, app version 2026-11-03.4)
 - History: open a workout, then Delete workout. It is removed from this device, Supabase and `data/log.json`, and remembered as deleted (`wt.deleted.v1`) so the GitHub copy is never re-uploaded. A later save of the same session id shows normally.
 - History: pull down to refresh (reloads GitHub and Supabase).
+- Runs (2026-11-03.6): History and Today's Workout details show distance, time, pace, heart rate, energy and climb, plus a route map (Leaflet from cdnjs, OpenStreetMap tiles darkened with CSS, loaded only when a run with a route is opened; the SVG outline is the offline fallback).
 
 Web app: DONE (2026-11-03, app version 2026-11-03.1)
 - Plan > Settings > Cloud account: Supabase email/password sign-in (plain REST, publishable key, tokens refresh automatically).

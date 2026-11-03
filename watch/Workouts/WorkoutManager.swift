@@ -21,6 +21,7 @@ final class WorkoutManager: NSObject, ObservableObject {
     private var routeBuilder: HKWorkoutRouteBuilder?
     private var location: CLLocationManager?
     private var lastAltitude: Double?
+    private var routePoints: [CLLocationCoordinate2D] = []
     private(set) var activity: HKWorkoutActivityType = .traditionalStrengthTraining
 
     struct Result {
@@ -32,6 +33,7 @@ final class WorkoutManager: NSObject, ObservableObject {
         let kcal: Double?
         let distanceM: Double
         let elevationGainM: Double
+        let route: [CLLocationCoordinate2D]
 
         var hk: HKInfo? {
             guard let w = workout else { return nil }
@@ -109,7 +111,7 @@ final class WorkoutManager: NSObject, ObservableObject {
         b.delegate = self
         active = true
         paused = false
-        heartRate = 0; activeKcal = 0; distanceM = 0; elevationGainM = 0; lastAltitude = nil
+        heartRate = 0; activeKcal = 0; distanceM = 0; elevationGainM = 0; lastAltitude = nil; routePoints = []
     }
 
     func elapsed(at date: Date = Date()) -> TimeInterval { builder?.elapsedTime(at: date) ?? 0 }
@@ -142,7 +144,7 @@ final class WorkoutManager: NSObject, ObservableObject {
         }
         location?.stopUpdatingLocation()
         let result = Result(workout: workout, start: start, end: end, avgHR: avg, maxHR: max, kcal: kcal,
-                            distanceM: distanceM, elevationGainM: elevationGainM)
+                            distanceM: distanceM, elevationGainM: elevationGainM, route: routePoints)
         session = nil; builder = nil; routeBuilder = nil; location = nil
         active = false; paused = false; startDate = nil
         return result
@@ -170,6 +172,7 @@ final class WorkoutManager: NSObject, ObservableObject {
         let good = locations.filter { $0.horizontalAccuracy >= 0 && $0.horizontalAccuracy <= 50 }
         guard !good.isEmpty else { return }
         rb.insertRouteData(good) { _, _ in }
+        routePoints += good.map(\.coordinate)
         for l in good where l.verticalAccuracy >= 0 && l.verticalAccuracy <= 15 {
             // Ignore GPS altitude noise under 2 m between accepted points.
             if let a = lastAltitude {

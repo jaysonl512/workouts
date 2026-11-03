@@ -228,6 +228,12 @@ details[open]>summary .chev{transform:rotate(90deg)}
 .chips2{display:flex;flex-wrap:wrap;gap:6px}
 .sc{background:#0f1318;border:1px solid var(--line);border-radius:9px;padding:4px 9px;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
 .wnote{margin-top:10px;border-left:3px solid var(--line);padding:2px 0 2px 12px;color:var(--mute);font-size:14px;font-style:italic}
+.rmap{height:190px;margin:12px 0 4px;border-radius:12px;overflow:hidden;background:#11161c;border:1px solid var(--line)}
+.rmap>svg{width:100%;height:100%;display:block}
+.rmap .dtile{filter:invert(1) hue-rotate(180deg) brightness(.85) contrast(.85) saturate(.3)}
+.rmap .leaflet-container,.rmap.leaflet-container{background:#11161c}
+.rmap .leaflet-control-attribution{background:rgba(15,18,22,.7);color:var(--mute);font-size:9px}
+.rmap .leaflet-control-attribution a{color:var(--mute)}
 .rstats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px 8px;padding:12px 0 4px}
 .rstats div{display:flex;flex-direction:column}.rstats b{font-size:18px}.rstats span{color:var(--mute);font-size:12px}
 .wsum{display:flex;gap:16px;color:var(--mute);font-size:13px;padding:10px 0 4px}
@@ -330,7 +336,7 @@ const SESS_KEYS = ['upperA','run','lowerA','upperB','lowerB','run2','yoga','rest
 const sessBase = k => k==='run2' ? 'run' : k;
 const sessName = k => k==='run2' ? 'Run (Saturday, optional)' : PLAN.sessions[k].name;
 const CHEERS = ['Nice one','Solid set','Strong','Locked in','Clean rep','Beast mode','Smooth'];
-const APP_VERSION='2026-11-03.5';
+const APP_VERSION='2026-11-03.6';
 const OWNER='jaysonl512', REPO='workouts', LOGPATH='data/log.json';
 
 /* alternatives per exercise: each alternative keeps its own history so weights stay comparable */
@@ -416,7 +422,7 @@ const verOf = x => Date.parse(x.updatedAt||x.savedAt||'')||0;
 const tombs = () => LS('wt.deleted.v1',{});
 const isDeleted = x => { const t=tombs()[x.id]; return !!t && verOf(x)<=t };
 const canon = v => JSON.stringify(v,(k,val)=> val&&typeof val==='object'&&!Array.isArray(val) ? Object.keys(val).sort().reduce((o,key)=>(o[key]=val[key],o),{}) : val);
-const contentOf = x => canon({entries:x.entries||null,run:x.run||null,yoga:x.yoga||null,energy:x.energy??null,notes:x.notes||null,durationMin:x.durationMin??null,deload:!!x.deload,hk:x.hk||null});
+const contentOf = x => canon({entries:x.entries||null,run:x.run||null,yoga:x.yoga||null,energy:x.energy??null,notes:x.notes||null,durationMin:x.durationMin??null,deload:!!x.deload,hk:x.hk||null,route:x.route||null});
 const allSessions = () => {
   const m = new Map();
   st.repo.forEach(s=>m.set(s.id,s));
@@ -922,8 +928,48 @@ function runStats(x){
   if(hk.maxHR) cells.push([hk.maxHR,'max bpm']);
   if(hk.activeKcal) cells.push([hk.activeKcal,'kcal']);
   if(x.elevationGainM!=null) cells.push([Math.round(x.elevationGainM),'m climb']);
-  return `<div class="rstats">${cells.map(([v,l])=>`<div><b>${esc(v)}</b><span>${l}</span></div>`).join('')}</div>`;
+  return `<div class="rstats">${cells.map(([v,l])=>`<div><b>${esc(v)}</b><span>${l}</span></div>`).join('')}</div>`+(x.route?routeMap(x.route):'');
 }
+/* ---------- run route map ---------- */
+// Google encoded polyline (precision 5), as written by the Watch.
+function decodeRoute(str){
+  const pts=[]; let i=0, lat=0, lng=0;
+  const next=()=>{ let r=0, sh=0, b; do{ b=str.charCodeAt(i++)-63; r|=(b&31)<<sh; sh+=5 }while(b>=32); return (r&1)?~(r>>1):(r>>1) };
+  while(i<str.length){ lat+=next(); lng+=next(); pts.push([lat/1e5,lng/1e5]) }
+  return pts;
+}
+// The route is drawn as an SVG line right away; the tile map replaces it when the details open.
+function routeMap(route){
+  const pts=decodeRoute(route); if(pts.length<2) return '';
+  const W=320,H=180,P=14, lat0=pts[0][0]*Math.PI/180;
+  const xy=pts.map(([a,b])=>[b*Math.cos(lat0),a]);
+  const xs=xy.map(p=>p[0]), ys=xy.map(p=>p[1]), x0=Math.min(...xs), y1=Math.max(...ys);
+  const sc=Math.min((W-2*P)/((Math.max(...xs)-x0)||1e-9),(H-2*P)/((y1-Math.min(...ys))||1e-9));
+  const d=xy.map((p,k)=>(k?'L':'M')+(P+(p[0]-x0)*sc).toFixed(1)+' '+(P+(y1-p[1])*sc).toFixed(1)).join('');
+  return `<div class="rmap" data-route="${esc(route)}"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet"><path d="${d}" fill="none" stroke="var(--acc)" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/></svg></div>`;
+}
+let leafletP=null;
+const loadLeaflet = () => leafletP ||= Promise.all([
+  new Promise((res,rej)=>{ const l=document.createElement('link'); l.rel='stylesheet'; l.href='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css'; l.onload=res; l.onerror=rej; document.head.appendChild(l) }),
+  new Promise((res,rej)=>{ const sc=document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js'; sc.onload=res; sc.onerror=rej; document.head.appendChild(sc) })
+]).then(()=>window.L).catch(e=>{ leafletP=null; throw e });
+async function showMaps(root){
+  const els=[...root.querySelectorAll('.rmap:not(.live)')]; if(!els.length) return;
+  let L; try{ L=await loadLeaflet() }catch(e){ return }   // offline: the SVG line stays
+  els.forEach(el=>{
+    if(el.classList.contains('live') || !el.isConnected) return;
+    el.classList.add('live'); el.innerHTML='';
+    const pts=decodeRoute(el.dataset.route);
+    const m=L.map(el,{zoomSnap:.25,zoomControl:false,dragging:false,touchZoom:false,scrollWheelZoom:false,doubleClickZoom:false,boxZoom:false,keyboard:false,tap:false,attributionControl:true});
+    m.attributionControl.setPrefix(false);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,className:'dtile',attribution:'© OpenStreetMap'}).addTo(m);
+    const line=L.polyline(pts,{color:'#ef4444',weight:4,opacity:.95,lineJoin:'round'}).addTo(m);
+    L.circleMarker(pts[0],{radius:5,color:'#fff',weight:2,fillColor:'#22c55e',fillOpacity:1}).addTo(m);
+    L.circleMarker(pts[pts.length-1],{radius:5,color:'#fff',weight:2,fillColor:'#ef4444',fillOpacity:1}).addTo(m);
+    m.fitBounds(line.getBounds(),{padding:[18,18]});
+  });
+}
+document.addEventListener('toggle',e=>{ if(e.target.open) showMaps(e.target) },true);
 function viewHistory(){
   const all = allSessions(), unsynced = st.local.length;
   let h = '';

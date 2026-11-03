@@ -1,4 +1,5 @@
 import Foundation
+import HealthKit
 
 /// The run in progress: an in_progress row at start, the summary with status complete at the end.
 @MainActor
@@ -43,6 +44,7 @@ final class RunStore: ObservableObject {
         let data = SessionData(run: RunData(distanceKm: km, minutes: minutes),
                                avgPaceSecPerKm: pace.map { Int($0.rounded()) },
                                elevationGainM: (r.elevationGainM * 10).rounded() / 10,
+                               route: Route.encode(r.route),
                                hk: r.hk, updatedAt: ISO.string())
         sync.enqueue(row(status: "complete", data: data))
         summary = Summary(distanceKm: km, minutes: minutes, paceSecPerKm: pace, avgHR: r.avgHR.map { Int($0.rounded()) },
@@ -51,6 +53,24 @@ final class RunStore: ObservableObject {
     }
 
     func discard() { key = nil }
+
+    /// Fills in `data.route` for Watch runs that were saved without one, from the route stored in Apple Health.
+    /// Runs with no GPS route in Health are remembered and not retried.
+    func backfillRoutes(from store: HKHealthStore) async {
+        var tried = Set(UserDefaults.standard.stringArray(forKey: "routeBackfillTried") ?? [])
+        guard let runs = try? await Supabase.shared.runsWithoutRoute() else { return }
+        for (id, data) in runs where !tried.contains(id) && sync.pending[id] == nil {
+            guard let hk = data["hk"] as? [String: Any], let s = hk["workoutUUID"] as? String, let uuid = UUID(uuidString: s),
+                  let locs = try? await Route.locations(of: uuid, in: store) else { continue }
+            tried.insert(id)
+            UserDefaults.standard.set(Array(tried), forKey: "routeBackfillTried")
+            guard let route = Route.encode(locs.filter { $0.horizontalAccuracy >= 0 && $0.horizontalAccuracy <= 50 }.map(\.coordinate)) else { continue }
+            var d = data
+            d["route"] = route
+            d["updatedAt"] = ISO.string()
+            try? await Supabase.shared.replaceData(id: id, data: d)
+        }
+    }
 
     private func row(status: String, data: SessionData) -> SessionRow {
         SessionRow(id: id, date: date, session: key!, name: Plan.name(key!), type: .run, status: status,

@@ -44,6 +44,7 @@ struct ContentView: View {
             if lift.draft != nil, !workout.active { try? await workout.start(.traditionalStrengthTraining) }
             sync.flush()
             sync.refreshHistory()
+            await run.backfillRoutes(from: workout.store)
         }
     }
 }
