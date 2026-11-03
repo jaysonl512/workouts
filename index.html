@@ -336,7 +336,7 @@ const SESS_KEYS = ['upperA','run','lowerA','upperB','lowerB','run2','yoga','rest
 const sessBase = k => k==='run2' ? 'run' : k;
 const sessName = k => k==='run2' ? 'Run (Saturday, optional)' : PLAN.sessions[k].name;
 const CHEERS = ['Nice one','Solid set','Strong','Locked in','Clean rep','Beast mode','Smooth'];
-const APP_VERSION='2026-11-03.7';
+const APP_VERSION='2026-11-03.8';
 const OWNER='jaysonl512', REPO='workouts', LOGPATH='data/log.json';
 
 /* alternatives per exercise: each alternative keeps its own history so weights stay comparable */
@@ -424,7 +424,7 @@ const verOf = x => Date.parse(x.updatedAt||x.savedAt||'')||0;
 const tombs = () => LS('wt.deleted.v1',{});
 const isDeleted = x => { const t=tombs()[x.id]; return !!t && verOf(x)<=t };
 const canon = v => JSON.stringify(v,(k,val)=> val&&typeof val==='object'&&!Array.isArray(val) ? Object.keys(val).sort().reduce((o,key)=>(o[key]=val[key],o),{}) : val);
-const contentOf = x => canon({entries:x.entries||null,run:x.run||null,yoga:x.yoga||null,energy:x.energy??null,notes:x.notes||null,durationMin:x.durationMin??null,deload:!!x.deload,hk:x.hk||null,route:x.route||null});
+const contentOf = x => canon({entries:x.entries||null,run:x.run||null,yoga:x.yoga||null,energy:x.energy??null,notes:x.notes||null,durationMin:x.durationMin??null,deload:!!x.deload,hk:x.hk||null,route:x.route||null,indoor:!!x.indoor});
 const allSessions = () => {
   const m = new Map();
   st.repo.forEach(s=>m.set(s.id,s));
@@ -727,13 +727,13 @@ function logSet(){
   const idx = wk.editing!=null ? wk.editing : a.length;
   const prior = Math.max(bestEver(e.id), ...a.filter((_,i)=>i!==idx).map(x=>x.w||0), 0);
   const isPR = w>0 && prior>0 && w>prior;
-  const nowT=Date.now(); if(!d.firstAt) d.firstAt=nowT; d.lastAt=nowT;
+  if(!isManual()){ const nowT=Date.now(); if(!d.firstAt) d.firstAt=nowT; d.lastAt=nowT }
   a[idx]={w,r}; saveDraft();
   const wasEdit = wk.editing!=null;
   wk.editing=null; wk.just=idx;
   if(isPR){ wk.prs[e.id]=true; burstAt(btn,44); buzz([30,40,30]); toast('New PR 🏆') }
   else { burstAt(btn,10); buzz(15); toast(CHEERS[Math.floor(Math.random()*CHEERS.length)]) }
-  if(!wasEdit && a.length<e.sets && restOn()) startRest(restSecs(e.rest)); else clearRest();
+  if(!wasEdit && a.length<e.sets && restOn() && !isManual()) startRest(restSecs(e.rest)); else clearRest();
   wk.cur={w,r};
   render();
   const nb=$('#logBtn'); if(nb){nb.classList.add('ok')}
@@ -796,9 +796,12 @@ function viewToday(){
   h += `<div class="hero"><h2>${esc(sessName(st.sess))}</h2>
     <div class="meta">${S.type==='run'?'Distance and time':S.type==='yoga'?'Class length':steps.length+' exercises'} · about ${mins} min</div>
     ${S.type==='lift'?`<div class="chips">${steps.map(e=>`<span class="${done(e)?'ok':''}">${esc(e.name.split(/[\/(]/)[0].trim())}</span>`).join('')}</div>`:`<div class="note" style="margin-bottom:16px">${esc(S.note)}</div>`}
-    <button class="btn big pulse" data-act="start" data-resume="${resume?1:0}">${resume?'Resume workout':'Start workout'}</button></div>`;
+    ${st.date>todayStr() ? `<div class="note" style="text-align:center">Coming up. You can log it on the day.</div>`
+      : `<button class="btn big ${isManual()?'':'pulse'}" data-act="start" data-resume="${resume?1:0}">${resume?(isManual()?'Continue adding':'Resume workout'):(isManual()?'Add workout manually':'Start workout')}</button>`}</div>`;
   return h;
 }
+/* A past day: workouts are entered after the fact (no rest timer, duration typed in). */
+const isManual = () => st.date<todayStr();
 
 const addDays = (ds,n) => { const d=new Date(ds+'T12:00:00'); d.setDate(d.getDate()+n); return d.toLocaleDateString('en-CA') };
 function weekStrip(){
@@ -878,14 +881,14 @@ function stepper(f,lbl,val,unit){
 }
 function viewYogaStep(e,cls){
   const d=getDraft();
-  return `<div class="${cls}"><div class="kicker">Today's class</div><h2>${esc(e.name)} 🔥</h2><div class="tgt">${esc(PLAN.sessions.yoga.note)}</div>
+  return `<div class="${cls}"><div class="kicker">${isManual()?esc(fmtDate(st.date)):"Today's class"}</div><h2>${esc(e.name)} 🔥</h2><div class="tgt">${esc(PLAN.sessions.yoga.note)}</div>
     <div class="steppers" style="margin-top:16px">${stepper('min','Time',d.run.min,'minutes')}</div>
     <div class="logwrap"><button class="btn log big" id="logBtn" data-act="runnext">Done</button></div></div>`;
 }
 function viewRunStep(e,cls){
   const d=getDraft(), S=PLAN.sessions.run;
   const pace=(num(d.run.dist)&&num(d.run.min))?d.run.min/d.run.dist:null;
-  return `<div class="${cls}"><div class="kicker">Today's run</div><h2>${esc(e.name)}</h2><div class="tgt">${esc(S.note)}</div>
+  return `<div class="${cls}"><div class="kicker">${isManual()?esc(fmtDate(st.date)):"Today's run"}</div><h2>${esc(e.name)}</h2><div class="tgt">${esc(S.note)}</div>
     <div class="steppers" style="margin-top:16px">${stepper('dist','Distance',d.run.dist,'km')}${stepper('min','Time',d.run.min,'minutes')}</div>
     <div class="note" style="text-align:center;margin-top:10px">Pace: <b id="pace">${pace?`${Math.floor(pace)}:${String(Math.round((pace%1)*60)).padStart(2,'0')} /km`:'—'}</b></div>
     <div class="logwrap"><button class="btn log big" id="logBtn" data-act="runnext">Done</button></div></div>`;
@@ -902,6 +905,7 @@ function viewSummary(cls){
   const moods=['😫','😕','😐','🙂','🔥'];
   return `<div class="${cls}"><div class="kicker">All done</div><h2>Nice work 💪</h2>
     <div class="sum">${stats.map(([b,s])=>`<div class="stat"><b>${b}</b><span>${s}</span></div>`).join('')}</div>
+    ${isManual()&&!isRun&&!isYoga?`<label class="f">Duration (minutes)</label><input id="dur" type="number" inputmode="numeric" min="1" value="${esc(d.dur??'')}" style="margin-bottom:14px">`:''}
     <label class="f">How did it feel?</label>
     <div class="moods">${moods.map((m,i)=>`<button class="${String(d.energy)===String(i+1)?'on':''}" data-act="mood" data-v="${i+1}" aria-label="Energy ${i+1} of 5">${m}</button>`).join('')}</div>
     <label class="f">Notes (optional)</label><textarea id="notes" placeholder="Pain, skipped anything, how it went…">${esc(d.notes)}</textarea>
@@ -916,6 +920,7 @@ function woBody(x,kind,compact){
     if(!compact) body += `<div class="wsum"><span><b>${st3[0][0]}</b> sets</span><span><b>${st3[1][0]}</b> lb lifted</span>${x.deload?'<span>deload week</span>':''}</div>`;
     body += (x.entries||[]).map(e=>`<div class="wex"><b>${esc(e.name)}</b><div class="chips2">${e.sets.map(t=>`<span class="sc">${esc(fmtSet(t))}</span>`).join('')}</div></div>`).join('');
   } else if(kind==='run'){
+    if(x.indoor) body += `<div class="note" style="padding-top:10px">Indoor run (treadmill). Distance and pace from the Watch's motion sensors.</div>`;
     body += runStats(x);
   } else if(!compact) body += `<div class="wsum"><span><b>${x.yoga.minutes??'—'}</b> minutes of hot yoga</span></div>`;
   if(x.notes) body += `<div class="wnote">${esc(x.notes)}</div>`;
@@ -924,12 +929,12 @@ function woBody(x,kind,compact){
 /* Run stats grid: always shown, including Watch extras (heart rate, energy, climb) when present. */
 function runStats(x){
   const r=x.run||{}, hk=x.hk||{}, cells=[];
-  const pace = x.avgPaceSecPerKm || ((r.distanceKm&&r.minutes) ? Math.round(r.minutes*60/r.distanceKm) : null);
+  const pace = (r.distanceKm&&r.minutes) ? Math.round(r.minutes*60/r.distanceKm) : (x.avgPaceSecPerKm||null);
   cells.push([r.distanceKm??'—','km'],[runTime(r.minutes),'time'],[pace?mmss(pace):'—','/km pace']);
   if(hk.avgHR) cells.push([hk.avgHR,'avg bpm']);
   if(hk.maxHR) cells.push([hk.maxHR,'max bpm']);
   if(hk.activeKcal) cells.push([hk.activeKcal,'kcal']);
-  if(x.elevationGainM!=null) cells.push([Math.round(x.elevationGainM),'m climb']);
+  if(x.elevationGainM!=null && !x.indoor) cells.push([Math.round(x.elevationGainM),'m climb']);
   return `<div class="rstats">${cells.map(([v,l])=>`<div><b>${esc(v)}</b><span>${l}</span></div>`).join('')}</div>`+(x.route?routeMap(x.route):'');
 }
 /* ---------- run route map ---------- */
@@ -988,7 +993,7 @@ function viewHistory(){
     list.forEach(x=>{
       const kind = x.yoga?'yoga':x.run?'run':'lift', loc = st.local.some(l=>l.id===x.id);
       const dt = new Date(x.date+'T12:00:00');
-      const meta = x.yoga ? `${x.yoga.minutes??'?'} min` : x.run ? `${x.run.distanceKm??'?'} km · ${runTime(x.run.minutes)}${paceStr(x.run)}` : `${(x.entries||[]).length} exercises${x.durationMin?' · '+x.durationMin+' min':''}`;
+      const meta = x.yoga ? `${x.yoga.minutes??'?'} min` : x.run ? `${x.indoor?'Indoor · ':''}${x.run.distanceKm??'?'} km · ${runTime(x.run.minutes)}${paceStr(x.run)}` : `${(x.entries||[]).length} exercises${x.durationMin?' · '+x.durationMin+' min':''}`;
       const mood = x.energy ? ' · '+MOODS[x.energy-1] : '';
       const body = woBody(x,kind);
       h += `<div class="wo ${kind}"><details><summary><div class="wdate"><small>${dt.toLocaleDateString(undefined,{weekday:'short'})}</small><b>${dt.getDate()}</b></div>
@@ -1109,6 +1114,7 @@ function paceUpdate(){
 app.addEventListener('input',e=>{
   const t=e.target;
   if(t.id==='notes'){getDraft().notes=t.value;saveDraft()}
+  else if(t.id==='dur'){getDraft().dur=num(t.value);saveDraft()}
   else if(t.dataset.fld&&st.wk){
     const f=t.dataset.fld, o=fldObj(f); o[f]=t.value===''?'':t.value;
     if(f==='dist'||f==='min'){saveDraft();paceUpdate()}
@@ -1122,7 +1128,7 @@ app.addEventListener('click',e=>{
   else if(act==='wk'){ st.date=addDays(st.date,+b.dataset.n); st.sess=defaultSession(st.date); render() }
   else if(act==='sess'){ st.sess=b.dataset.k; render() }
   else if(act==='edit') startWorkout(false);
-  else if(act==='start') startWorkout(b.dataset.resume==='1');
+  else if(act==='start'){ if(st.date<=todayStr()) startWorkout(b.dataset.resume==='1') }
   else if(act==='exit') exitWorkout();
   else if(act==='jump') goStep(+b.dataset.i, +b.dataset.i>=wk.step?1:-1);
   else if(act==='back') goStep(wk.step-1,-1);
@@ -1178,8 +1184,11 @@ function save(){
   const base=sessBase(st.sess), S=PLAN.sessions[base], d=getDraft();
   const rec={id:sid(), date:st.date, session:st.sess, name:sessName(st.sess), type:S.type,
     energy:num(d.energy), notes:(d.notes||'').trim()||undefined, savedAt:new Date().toISOString(), updatedAt:new Date().toISOString()};
-  if(S.type==='lift'){ if(d.firstAt && d.lastAt){const m=Math.max(1,Math.round((d.lastAt-d.firstAt)/60000)); if(m<300) rec.durationMin=m} else if(d.dur) rec.durationMin=d.dur }
+  if(S.type==='lift'){ if(isManual() && d.dur) rec.durationMin=d.dur; else if(d.firstAt && d.lastAt){const m=Math.max(1,Math.round((d.lastAt-d.firstAt)/60000)); if(m<300) rec.durationMin=m} else if(d.dur) rec.durationMin=d.dur }
   if(d.savedAt) rec.savedAt=d.savedAt;
+  // Editing a Watch session keeps what only the Watch records (Health link, route, indoor, climb).
+  const prev=allSessions().find(x=>x.id===rec.id);
+  if(prev) ['hk','route','indoor','elevationGainM'].forEach(k=>{ if(prev[k]!=null) rec[k]=prev[k] });
   if(S.type==='yoga'){
     const min=num(d.run.min);
     if(min==null) return toast('Enter the class length');

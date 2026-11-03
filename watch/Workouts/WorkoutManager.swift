@@ -1,4 +1,5 @@
 import CoreLocation
+import CoreMotion
 import Foundation
 import HealthKit
 
@@ -15,6 +16,8 @@ final class WorkoutManager: NSObject, ObservableObject {
     @Published private(set) var elevationGainM: Double = 0
     @Published private(set) var gpsAccuracy: Double?
     @Published private(set) var startDate: Date?
+    /// Running without GPS (treadmill): HealthKit measures distance from wrist motion.
+    @Published private(set) var indoor = false
 
     private var session: HKWorkoutSession?
     private var builder: HKLiveWorkoutBuilder?
@@ -34,6 +37,7 @@ final class WorkoutManager: NSObject, ObservableObject {
         let distanceM: Double
         let elevationGainM: Double
         let route: [CLLocationCoordinate2D]
+        let indoor: Bool
 
         var hk: HKInfo? {
             guard let w = workout else { return nil }
@@ -69,11 +73,14 @@ final class WorkoutManager: NSObject, ObservableObject {
 
     // MARK: Session lifecycle
 
-    func start(_ type: HKWorkoutActivityType) async throws {
+    /// GPS fix good enough to record an outdoor run.
+    var gpsReady: Bool { (gpsAccuracy ?? .infinity) <= 30 }
+
+    func start(_ type: HKWorkoutActivityType, indoor: Bool = true) async throws {
         if active { return }
         let config = HKWorkoutConfiguration()
         config.activityType = type
-        config.locationType = type == .running ? .outdoor : .indoor
+        config.locationType = indoor ? .indoor : .outdoor
         let s = try HKWorkoutSession(healthStore: store, configuration: config)
         let b = s.associatedWorkoutBuilder()
         b.dataSource = HKLiveWorkoutDataSource(healthStore: store, workoutConfiguration: config)
@@ -82,9 +89,13 @@ final class WorkoutManager: NSObject, ObservableObject {
         s.startActivity(with: now)
         try await b.beginCollection(at: now)
         startDate = now
-        if type == .running {
+        self.indoor = indoor
+        if type == .running && !indoor {
             routeBuilder = HKWorkoutRouteBuilder(healthStore: store, device: nil)
             if location == nil { requestLocation() }
+        } else {
+            location?.stopUpdatingLocation()
+            location = nil
         }
     }
 
@@ -96,7 +107,8 @@ final class WorkoutManager: NSObject, ObservableObject {
         attach(s, b, type: s.workoutConfiguration.activityType)
         startDate = b.startDate ?? s.startDate
         paused = s.state == .paused
-        if activity == .running {
+        indoor = s.workoutConfiguration.locationType != .outdoor
+        if activity == .running && !indoor {
             routeBuilder = HKWorkoutRouteBuilder(healthStore: store, device: nil)
             requestLocation()
         }
@@ -125,7 +137,22 @@ final class WorkoutManager: NSObject, ObservableObject {
         let start = startDate ?? end
         var workout: HKWorkout?
         var avg: Double?, max: Double?, kcal: Double?
+        var indoorRun = activity == .running && indoor
         if let s = session, let b = builder {
+            // An outdoor run whose GPS never really moved was on a treadmill: save it as an indoor run,
+            // with distance from step tracking, and drop the route.
+            if activity == .running && !indoor && looksStationary {
+                indoorRun = true
+                routeBuilder = nil
+                routePoints = []
+                try? await b.addMetadata([HKMetadataKeyIndoorWorkout: true])
+            }
+            if indoorRun, let steps = await pedometerDistance(from: start, to: end), steps - distanceM > 50 {
+                let extra = HKQuantitySample(type: HKQuantityType(.distanceWalkingRunning),
+                                             quantity: HKQuantity(unit: .meter(), doubleValue: steps - distanceM), start: start, end: end)
+                await withCheckedContinuation { cont in b.add([extra]) { _, _ in cont.resume() } }
+                distanceM = steps
+            }
             s.end()
             let bpm = HKUnit.count().unitDivided(by: .minute())
             let hr = b.statistics(for: HKQuantityType(.heartRate))
@@ -144,10 +171,28 @@ final class WorkoutManager: NSObject, ObservableObject {
         }
         location?.stopUpdatingLocation()
         let result = Result(workout: workout, start: start, end: end, avgHR: avg, maxHR: max, kcal: kcal,
-                            distanceM: distanceM, elevationGainM: elevationGainM, route: routePoints)
+                            distanceM: distanceM, elevationGainM: indoorRun ? 0 : elevationGainM, route: indoorRun ? [] : routePoints,
+                            indoor: indoorRun)
         session = nil; builder = nil; routeBuilder = nil; location = nil
-        active = false; paused = false; startDate = nil
+        active = false; paused = false; startDate = nil; indoor = false
         return result
+    }
+
+    /// Fewer than 10 GPS points, or none more than 100 m from the start.
+    private var looksStationary: Bool {
+        guard routePoints.count >= 10, let first = routePoints.first else { return true }
+        let a = CLLocation(latitude: first.latitude, longitude: first.longitude)
+        return !routePoints.contains { CLLocation(latitude: $0.latitude, longitude: $0.longitude).distance(from: a) > 100 }
+    }
+
+    /// Distance from the Watch's step tracking (calibrated by Apple from earlier outdoor runs).
+    private func pedometerDistance(from start: Date, to end: Date) async -> Double? {
+        guard CMPedometer.isDistanceAvailable() else { return nil }
+        return await withCheckedContinuation { cont in
+            CMPedometer().queryPedometerData(from: start, to: end) { data, _ in
+                cont.resume(returning: data?.distance?.doubleValue)
+            }
+        }
     }
 
     /// Throws the workout away without saving it to Health.

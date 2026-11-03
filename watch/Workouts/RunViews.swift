@@ -17,10 +17,10 @@ struct RunView: View {
     private var ready: some View {
         VStack(spacing: 8) {
             Text(Plan.name(run.key ?? "run")).font(.headline)
-            Text(gpsText).font(.footnote).foregroundStyle(gpsReady ? .green : .orange)
+            Text(gpsText).font(.footnote).foregroundStyle(workout.gpsReady ? .green : .secondary)
             Button {
                 Task {
-                    try? await workout.start(.running)
+                    try? await workout.start(.running, indoor: !workout.gpsReady)
                     run.started()
                 }
             } label: {
@@ -32,10 +32,11 @@ struct RunView: View {
         .onAppear { workout.requestLocation() }
     }
 
-    private var gpsReady: Bool { (workout.gpsAccuracy ?? 999) <= 20 }
+    /// Starting now records outdoor (GPS) or indoor (treadmill, distance from motion).
     private var gpsText: String {
-        guard let a = workout.gpsAccuracy, a >= 0 else { return "Waiting for GPS…" }
-        return gpsReady ? "GPS ready" : "GPS ±\(Int(a)) m"
+        if workout.gpsReady { return "Outdoor · GPS ready" }
+        guard let a = workout.gpsAccuracy, a >= 0 else { return "Indoor · no GPS yet" }
+        return "Indoor · GPS ±\(Int(a)) m"
     }
 
     private var live: some View {
@@ -43,8 +44,11 @@ struct RunView: View {
             let t = workout.elapsed(at: ctx.date)
             let km = workout.distanceM / 1000
             VStack(alignment: .leading, spacing: 2) {
-                Text(Fmt.clock(t)).font(.system(size: 34, weight: .semibold, design: .rounded)).monospacedDigit()
-                    .foregroundStyle(workout.paused ? Color.secondary : Color.brand)
+                HStack(alignment: .firstTextBaseline) {
+                    Text(Fmt.clock(t)).font(.system(size: 34, weight: .semibold, design: .rounded)).monospacedDigit()
+                        .foregroundStyle(workout.paused ? Color.secondary : Color.brand)
+                    if workout.indoor { Text("Indoor").font(.caption2).foregroundStyle(.secondary) }
+                }
                 Text(String(format: "%.2f km", km)).font(.title3).monospacedDigit()
                 Text("\(Fmt.pace(secPerKm: km > 0.05 ? t / km : nil)) /km").font(.title3).monospacedDigit()
                 Text(workout.heartRate > 0 ? "\(Int(workout.heartRate)) bpm" : "-- bpm").font(.title3).monospacedDigit()
@@ -79,12 +83,12 @@ struct RunSummaryView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Run saved").font(.headline)
+                Text(summary.indoor ? "Indoor run saved" : "Run saved").font(.headline)
                 row("Distance", String(format: "%.2f km", summary.distanceKm))
                 row("Time", Fmt.clock(summary.minutes * 60))
                 row("Pace", Fmt.pace(secPerKm: summary.paceSecPerKm) + " /km")
                 row("Avg HR", summary.avgHR.map { "\($0) bpm" } ?? "–")
-                row("Climb", "\(Int(summary.elevationGainM)) m")
+                if !summary.indoor { row("Climb", "\(Int(summary.elevationGainM)) m") }
                 Text(sync.statusText.isEmpty ? "Saved" : sync.statusText).font(.footnote).foregroundStyle(.secondary)
                 Button("Done") { run.summary = nil }.buttonStyle(PrimaryButtonStyle()).padding(.top, 4)
             }

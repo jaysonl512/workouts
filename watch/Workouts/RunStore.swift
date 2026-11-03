@@ -10,6 +10,7 @@ final class RunStore: ObservableObject {
         let paceSecPerKm: Double?
         let avgHR: Int?
         let elevationGainM: Double
+        let indoor: Bool
     }
 
     @Published private(set) var key: String?
@@ -44,11 +45,12 @@ final class RunStore: ObservableObject {
         let data = SessionData(run: RunData(distanceKm: km, minutes: minutes),
                                avgPaceSecPerKm: pace.map { Int($0.rounded()) },
                                elevationGainM: (r.elevationGainM * 10).rounded() / 10,
-                               route: Route.encode(r.route),
+                               route: r.indoor ? nil : Route.encode(r.route),
+                               indoor: r.indoor ? true : nil,
                                hk: r.hk, updatedAt: ISO.string())
         sync.enqueue(row(status: "complete", data: data))
         summary = Summary(distanceKm: km, minutes: minutes, paceSecPerKm: pace, avgHR: r.avgHR.map { Int($0.rounded()) },
-                          elevationGainM: r.elevationGainM)
+                          elevationGainM: r.elevationGainM, indoor: r.indoor)
         key = nil
     }
 

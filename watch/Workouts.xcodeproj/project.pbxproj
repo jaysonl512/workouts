@@ -198,6 +198,7 @@
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Reads heart rate, energy and distance to show them during workouts.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Saves your lifts and runs, with heart rate and route, to Apple Health.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Tracks distance, pace and your route during outdoor runs.";
+				INFOPLIST_KEY_NSMotionUsageDescription = "Measures distance and pace on indoor runs from your steps.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKWatchOnly = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -232,6 +233,7 @@
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Reads heart rate, energy and distance to show them during workouts.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Saves your lifts and runs, with heart rate and route, to Apple Health.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Tracks distance, pace and your route during outdoor runs.";
+				INFOPLIST_KEY_NSMotionUsageDescription = "Measures distance and pace on indoor runs from your steps.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKWatchOnly = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
