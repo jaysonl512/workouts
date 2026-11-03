@@ -127,37 +127,6 @@
  },
  {
   "hk": {
-   "avgHR": 78,
-   "maxHR": 85,
-   "endedAt": "2026-11-03T19:03:07.196Z",
-   "startedAt": "2026-11-03T18:58:49.406Z",
-   "activeKcal": 18,
-   "workoutUUID": "3E1B16FE-0CA8-4F1D-97C0-773A23850DD5"
-  },
-  "entries": [
-   {
-    "id": "rdl",
-    "name": "Romanian deadlift",
-    "sets": [
-     {
-      "r": 5,
-      "w": 60
-     }
-    ]
-   }
-  ],
-  "updatedAt": "2026-11-03T19:03:08.108Z",
-  "durationMin": 4,
-  "id": "2026-11-03-lowerA",
-  "date": "2026-11-03",
-  "session": "lowerA",
-  "name": "Lower A · squat",
-  "type": "lift",
-  "source": "watch",
-  "savedAt": "2026-11-03T19:03:08.108+00:00"
- },
- {
-  "hk": {
    "avgHR": 77,
    "maxHR": 79,
    "endedAt": "2026-11-03T19:17:52.596Z",
