@@ -59,6 +59,10 @@ final class WorkoutManager: NSObject, ObservableObject {
             read.insert(HKQuantityType(q))
         }
         try? await store.requestAuthorization(toShare: share, read: read)
+        // Ask for Motion & Fitness now, not at the end of a run: a tiny pedometer query shows the prompt once.
+        if CMPedometer.isDistanceAvailable(), CMPedometer.authorizationStatus() == .notDetermined {
+            _ = await pedometerDistance(from: Date().addingTimeInterval(-60), to: Date())
+        }
     }
 
     func requestLocation() {
