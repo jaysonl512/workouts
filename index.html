@@ -336,7 +336,7 @@ const SESS_KEYS = ['upperA','run','lowerA','upperB','lowerB','run2','yoga','rest
 const sessBase = k => k==='run2' ? 'run' : k;
 const sessName = k => k==='run2' ? 'Run (Saturday, optional)' : PLAN.sessions[k].name;
 const CHEERS = ['Nice one','Solid set','Strong','Locked in','Clean rep','Beast mode','Smooth'];
-const APP_VERSION='2026-11-03.6';
+const APP_VERSION='2026-11-03.7';
 const OWNER='jaysonl512', REPO='workouts', LOGPATH='data/log.json';
 
 /* alternatives per exercise: each alternative keeps its own history so weights stay comparable */
@@ -410,6 +410,8 @@ function restSecs(txt){
   const a=+m[1], b=m[2]?+m[2]:a, v=(a+b)/2; return Math.round(m[3]==='min'? v*60 : v);
 }
 const mmss = s => Math.floor(s/60)+':'+String(Math.max(0,s)%60).padStart(2,'0');
+/* Run time from decimal minutes: 12.9 -> "12:54", 75.5 -> "1:15:30". */
+const runTime = m => { if(m==null||m===''||isNaN(+m)) return '—'; const t=Math.round(+m*60), h=Math.floor(t/3600); return h ? h+':'+String(Math.floor(t/60)%60).padStart(2,'0')+':'+String(t%60).padStart(2,'0') : mmss(t) };
 
 /* ---------- state ---------- */
 const st = {
@@ -754,7 +756,7 @@ function render(){
 const MOODS=['😫','😕','😐','🙂','🔥'];
 function sessStats(x){
   if(x.yoga) return [[x.yoga.minutes??'—','minutes']];
-  if(x.run){ const p=(x.run.distanceKm&&x.run.minutes)?x.run.minutes/x.run.distanceKm:null; return [[x.run.distanceKm??'—','km'],[x.run.minutes??'—','minutes'],[p?`${Math.floor(p)}:${String(Math.round((p%1)*60)).padStart(2,'0')}`:'—','/km']] }
+  if(x.run){ const p=(x.run.distanceKm&&x.run.minutes)?x.run.minutes/x.run.distanceKm:null; return [[x.run.distanceKm??'—','km'],[runTime(x.run.minutes),'time'],[p?mmss(Math.round(p*60)):'—','/km']] }
   let sets=0,vol=0; (x.entries||[]).forEach(e=>e.sets.forEach(t=>{sets++;vol+=(t.w||0)*(t.r||0)}));
   return [[sets,'sets'],[vol>=1000?(vol/1000).toFixed(1)+'k':vol,'lb lifted'],[x.durationMin??'—','minutes']];
 }
@@ -895,7 +897,7 @@ function viewSummary(cls){
   const mins=(d.firstAt&&d.lastAt)?Math.max(1,Math.round((d.lastAt-d.firstAt)/60000)):(d.dur||null);
   const isRun=steps[0]&&steps[0].run, isYoga=steps[0]&&steps[0].yoga;
   const stats = isYoga ? [[d.run.min||'—','minutes']] : isRun
-    ? [[d.run.dist||'—','km'],[d.run.min||'—','minutes']]
+    ? [[d.run.dist||'—','km'],[runTime(d.run.min),'time']]
     : [[sets,'sets'],[vol.toLocaleString(),'lb lifted'],[prs?prs+' 🏆':'0','PRs'],[mins!=null?mins:'—','minutes']];
   const moods=['😫','😕','😐','🙂','🔥'];
   return `<div class="${cls}"><div class="kicker">All done</div><h2>Nice work 💪</h2>
@@ -923,7 +925,7 @@ function woBody(x,kind,compact){
 function runStats(x){
   const r=x.run||{}, hk=x.hk||{}, cells=[];
   const pace = x.avgPaceSecPerKm || ((r.distanceKm&&r.minutes) ? Math.round(r.minutes*60/r.distanceKm) : null);
-  cells.push([r.distanceKm??'—','km'],[r.minutes!=null?mmss(Math.round(r.minutes*60)):'—','time'],[pace?mmss(pace):'—','/km pace']);
+  cells.push([r.distanceKm??'—','km'],[runTime(r.minutes),'time'],[pace?mmss(pace):'—','/km pace']);
   if(hk.avgHR) cells.push([hk.avgHR,'avg bpm']);
   if(hk.maxHR) cells.push([hk.maxHR,'max bpm']);
   if(hk.activeKcal) cells.push([hk.activeKcal,'kcal']);
@@ -986,7 +988,7 @@ function viewHistory(){
     list.forEach(x=>{
       const kind = x.yoga?'yoga':x.run?'run':'lift', loc = st.local.some(l=>l.id===x.id);
       const dt = new Date(x.date+'T12:00:00');
-      const meta = x.yoga ? `${x.yoga.minutes??'?'} min` : x.run ? `${x.run.distanceKm??'?'} km · ${x.run.minutes??'?'} min${paceStr(x.run)}` : `${(x.entries||[]).length} exercises${x.durationMin?' · '+x.durationMin+' min':''}`;
+      const meta = x.yoga ? `${x.yoga.minutes??'?'} min` : x.run ? `${x.run.distanceKm??'?'} km · ${runTime(x.run.minutes)}${paceStr(x.run)}` : `${(x.entries||[]).length} exercises${x.durationMin?' · '+x.durationMin+' min':''}`;
       const mood = x.energy ? ' · '+MOODS[x.energy-1] : '';
       const body = woBody(x,kind);
       h += `<div class="wo ${kind}"><details><summary><div class="wdate"><small>${dt.toLocaleDateString(undefined,{weekday:'short'})}</small><b>${dt.getDate()}</b></div>
@@ -995,7 +997,7 @@ function viewHistory(){
   });
   return h;
 }
-const paceStr = r => (r.distanceKm&&r.minutes) ? (()=>{const p=r.minutes/r.distanceKm;return ` (${Math.floor(p)}:${String(Math.round((p%1)*60)).padStart(2,'0')}/km)`})() : '';
+const paceStr = r => (r.distanceKm&&r.minutes) ? ` (${mmss(Math.round(r.minutes*60/r.distanceKm))}/km)` : '';
 
 function viewProgress(){
   const have=new Set(); allSessions().forEach(s=>(s.entries||[]).forEach(e=>have.add(e.id)));
