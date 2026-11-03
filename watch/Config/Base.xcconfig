@@ -1,0 +1,3 @@
+// Shared build settings. Secrets (Supabase URL, publishable key, login) come from the git-ignored
+// Secrets.xcconfig next to this file; copy Secrets.example.xcconfig to create it.
+#include? "Secrets.xcconfig"

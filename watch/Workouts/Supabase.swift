@@ -1,0 +1,142 @@
+import Foundation
+import Security
+
+/// Supabase over plain REST, like the web app: password sign-in, refresh token in Keychain,
+/// upserts keyed by (user_id, id). Uses the publishable key only.
+actor Supabase {
+    static let shared = Supabase()
+
+    struct Config {
+        let url: String, key: String, email: String, password: String
+        static let main: Config = {
+            let info = Bundle.main.infoDictionary ?? [:]
+            func v(_ k: String) -> String { (info[k] as? String ?? "").trimmingCharacters(in: .whitespaces) }
+            return Config(url: v("SUPABASE_URL"), key: v("SUPABASE_ANON_KEY"), email: v("SUPABASE_EMAIL"), password: v("SUPABASE_PASSWORD"))
+        }()
+        var isComplete: Bool { url.hasPrefix("https://") && !key.isEmpty && !email.isEmpty && !password.isEmpty }
+    }
+
+    enum SBError: LocalizedError {
+        case notConfigured, http(Int, String)
+        var errorDescription: String? {
+            switch self {
+            case .notConfigured: return "Secrets.xcconfig is missing values"
+            case let .http(code, msg): return "HTTP \(code) \(msg)"
+            }
+        }
+    }
+
+    private let cfg = Config.main
+    private var access: String?
+    private var expiry = Date.distantPast
+    private(set) var userId: String?
+
+    private struct TokenResponse: Decodable {
+        let access_token: String
+        let refresh_token: String
+        let expires_in: Double?
+        struct User: Decodable { let id: String }
+        let user: User?
+    }
+
+    private func authRequest(grant: String, body: [String: String]) async throws -> TokenResponse {
+        var req = URLRequest(url: URL(string: cfg.url + "/auth/v1/token?grant_type=" + grant)!)
+        req.httpMethod = "POST"
+        req.setValue(cfg.key, forHTTPHeaderField: "apikey")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONEncoder().encode(body)
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+        guard code == 200 else { throw SBError.http(code, String(data: data, encoding: .utf8) ?? "") }
+        return try JSONDecoder().decode(TokenResponse.self, from: data)
+    }
+
+    private func store(_ t: TokenResponse) {
+        access = t.access_token
+        expiry = Date().addingTimeInterval((t.expires_in ?? 3600) - 60)
+        userId = t.user?.id ?? Self.jwtSub(t.access_token)
+        Keychain.set(t.refresh_token, for: "sb.refresh")
+    }
+
+    /// A valid access token: cached, refreshed from the Keychain token, or a fresh password sign-in.
+    func token() async throws -> String {
+        guard cfg.isComplete else { throw SBError.notConfigured }
+        if let a = access, Date() < expiry { return a }
+        if let r = Keychain.get("sb.refresh") {
+            do {
+                store(try await authRequest(grant: "refresh_token", body: ["refresh_token": r]))
+                return access!
+            } catch SBError.http(let code, _) where code == 400 || code == 401 {
+                Keychain.delete("sb.refresh")
+            }
+        }
+        store(try await authRequest(grant: "password", body: ["email": cfg.email, "password": cfg.password]))
+        return access!
+    }
+
+    private func request(_ path: String, method: String = "GET", body: Data? = nil, prefer: String? = nil) async throws -> Data {
+        let t = try await token()
+        var req = URLRequest(url: URL(string: cfg.url + path)!)
+        req.httpMethod = method
+        req.setValue(cfg.key, forHTTPHeaderField: "apikey")
+        req.setValue("Bearer " + t, forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let prefer { req.setValue(prefer, forHTTPHeaderField: "Prefer") }
+        req.httpBody = body
+        req.timeoutInterval = 20
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+        if code == 401 { access = nil }
+        guard (200..<300).contains(code) else { throw SBError.http(code, String(data: data, encoding: .utf8) ?? "") }
+        return data
+    }
+
+    /// Insert or replace sessions by (user_id, id). Safe to retry.
+    func upsert(_ rows: [SessionRow]) async throws {
+        _ = try await token()
+        guard let uid = userId else { throw SBError.http(0, "no user id") }
+        let body = try JSONEncoder().encode(rows.map { var r = $0; r.userId = uid; return r })
+        _ = try await request("/rest/v1/sessions?on_conflict=user_id,id", method: "POST", body: body,
+                              prefer: "resolution=merge-duplicates,return=minimal")
+    }
+
+    /// Recent completed lift sessions, newest first, for "last time".
+    func recentLifts() async throws -> [HistoryRow] {
+        let data = try await request("/rest/v1/sessions?select=id,date,data&type=eq.lift&status=eq.complete&order=date.desc&limit=60")
+        return try JSONDecoder().decode([HistoryRow].self, from: data)
+    }
+
+    static func jwtSub(_ jwt: String) -> String? {
+        let parts = jwt.split(separator: ".")
+        guard parts.count > 1 else { return nil }
+        var b = parts[1].replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+        while b.count % 4 != 0 { b += "=" }
+        guard let d = Data(base64Encoded: b), let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any] else { return nil }
+        return o["sub"] as? String
+    }
+}
+
+enum Keychain {
+    private static func query(_ key: String) -> [String: Any] {
+        [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: "workouts", kSecAttrAccount as String: key]
+    }
+
+    static func set(_ value: String, for key: String) {
+        SecItemDelete(query(key) as CFDictionary)
+        var q = query(key)
+        q[kSecValueData as String] = Data(value.utf8)
+        q[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+        SecItemAdd(q as CFDictionary, nil)
+    }
+
+    static func get(_ key: String) -> String? {
+        var q = query(key)
+        q[kSecReturnData as String] = true
+        q[kSecMatchLimit as String] = kSecMatchLimitOne
+        var out: AnyObject?
+        guard SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess, let d = out as? Data else { return nil }
+        return String(data: d, encoding: .utf8)
+    }
+
+    static func delete(_ key: String) { SecItemDelete(query(key) as CFDictionary) }
+}

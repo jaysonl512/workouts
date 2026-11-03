@@ -249,6 +249,11 @@ details[open]>summary .chev{transform:rotate(90deg)}
 .recap>summary{list-style:none;display:flex;justify-content:space-between;align-items:center;padding:14px 0;cursor:pointer;font-weight:700}
 .recap>summary::-webkit-details-marker{display:none}
 .recap .wbody{padding:0 0 4px;border-top:0}
+.dellink{display:block;margin:4px auto 0;background:none;border:0;color:var(--acc);font-size:14px;padding:10px}
+#ptr{height:0;overflow:hidden;display:flex;align-items:flex-end;justify-content:center;color:var(--mute);font-size:13px;transition:height .2s var(--ease)}
+#ptr::after{content:'Pull to refresh';padding-bottom:10px}
+#ptr.ready::after{content:'Release to refresh'}
+#ptr.spin::after{content:'Refreshing…'}
 .editlink{display:block;margin:6px auto 0;background:none;border:0;color:var(--mute);font-size:14px;text-decoration:underline;padding:10px}
 .upd{flex:none;display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--acc);color:#fff;padding:calc(10px + env(safe-area-inset-top)) 16px 10px;font-weight:700;z-index:6}
 .upd[hidden]{display:none}
@@ -323,7 +328,7 @@ const SESS_KEYS = ['upperA','run','lowerA','upperB','lowerB','run2','yoga','rest
 const sessBase = k => k==='run2' ? 'run' : k;
 const sessName = k => k==='run2' ? 'Run (Saturday, optional)' : PLAN.sessions[k].name;
 const CHEERS = ['Nice one','Solid set','Strong','Locked in','Clean rep','Beast mode','Smooth'];
-const APP_VERSION='2026-11-03.3';
+const APP_VERSION='2026-11-03.4';
 const OWNER='jaysonl512', REPO='workouts', LOGPATH='data/log.json';
 
 /* alternatives per exercise: each alternative keeps its own history so weights stay comparable */
@@ -405,6 +410,9 @@ const st = {
   progEx:null, wk:null
 };
 const verOf = x => Date.parse(x.updatedAt||x.savedAt||'')||0;
+/* Deleted workouts: id -> time of deletion. A copy is hidden (and never re-uploaded) unless it was saved after the deletion. */
+const tombs = () => LS('wt.deleted.v1',{});
+const isDeleted = x => { const t=tombs()[x.id]; return !!t && verOf(x)<=t };
 const canon = v => JSON.stringify(v,(k,val)=> val&&typeof val==='object'&&!Array.isArray(val) ? Object.keys(val).sort().reduce((o,key)=>(o[key]=val[key],o),{}) : val);
 const contentOf = x => canon({entries:x.entries||null,run:x.run||null,yoga:x.yoga||null,energy:x.energy??null,notes:x.notes||null,durationMin:x.durationMin??null,deload:!!x.deload,hk:x.hk||null});
 const allSessions = () => {
@@ -412,7 +420,7 @@ const allSessions = () => {
   st.repo.forEach(s=>m.set(s.id,s));
   st.sb.forEach(s=>{ const c=m.get(s.id); if(!c || verOf(s)>=verOf(c)) m.set(s.id,s) });
   st.local.forEach(s=>m.set(s.id,s));
-  return [...m.values()].sort((a,b)=> a.date<b.date?1:a.date>b.date?-1:0);
+  return [...m.values()].filter(s=>!isDeleted(s)).sort((a,b)=> a.date<b.date?1:a.date>b.date?-1:0);
 };
 const isLocalOnly = s => !st.repo.some(r=>r.id===s.id && contentOf(r)===contentOf(s));
 const sid = () => st.date+'-'+st.sess;
@@ -431,6 +439,7 @@ async function loadRepo(){
   st.local = st.local.filter(isLocalOnly);
   SS('wt.local.v1', st.local);
   if(sbAuth()){ try{ st.sb=await sbLoad(); await reconcile() }catch(e){} }
+  purgeDeleted();
   if(!st.wk) render();
   if(tok && st.local.length) syncNow();
 }
@@ -567,13 +576,46 @@ async function reconcile(){
   if(!sbAuth()) return;
   const gh=new Map(); st.repo.forEach(x=>gh.set(x.id,x)); st.local.forEach(x=>gh.set(x.id,x));
   const sbm=new Map(st.sb.map(x=>[x.id,x])), toSb=[], toGh=[];
-  gh.forEach((x,id)=>{ const y=sbm.get(id); if(!y || (contentOf(x)!==contentOf(y) && verOf(x)>=verOf(y))) toSb.push(x) });
-  sbm.forEach((y,id)=>{ const x=gh.get(id); if(!x || (contentOf(x)!==contentOf(y) && verOf(y)>verOf(x))) toGh.push(y) });
+  gh.forEach((x,id)=>{ if(isDeleted(x)) return; const y=sbm.get(id); if(!y || (contentOf(x)!==contentOf(y) && verOf(x)>=verOf(y))) toSb.push(x) });
+  sbm.forEach((y,id)=>{ if(isDeleted(y)) return; const x=gh.get(id); if(!x || (contentOf(x)!==contentOf(y) && verOf(y)>verOf(x))) toGh.push(y) });
   if(toSb.length) await sbUpsert(toSb);
   if(toGh.length && getToken()){
     toGh.forEach(y=>{ st.local=st.local.filter(l=>l.id!==y.id); st.local.push(y) });
     SS('wt.local.v1',st.local);
   }
+}
+/* Delete a saved workout from this device, Supabase and GitHub. */
+async function deleteWorkout(id){
+  const t=tombs(); t[id]=Date.now(); SS('wt.deleted.v1',t);
+  st.local=st.local.filter(x=>x.id!==id); SS('wt.local.v1',st.local);
+  delete st.draft[id]; SS('wt.draft.v1',st.draft);
+  render(); toast('Workout deleted');
+  await purgeDeleted();
+}
+let purging=false;
+async function purgeDeleted(){
+  if(purging) return; purging=true;
+  try{
+    const dead = l => l.filter(isDeleted).map(x=>x.id);
+    const sbIds=dead(st.sb);
+    if(sbIds.length && sbAuth()){
+      const r=await sbFetch('/rest/v1/sessions?id=in.('+sbIds.map(i=>'"'+i+'"').join(',')+')',{method:'DELETE'});
+      if(r.ok) st.sb=st.sb.filter(x=>!sbIds.includes(x.id));
+    }
+    const tok=getToken();
+    if(tok && dead(st.repo).length){
+      for(let attempt=0;attempt<3;attempt++){
+        const cur=await ghGet(tok), ids=dead(cur.arr);
+        if(!ids.length){ st.repo=cur.arr; break }
+        const kept=cur.arr.filter(x=>!ids.includes(x.id));
+        const res=await ghPut(tok,kept,cur.sha,'Delete workout: '+ids.join(', '));
+        if(res.status===409||res.status===422) continue;
+        if(res.ok) st.repo=kept;
+        break;
+      }
+    }
+  }catch(e){}
+  purging=false;
 }
 const restOn = () => LS('wt.rest', false);
 const b64enc = str => { const bytes=new TextEncoder().encode(str); let bin=''; for(let i=0;i<bytes.length;i+=8192) bin+=String.fromCharCode(...bytes.subarray(i,i+8192)); return btoa(bin) };
@@ -889,7 +931,7 @@ function viewHistory(){
       const mood = x.energy ? ' · '+MOODS[x.energy-1] : '';
       const body = woBody(x,kind);
       h += `<div class="wo ${kind}"><details><summary><div class="wdate"><small>${dt.toLocaleDateString(undefined,{weekday:'short'})}</small><b>${dt.getDate()}</b></div>
-        <div class="wmain"><div class="wt">${esc(x.name)}${loc?'<span class="pill loc">local</span>':''}</div><div class="wm">${meta}${mood}</div></div><span class="chev">›</span></summary><div class="wbody">${body}</div></details></div>`;
+        <div class="wmain"><div class="wt">${esc(x.name)}${loc?'<span class="pill loc">local</span>':''}</div><div class="wm">${meta}${mood}</div></div><span class="chev">›</span></summary><div class="wbody">${body}<button class="dellink" data-act="del" data-id="${esc(x.id)}">Delete workout</button></div></details></div>`;
     });
   });
   return h;
@@ -1065,6 +1107,7 @@ app.addEventListener('click',e=>{
   }
   else if(act==='sbout'){ try{localStorage.removeItem('wt.sb')}catch(err){} st.sb=[]; toast('Signed out'); render() }
   else if(act==='refresh') refreshApp();
+  else if(act==='del'){ const x=allSessions().find(s=>s.id===b.dataset.id); if(x && confirm('Delete '+x.name+' on '+fmtDate(x.date)+'? This removes it everywhere.')) deleteWorkout(x.id) }
   else if(act==='resttoggle'){ SS('wt.rest',!restOn()); if(restOn()===false) clearRest(); render() }
   else if(act==='save') save();
   else if(act==='copy') copyUnsynced();
@@ -1118,6 +1161,25 @@ async function checkUpdate(){
 function refreshApp(){ location.replace(location.pathname+'?r='+Date.now()) }
 document.getElementById('updBtn').addEventListener('click',refreshApp);
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') checkUpdate() });
+/* ---------- pull to refresh (History) ---------- */
+(()=>{
+  const sc=$('#scroll'), ptr=document.createElement('div'); ptr.id='ptr'; sc.prepend(ptr);
+  const PULL=60; let y0=null, dy=0, busy=false;
+  sc.addEventListener('touchstart',e=>{ y0=(st.tab==='history'&&!busy&&sc.scrollTop<=0)?e.touches[0].clientY:null; dy=0 },{passive:true});
+  sc.addEventListener('touchmove',e=>{
+    if(y0==null) return;
+    dy=Math.max(0,(e.touches[0].clientY-y0)*0.5);
+    if(sc.scrollTop>0){ dy=0 }
+    ptr.style.transition='none'; ptr.style.height=Math.min(80,dy)+'px'; ptr.classList.toggle('ready',dy>=PULL);
+  },{passive:true});
+  sc.addEventListener('touchend',async()=>{
+    if(y0==null) return; y0=null; ptr.style.transition='';
+    if(dy<PULL){ ptr.style.height='0'; return }
+    busy=true; ptr.classList.remove('ready'); ptr.classList.add('spin'); ptr.style.height='40px'; buzz(10);
+    try{ await loadRepo() }catch(e){}
+    render(); busy=false; ptr.classList.remove('spin'); ptr.style.height='0'; toast('History up to date');
+  });
+})();
 render(); loadRepo(); checkUpdate();
 </script>
 </body>
