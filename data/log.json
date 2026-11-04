@@ -149,5 +149,125 @@
   "type": "run",
   "source": "watch",
   "savedAt": "2026-11-03T20:15:29.273+00:00"
+ },
+ {
+  "hk": {
+   "avgHR": 137,
+   "maxHR": 170,
+   "endedAt": "2026-11-04T20:43:20.625Z",
+   "startedAt": "2026-11-04T20:08:06.418Z",
+   "activeKcal": 354,
+   "workoutUUID": "D39D8369-739E-4D9C-8CE0-8C802DE3EDE3"
+  },
+  "entries": [
+   {
+    "id": "squat",
+    "name": "Back squat / leg press",
+    "sets": [
+     {
+      "r": 8,
+      "w": 155
+     },
+     {
+      "r": 8,
+      "w": 165
+     },
+     {
+      "r": 7,
+      "w": 175
+     },
+     {
+      "r": 5,
+      "w": 185
+     }
+    ]
+   },
+   {
+    "id": "rdl",
+    "name": "Romanian deadlift",
+    "sets": [
+     {
+      "r": 10,
+      "w": 115
+     },
+     {
+      "r": 8,
+      "w": 135
+     },
+     {
+      "r": 8,
+      "w": 135
+     }
+    ]
+   },
+   {
+    "id": "lunge~walking-lunge",
+    "name": "Walking lunge",
+    "sets": [
+     {
+      "r": 8,
+      "w": 30
+     },
+     {
+      "r": 8,
+      "w": 30
+     },
+     {
+      "r": 8,
+      "w": 25
+     }
+    ],
+    "slot": "lunge"
+   },
+   {
+    "id": "leg-curl",
+    "name": "Leg curl",
+    "sets": [
+     {
+      "r": 10,
+      "w": 65
+     },
+     {
+      "r": 12,
+      "w": 50
+     },
+     {
+      "r": 10,
+      "w": 55
+     }
+    ]
+   },
+   {
+    "id": "calf-st",
+    "name": "Standing calf raise",
+    "sets": [
+     {
+      "r": 15,
+      "w": 160
+     },
+     {
+      "r": 13,
+      "w": 160
+     },
+     {
+      "r": 12,
+      "w": 160
+     },
+     {
+      "r": 10,
+      "w": 160
+     }
+    ]
+   }
+  ],
+  "updatedAt": "2026-11-04T20:43:23.456Z",
+  "durationMin": 35,
+  "id": "2026-11-04-lowerA",
+  "date": "2026-11-04",
+  "session": "lowerA",
+  "name": "Lower A · squat",
+  "type": "lift",
+  "source": "watch",
+  "savedAt": "2026-11-04T20:43:23.456+00:00"
  }
 ]
