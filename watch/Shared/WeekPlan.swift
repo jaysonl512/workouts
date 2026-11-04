@@ -53,6 +53,7 @@ struct WeekPlan {
     var slots: [Slot]
     var extras: [WeekRow]
     let today: String
+    private let now: Date
 
     var left: [Slot] { slots.filter { $0.done == nil && !$0.optional } }
     var doneCount: Int { slots.filter { $0.done != nil && !$0.optional }.count }
@@ -60,6 +61,7 @@ struct WeekPlan {
     init(rows: [WeekRow], now: Date = Date()) {
         let day = Day.string(now)
         today = day
+        self.now = now
         let mon = Self.monday(now)
         var slots = Self.order.map { Slot(key: $0, done: nil) }
         var extras: [WeekRow] = []
@@ -78,7 +80,7 @@ struct WeekPlan {
     /// The workout to suggest now: today's planned one if still open, else the next open one. Nil on a rest
     /// day or when the week is done.
     var next: String? {
-        let planned = Plan.todayKey()
+        let planned = Plan.todayKey(now)
         if planned == "rest" { return nil }
         let slot = slots.first { $0.done == nil && Plan.base($0.key) == Plan.base(planned) } ?? left.first
         return slot.map { key(for: $0) }

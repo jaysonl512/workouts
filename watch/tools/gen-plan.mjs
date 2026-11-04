@@ -1,4 +1,4 @@
-// Generates watch/Workouts/Plan.swift from PLAN and ALTS in index.html, so the Watch uses
+// Generates watch/Shared/Plan.swift from PLAN and ALTS in index.html, so the Watch uses
 // exactly the web app's exercise ids, sets, rep ranges, rest strings and alternative ids.
 // Usage: node watch/tools/gen-plan.mjs   (run again whenever PLAN or ALTS changes)
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -49,6 +49,6 @@ lines.push('    ]');
 lines.push('}');
 lines.push('');
 
-const out = join(root, 'watch', 'Workouts', 'Plan.swift');
+const out = join(root, 'watch', 'Shared', 'Plan.swift');
 writeFileSync(out, lines.join('\n'));
 console.log('Wrote', out);

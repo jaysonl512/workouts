@@ -52,6 +52,8 @@ struct ContentView: View {
             }
             // A lift draft without a live workout (for example after a reboot): restart HealthKit for it.
             if lift.draft != nil, !workout.active { try? await workout.start(.traditionalStrengthTraining) }
+            sync.publishWeek()
+            await AppGroup.updateGymRelevance()
             sync.flush()
             sync.refreshHistory()
             await run.backfillRoutes(from: workout.store)
@@ -65,6 +67,7 @@ struct TodayView: View {
     @EnvironmentObject var run: RunStore
     @EnvironmentObject var timed: TimedStore
     @EnvironmentObject var workout: WorkoutManager
+    @EnvironmentObject var gym: GymStore
 
     var body: some View {
         let week = WeekPlan(rows: sync.week)
@@ -94,6 +97,9 @@ struct TodayView: View {
                         }
                         .buttonStyle(.plain)
                     }
+
+                    header("Gym", nil)
+                    gymRow
 
                     if !sync.statusText.isEmpty {
                         Text(sync.statusText).font(.footnote).foregroundStyle(.secondary)
@@ -131,6 +137,20 @@ struct TodayView: View {
             .padding(10)
             .background(RoundedRectangle(cornerRadius: 14).fill(Color.card))
         }
+    }
+
+    /// Saves the gym's location so the Smart Stack can show the widget there. Tap it while at the gym.
+    @ViewBuilder private var gymRow: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Button(gym.locating ? "Finding you…" : gym.isSet ? "Update gym to here" : "Set gym to here") { gym.setHere() }
+                .buttonStyle(PillButtonStyle()).disabled(gym.locating)
+            Text(gym.message ?? (gym.isSet ? "The Smart Stack can show Workouts when you get there." : "Tap this at your gym so the Smart Stack can show Workouts there."))
+                .font(.caption2).foregroundStyle(.secondary)
+            if gym.isSet && !gym.locating {
+                Button("Forget gym") { gym.clear() }.font(.caption2).foregroundStyle(.secondary).buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 2)
     }
 
     private func header(_ title: String, _ trailing: String?) -> some View {

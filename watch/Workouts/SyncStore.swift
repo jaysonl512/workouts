@@ -1,4 +1,5 @@
 import Foundation
+import WidgetKit
 
 /// Offline queue plus "last time" history. Every write lands on disk first and is uploaded when
 /// Supabase is reachable (the Watch has no cellular). Only the newest copy of each session is kept.
@@ -116,7 +117,17 @@ final class SyncStore: ObservableObject {
     }
 
     private func persistQueue() { try? JSONEncoder().encode(pending).write(to: queueURL, options: .atomic) }
-    private func persistWeek() { try? JSONEncoder().encode(week).write(to: weekURL, options: .atomic) }
+    /// Saves this week's sessions and hands them to the watch-face complication.
+    private func persistWeek() {
+        try? JSONEncoder().encode(week).write(to: weekURL, options: .atomic)
+        publishWeek()
+    }
+
+    func publishWeek() {
+        guard AppGroup.week != week else { return }
+        AppGroup.week = week
+        WidgetCenter.shared.reloadAllTimelines()
+    }
     private func persistHistory() { try? JSONEncoder().encode(history).write(to: historyURL, options: .atomic) }
 
     private static func short(_ e: Error) -> String {
