@@ -10,7 +10,9 @@ struct ContentView: View {
 
     var body: some View {
         Group {
-            if let s = lift.summary {
+            if let row = sync.toRate {
+                EffortView(name: row.name)
+            } else if let s = lift.summary {
                 LiftSummaryView(summary: s)
             } else if let s = run.summary {
                 RunSummaryView(summary: s)

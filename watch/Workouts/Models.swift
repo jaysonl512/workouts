@@ -57,6 +57,8 @@ struct SessionData: Codable {
     var yoga: Timed?
     var other: Timed?
     var hk: HKInfo?
+    /// "easy" | "medium" | "hard", asked right after a workout (same field the web app uses).
+    var effort: String?
     var updatedAt: String
 }
 

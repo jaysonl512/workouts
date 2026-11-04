@@ -11,6 +11,8 @@ final class SyncStore: ObservableObject {
     @Published private(set) var history: [HistoryRow] = []
     /// This week's completed sessions (any type), for Today's checklist.
     @Published private(set) var week: [WeekRow] = []
+    /// The workout just finished, waiting for "How did it go?".
+    @Published private(set) var toRate: SessionRow?
 
     private var flushing = false
     private var retryTask: Task<Void, Never>?
@@ -42,12 +44,23 @@ final class SyncStore: ObservableObject {
         pending[row.id] = row
         persistQueue()
         if row.status == "complete", row.type == .lift { remember(row) }
+        if row.status == "complete", row.data.effort == nil { toRate = row }
         if row.status == "complete" {
             week.removeAll { $0.id == row.id }
             week.append(WeekRow(id: row.id, date: row.date, session: row.session, name: row.name, type: row.type.rawValue))
             persistWeek()
         }
         flush()
+    }
+
+    /// Saves the answer to "How did it go?" on the workout just finished (nil = skipped).
+    func rate(_ effort: String?) {
+        guard var row = toRate else { return }
+        toRate = nil
+        guard let effort else { return }
+        row.data.effort = effort
+        row.data.updatedAt = ISO.string()
+        enqueue(row)
     }
 
     func flush() {
