@@ -110,10 +110,40 @@ final class SyncStore: ObservableObject {
 
     /// Like the web app's lastFor: the most recent earlier session that has sets for this exercise id.
     func lastSets(for exerciseId: String, excluding sessionId: String, before date: String) -> (date: String, sets: [LoggedSet])? {
+        recentSets(for: exerciseId, excluding: sessionId, before: date, limit: 1).first.map { (date, $0) }
+    }
+
+    /// Sets from the most recent earlier sessions with this exercise, newest first.
+    func recentSets(for exerciseId: String, excluding sessionId: String, before date: String, limit: Int) -> [[LoggedSet]] {
+        var out: [[LoggedSet]] = []
         for s in history where s.id != sessionId && s.date <= date {
-            if let e = s.data.entries?.first(where: { $0.id == exerciseId }), !e.sets.isEmpty { return (s.date, e.sets) }
+            if let e = s.data.entries?.first(where: { $0.id == exerciseId }), !e.sets.isEmpty { out.append(e.sets) }
+            if out.count >= limit { break }
         }
-        return nil
+        return out
+    }
+
+    /// Next target for an exercise, the same rules as the web app's suggestFor (without deload weeks):
+    /// top of the rep range on every set → add weight; missed the bottom twice → drop about 10%; else add a rep.
+    func suggestion(for step: Step, excluding sessionId: String, before date: String) -> Suggestion? {
+        let hist = recentSets(for: step.id, excluding: sessionId, before: date, limit: 2)
+        guard let latest = hist.first else { return nil }
+        let q = step.slot.weightStep, lo = step.slot.reps.lowerBound, hi = step.slot.reps.upperBound
+        func top(_ sets: [LoggedSet]) -> (w: Double, minR: Int) {
+            let mw = sets.map(\.w).max() ?? 0
+            return (mw, sets.filter { $0.w == mw }.map(\.r).min() ?? 0)
+        }
+        let (w, minR) = top(latest)
+        if w == 0 {
+            let inc = step.slot.repStep
+            return Suggestion(w: 0, r: minR + inc, why: "+\(inc) \(step.slot.id == "plank" ? "sec" : "rep")")
+        }
+        if minR >= hi { return Suggestion(w: w + q, r: lo, why: "+\(Fmt.weight(q)) lb · hit \(hi)s last time") }
+        if hist.count > 1, top(hist[1]).minR < lo, minR < lo {
+            return Suggestion(w: max(0, (w * 0.9 / q).rounded() * q), r: lo, why: "−10% · missed twice")
+        }
+        let r = minR < lo ? lo : min(hi, minR + 1)
+        return Suggestion(w: w, r: r, why: minR < lo ? "Same weight · get \(lo)+" : "Same weight · aim for \(r)")
     }
 
     private func persistQueue() { try? JSONEncoder().encode(pending).write(to: queueURL, options: .atomic) }

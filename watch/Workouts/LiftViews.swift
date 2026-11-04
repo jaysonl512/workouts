@@ -36,6 +36,10 @@ struct ExerciseView: View {
         return sync.lastSets(for: step.id, excluding: d.id, before: d.date)?.sets
     }
     private var isPlank: Bool { step.slot.id == "plank" }
+    private var suggestion: Suggestion? {
+        guard let d = lift.draft else { return nil }
+        return sync.suggestion(for: step, excluding: d.id, before: d.date)
+    }
 
     var body: some View {
         TabView(selection: $page) {
@@ -77,9 +81,10 @@ struct ExerciseView: View {
         .padding(.horizontal, 2)
     }
 
-    /// "Last 185×5 185×5 180×6", or this session's sets once logging has started.
+    /// The suggestion's reason ("+5 lb · hit 8s last time") before the first set, this session's sets after.
     private var lastLine: String {
         if !done.isEmpty { return "Done " + done.map(\.text).joined(separator: " ") }
+        if let s = suggestion { return s.why }
         guard let l = last, !l.isEmpty else { return "New" }
         return "Last " + l.map(\.text).joined(separator: " ")
     }
@@ -106,9 +111,12 @@ struct ExerciseView: View {
         .focusEffectDisabled()
     }
 
-    /// This session's last set, else last time's set at the same position, else the bottom of the rep range.
+    /// This session's last set, else the suggested target, else last time's set, else the bottom of the rep range
+    /// (the web app's initCur order).
     private func prefill() {
         if let s = done.last {
+            weight = s.w; reps = Double(s.r)
+        } else if let s = suggestion {
             weight = s.w; reps = Double(s.r)
         } else if let l = last, !l.isEmpty {
             let s = l[min(done.count, l.count - 1)]

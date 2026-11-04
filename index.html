@@ -274,6 +274,22 @@ details[open]>summary .chev{transform:rotate(90deg)}
 .elap b{display:block;font-size:52px;font-weight:800;letter-spacing:-1px;color:var(--acc);font-variant-numeric:tabular-nums}
 .elap span{color:var(--mute);font-size:13px}
 .wo.other{border-left-color:#a78bfa}
+.recapc{display:flex;align-items:center;gap:12px;cursor:pointer;background:linear-gradient(135deg,#3a1518,#171c22 70%);border-color:#5a2328}
+.recapc .ric{flex:none;font-size:26px;line-height:1}
+.recapc span{flex:1;min-width:0;display:flex;flex-direction:column}
+.recapc small{color:var(--mute);font-size:13px}
+.recapc .xbtn{width:30px;height:30px;font-size:14px;border-radius:9px}
+.rlink{background:none;border:0;color:var(--acc);font:inherit;font-weight:700;padding:0}
+.mchips{display:flex;gap:8px;overflow-x:auto;margin:0 -16px 4px;padding:2px 16px 8px;scrollbar-width:none}
+.mchips::-webkit-scrollbar{display:none}
+.mchips button{flex:none;border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:99px;padding:9px 15px;font-size:14px;font-weight:700}
+.recapbg{position:fixed;inset:0;z-index:60;background:#07090c;display:flex;flex-direction:column;padding:calc(10px + env(safe-area-inset-top)) 16px calc(14px + env(safe-area-inset-bottom));animation:fade .2s}
+.recaptop{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.recaptop b{font-size:16px}
+.recaptop span{width:36px}
+.recapimg{flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
+.recapimg img{max-width:100%;max-height:100%;border-radius:18px;box-shadow:0 10px 40px rgba(0,0,0,.6)}
+.recapbtns{margin-top:12px}
 .recap{margin:4px 0 2px;border-top:1px solid rgba(255,255,255,.08)}
 .recap>summary{list-style:none;display:flex;justify-content:space-between;align-items:center;padding:14px 0;cursor:pointer;font-weight:700}
 .recap>summary::-webkit-details-marker{display:none}
@@ -397,7 +413,7 @@ const sessName = k => k==='run2' ? 'Run 2 (optional)' : isOther(k) ? OTHERS[k].n
 const sessDef = k => isOther(k) ? {name:OTHERS[k].name, type:'other', note:''} : (PLAN.sessions[sessBase(k)] || PLAN.sessions.rest);
 const kindOf = x => x.yoga ? 'yoga' : x.other ? 'other' : x.run ? 'run' : 'lift';
 const CHEERS = ['Nice one','Solid set','Strong','Locked in','Clean rep','Beast mode','Smooth'];
-const APP_VERSION='2026-11-04.2';
+const APP_VERSION='2026-11-04.3';
 const OWNER='jaysonl512', REPO='workouts', LOGPATH='data/log.json';
 
 /* alternatives per exercise: each alternative keeps its own history so weights stay comparable */
@@ -818,7 +834,7 @@ function render(){
   const uns = st.local.length ? st.local.length+' unsynced' : '';
   $('#sub').textContent = st.tab==='today' ? [new Date(st.date+'T12:00:00').toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'}),uns].filter(Boolean).join(' · ') : uns;
   const v = {today:viewToday, history:viewHistory, progress:viewProgress, plan:viewPlan}[st.tab];
-  $('#app').innerHTML = v() + (st.add&&!inWk ? addSheet() : '');
+  $('#app').innerHTML = v() + (st.add&&!inWk ? addSheet() : '') + (st.recap ? recapView() : '');
   if(st.wk){ st.wk.anim=false; st.wk.just=null }
 }
 
@@ -869,7 +885,7 @@ function viewToday(){
   if(st.wk) return viewWorkout();
   if(st.auto) st.sess = pickSess(st.date);
   const wp=weekPlan(st.date);
-  return weekStrip() + todayHero(wp) + weekList(wp);
+  return recapBanners() + weekStrip() + todayHero(wp) + weekList(wp);
 }
 function weekList(wp){
   const t=todayStr(), cur=monOf(t)===wp.mon;
@@ -1143,11 +1159,13 @@ function viewHistory(){
     <div class="tools2">${getToken()?`<button class="btn sm" data-act="sync">Sync now</button>`:''}<button class="btn ghost sm" data-act="copy">Copy unsynced</button></div></div>`;
   if(!all.length) return h+`<div class="empty">No workouts logged yet.<br>Log your first one on the Today tab.</div>`;
   const thisMon=monOf(todayStr()), lastMon=addDays(thisMon,-7), groups=new Map();
+  const months=[...new Set(all.map(x=>x.date.slice(0,7)))].filter(m=>m<todayStr().slice(0,7));
+  if(months.length) h += `<div class="schhd"><b>Monthly recaps</b></div><div class="mchips">${months.map(m=>`<button data-act="recap" data-k="month" data-v="${m}">${esc(monthName(m))}</button>`).join('')}</div>`;
   all.forEach(x=>{ const k=monOf(x.date); if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(x) });
   const rng = m => { const f=d=>new Date(d+'T12:00:00').toLocaleDateString(undefined,{month:'short',day:'numeric'}); return f(m)+' – '+f(addDays(m,6)) };
   groups.forEach((list,mon)=>{
     const label = mon===thisMon ? 'This week' : mon===lastMon ? 'Last week' : rng(mon);
-    h += `<div class="wkhead"><b>${label}</b><span>${mon===thisMon||mon===lastMon?rng(mon)+' · ':''}${list.length} workout${list.length>1?'s':''}</span></div>`;
+    h += `<div class="wkhead"><b>${label}</b><span>${mon===thisMon||mon===lastMon?rng(mon)+' · ':''}${list.length} workout${list.length>1?'s':''}${mon<thisMon?` · <button class="rlink" data-act="recap" data-k="week" data-v="${mon}">Recap</button>`:''}</span></div>`;
     list.forEach(x=>{
       const kind = kindOf(x), loc = st.local.some(l=>l.id===x.id);
       const dt = new Date(x.date+'T12:00:00');
@@ -1352,6 +1370,149 @@ function insightsCard(){
     ${out.slice(0,4).map(([i,c,h,n])=>`<div class="insrow">${ico(i,c)}<div><b>${h}</b><span>${n}</span></div></div>`).join('')}</div>`;
 }
 
+/* ---------- week & month in review ---------- */
+const sessMin = s => s.run ? (+s.run.minutes||0) : (s.yoga||s.other) ? (+(s.yoga||s.other).minutes||0) : (+s.durationMin||0);
+const monthStart = ym => ym+'-01';
+const monthAdd = (ym,n) => { const [y,m]=ym.split('-').map(Number), d=new Date(y,m-1+n,1); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0') };
+const monthEnd = ym => addDays(monthStart(monthAdd(ym,1)),-1);
+const monthName = ym => new Date(ym+'-15T12:00:00').toLocaleDateString(undefined,{month:'long',year:'numeric'});
+const fmtMins = m => { m=Math.round(m); return m>=60 ? Math.floor(m/60)+'h '+String(m%60).padStart(2,'0')+'m' : m+' min' };
+const KIND_COL = {lift:'#ef4444', run:'#fb923c', yoga:'#a78bfa', other:'#a78bfa'};
+/* Everything a recap shows, for a week (key = its Monday) or a month (key = YYYY-MM). */
+function periodReview(kind,key){
+  const start = kind==='week' ? key : monthStart(key), end = kind==='week' ? addDays(key,6) : monthEnd(key);
+  const pStart = kind==='week' ? addDays(key,-7) : monthStart(monthAdd(key,-1)), pEnd = addDays(start,-1);
+  const all=allSessions(), list=all.filter(s=>s.date>=start&&s.date<=end).reverse();
+  const agg = L => { const o={n:0,lifts:0,runs:0,extras:0,vol:0,km:0,min:0};
+    L.forEach(s=>{ o.n++; o.min+=sessMin(s);
+      if(s.run){o.runs++;o.km+=+s.run.distanceKm||0} else if(s.yoga||s.other) o.extras++;
+      else {o.lifts++;(s.entries||[]).forEach(e=>e.sets.forEach(x=>o.vol+=(x.w||0)*(x.r||0)))} });
+    return o };
+  const cur=agg(list), was=agg(all.filter(s=>s.date>=pStart&&s.date<=pEnd));
+  // A PR is a heavier set than anything logged for that exercise before this period (first-timers don't count).
+  const before=new Map();
+  all.filter(s=>s.date<start).forEach(s=>(s.entries||[]).forEach(e=>e.sets.forEach(x=>{ if((x.w||0)>(before.get(e.id)??-1)) before.set(e.id,x.w||0) })));
+  const prs=new Map();
+  list.forEach(s=>(s.entries||[]).forEach(e=>e.sets.forEach(x=>{ const b=before.get(e.id);
+    if(b!=null&&x.w>0&&x.w>b){ const p=prs.get(e.id); if(!p||x.w>p.w||(x.w===p.w&&x.r>p.r)) prs.set(e.id,{name:(EXMAP[e.id]||e).name.split(/ [\/(]/)[0],w:x.w,r:x.r}) } })));
+  let gain=null;
+  new Set(list.flatMap(s=>(s.entries||[]).map(e=>e.id))).forEach(id=>{
+    const pts=liftPoints(id), a=pts.filter(p=>p.d<start).pop(), b=pts.filter(p=>p.d>=start&&p.d<=end).pop();
+    if(a&&b&&b.e1>a.e1&&(!gain||b.e1-a.e1>gain.d)) gain={name:(EXMAP[id]?.name||id).split(/ [\/(]/)[0],d:b.e1-a.e1};
+  });
+  const runs=list.filter(s=>s.run&&+s.run.distanceKm>=1&&+s.run.minutes>0);
+  const bestPace=runs.length?Math.min(...runs.map(s=>Math.round(s.run.minutes*60/s.run.distanceKm))):null;
+  const days={}; list.forEach(s=>{ (days[s.date] ||= []).push(kindOf(s)) });
+  const R={kind,key,start,end,cur,was,prs:[...prs.values()].sort((a,b)=>b.w-a.w),gain,bestPace,days};
+  if(kind==='week'){
+    R.done=weekPlan(start).doneN;
+    let k=0, m=start; while(k<52 && weekPlan(m).doneN>=5){k++;m=addDays(m,-7)} R.streak=k;
+  } else {
+    const mons=[]; for(let m=monOf(start); m<=end; m=addDays(m,7)) if(m>=start) mons.push(m);
+    R.weeks=mons.length; R.weeksHit=mons.filter(m=>weekPlan(m).doneN>=5).length;
+  }
+  const hl=[];
+  if(R.prs.length>2){ const p=R.prs[0]; hl.push(`${R.prs.length} new PRs`, `Top PR: ${p.name} ${p.w} lb × ${p.r}`) }
+  else R.prs.forEach(p=>hl.push(`New PR: ${p.name} ${p.w} lb × ${p.r}`));
+  if(gain) hl.push(`${gain.name} est. 1RM +${gain.d} lb`);
+  if(kind==='week'&&R.streak>=2) hl.push(`${R.streak} weeks in a row at 5/5`);
+  if(was.vol>0&&cur.vol>0){ const p=Math.round((cur.vol-was.vol)/was.vol*100); hl.push(`Volume ${p>=0?'up':'down'} ${Math.abs(p)}% vs last ${kind}`) }
+  if(!hl.length) hl.push(cur.n?`${cur.n} workout${cur.n>1?'s':''} logged. Keep it rolling.`:'A quiet one. Next one counts.');
+  R.highlights=hl;
+  return R;
+}
+/* The share image: 1080 × 1920, the size of a phone story. */
+function drawRecap(R){
+  const W=1080,H=1920,P=90, c=document.createElement('canvas'); c.width=W; c.height=H;
+  const x=c.getContext('2d'), F=(w,sz)=>`${w} ${sz}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+  const text=(t,X,Y,font,col,align='left')=>{x.font=font;x.fillStyle=col;x.textAlign=align;x.fillText(t,X,Y)};
+  x.fillStyle='#0f1216'; x.fillRect(0,0,W,H);
+  let g=x.createRadialGradient(W/2,-80,0,W/2,-80,1150); g.addColorStop(0,'rgba(239,68,68,.42)'); g.addColorStop(1,'rgba(239,68,68,0)');
+  x.fillStyle=g; x.fillRect(0,0,W,H);
+  const wk=R.kind==='week';
+  text(wk?'WEEK IN REVIEW':'MONTH IN REVIEW',P,180,F(800,40),'#ef4444');
+  const title = wk ? (()=>{ const a=new Date(R.start+'T12:00:00'), b=new Date(R.end+'T12:00:00'), m=d=>d.toLocaleDateString(undefined,{month:'short'});
+    return m(a)+' '+a.getDate()+' – '+(m(a)===m(b)?'':m(b)+' ')+b.getDate() })() : monthName(R.key);
+  text(title,P,285,F(800,92),'#e8edf2');
+  let y;
+  if(wk){
+    const cx=W/2, cy=575, r=185;
+    x.lineWidth=38; x.lineCap='round'; x.strokeStyle='#262d36'; x.beginPath(); x.arc(cx,cy,r,0,Math.PI*2); x.stroke();
+    if(R.done>0){ x.strokeStyle='#ef4444'; x.beginPath(); x.arc(cx,cy,r,-Math.PI/2,-Math.PI/2+Math.PI*2*Math.min(1,R.done/5)); x.stroke() }
+    text(`${R.done}/5`,cx,cy+40,F(800,140),'#e8edf2','center');
+    text('workouts',cx,cy+100,F(600,38),'#8b97a5','center');
+    const L=['M','T','W','T','F','S','S'], step=(W-2*P)/7;
+    L.forEach((l,i)=>{ const X=P+step*i+step/2, k=R.days[addDays(R.start,i)];
+      text(l,X,880,F(700,32),'#8b97a5','center');
+      x.beginPath(); x.arc(X,945,36,0,Math.PI*2);
+      if(k){ x.fillStyle=KIND_COL[k[0]]; x.fill(); if(k.length>1) text('+'+(k.length-1),X,957,F(800,30),'#fff','center') }
+      else { x.lineWidth=5; x.strokeStyle='#262d36'; x.stroke() }
+    });
+    y=1030;
+  } else {
+    text(String(R.cur.n),W/2,560,F(800,230),'#e8edf2','center');
+    text(R.cur.n===1?'workout':'workouts',W/2,625,F(600,40),'#8b97a5','center');
+    text(`${R.weeksHit} of ${R.weeks} weeks at 5/5`,W/2,690,F(700,38),'#ef4444','center');
+    const step=(W-2*P)/7, first=monOf(R.start);
+    ['M','T','W','T','F','S','S'].forEach((l,i)=>text(l,P+step*i+step/2,770,F(700,30),'#8b97a5','center'));
+    let row=0;
+    for(let d=first; d<=R.end; d=addDays(d,1)){
+      const i=(new Date(d+'T12:00:00').getDay()+6)%7, X=P+step*i+step/2, Y=825+row*68;
+      if(d>=R.start){ const k=R.days[d]; x.beginPath(); x.arc(X,Y,25,0,Math.PI*2);
+        if(k){ x.fillStyle=KIND_COL[k[0]]; x.fill() } else { x.lineWidth=4; x.strokeStyle='#262d36'; x.stroke() } }
+      if(i===6) row++;
+    }
+    y=825+(row+(((new Date(R.end+'T12:00:00').getDay()+6)%7)===6?0:1))*68-10;
+  }
+  const tiles=[[kfmt(R.cur.vol)+' lb','Lifted'],[(R.cur.km?R.cur.km.toFixed(1).replace(/\.0$/,''):'0')+' km','Running'],[R.bestPace?mmss(R.bestPace)+' /km':'—','Best pace'],[fmtMins(R.cur.min),'Time trained']];
+  const tw=(W-2*P-30)/2, th=wk?190:170;
+  tiles.forEach(([v,l],i)=>{ const X=P+(i%2)*(tw+30), Y=y+Math.floor(i/2)*(th+26);
+    x.fillStyle='#171c22'; x.strokeStyle='#262d36'; x.lineWidth=3; x.beginPath(); x.roundRect(X,Y,tw,th,30); x.fill(); x.stroke();
+    text(v,X+36,Y+th/2+12,F(800,wk?68:62),'#e8edf2'); text(l,X+36,Y+th/2+62,F(600,32),'#8b97a5') });
+  y+=2*th+26+80;
+  const room=Math.max(1,Math.floor((1850-y)/70));
+  R.highlights.slice(0,room).forEach((h,i)=>{ const Y=y+i*70;
+    x.beginPath(); x.arc(P+12,Y-13,11,0,Math.PI*2); x.fillStyle='#ef4444'; x.fill();
+    x.font=F(700,40); let t=h; while(x.measureText(t).width>W-2*P-50&&t.length>4) t=t.slice(0,-2);
+    text(t===h?h:t+'…',P+44,Y,F(700,40),'#e8edf2') });
+  text('LIFT & RUN LOG',W/2,1870,F(800,28),'#5b6672','center');
+  return c;
+}
+function recapFile(R){
+  const k=R.kind+R.key+'|'+allSessions().length;
+  if(st.recapCache?.k===k) return st.recapCache;
+  const url=drawRecap(R).toDataURL('image/png'), bin=atob(url.split(',')[1]), u8=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) u8[i]=bin.charCodeAt(i);
+  const name=(R.kind==='week'?'week-':'month-')+R.key+'.png';
+  return st.recapCache={k,url,file:new File([u8],name,{type:'image/png'})};
+}
+function recapView(){
+  const R=periodReview(st.recap.kind,st.recap.key), f=recapFile(R);
+  const na = st.recap.shown ? ' style="animation:none"' : ''; st.recap.shown=true;
+  return `<div class="recapbg"${na}><div class="recaptop"><button class="xbtn" data-act="recapclose" aria-label="Close">✕</button><b>${R.kind==='week'?'Week':'Month'} in review</b><span></span></div>
+    <div class="recapimg"><img src="${f.url}" alt="${R.kind==='week'?'Week':'Month'} in review"></div>
+    <div class="recapbtns"><button class="btn big" data-act="recapshare">Share</button></div>
+    <div class="note" style="text-align:center;margin-top:8px">Post it to a story, send it, or save it to Photos.</div></div>`;
+}
+function shareRecap(){
+  const f=st.recapCache; if(!f) return;
+  if(navigator.canShare&&navigator.canShare({files:[f.file]})) navigator.share({files:[f.file]}).catch(()=>{});
+  else { const a=document.createElement('a'); a.href=f.url; a.download=f.file.name; a.click(); toast('Image saved') }
+}
+/* On Today: last week's recap Monday–Wednesday, last month's on the 1st–5th, until dismissed. */
+function recapBanners(){
+  const t=todayStr(); if(st.date!==t) return '';
+  const seen=LS('wt.recapSeen',{}), out=[], dow=(new Date(t+'T12:00:00').getDay()+6)%7, all=allSessions();
+  const lw=addDays(monOf(t),-7);
+  if(dow<=2 && seen.week!==lw && all.some(s=>s.date>=lw&&s.date<=addDays(lw,6))){
+    const R=periodReview('week',lw);
+    out.push(['week',lw,'Your week in review',`${shortDate(R.start)} – ${shortDate(R.end)} · ${R.done} of 5 workouts`]);
+  }
+  const lm=monthAdd(t.slice(0,7),-1);
+  if(+t.slice(8)<=5 && seen.month!==lm && all.some(s=>s.date.startsWith(lm))) out.push(['month',lm,'Your month in review',monthName(lm)]);
+  return out.map(([k,v,h,sub])=>`<div class="card recapc" data-act="recap" data-k="${k}" data-v="${v}"><span class="ric">${k==='week'?'🗓️':'🏁'}</span><span><b>${h}</b><small>${esc(sub)}</small></span><button class="xbtn" data-act="recapx" data-k="${k}" data-v="${v}" aria-label="Dismiss">✕</button></div>`).join('');
+}
+
 function viewProgress(){
   chartN=0;
   return weekCard()+strengthCard()+runCard()+prCard()+volumeCard()+insightsCard();
@@ -1428,6 +1589,10 @@ app.addEventListener('click',e=>{
   else if(act==='wk'){ st.date=addDays(st.date,+b.dataset.n); st.auto=true; render() }
   else if(act==='pick'){ st.auto=false; st.sess=slotKey(b.dataset.k,st.date); render(); toTop() }
   else if(act==='opensess'){ st.auto=false; st.date=b.dataset.d; st.sess=b.dataset.s; render(); toTop() }
+  else if(act==='recap'){ st.recap={kind:b.dataset.k,key:b.dataset.v}; render() }
+  else if(act==='recapx'){ const sn=LS('wt.recapSeen',{}); sn[b.dataset.k]=b.dataset.v; SS('wt.recapSeen',sn); render() }
+  else if(act==='recapclose'){ st.recap=null; render() }
+  else if(act==='recapshare') shareRecap();
   else if(act==='addclose'){ if(e.target.closest('[data-stop]') && !b.classList.contains('btn')) return; st.add=null; render() }
   else if(act==='addgo'){ if(b.dataset.k==='other'){ st.add.other=true; render(); const i=$('#addLabel'); if(i) i.focus() } else beginAdd(b.dataset.k) }
   else if(act==='addother'){ const l=(st.add.label||'').trim(); if(!l) return toast('Type a name first'); beginAdd('other',l) }

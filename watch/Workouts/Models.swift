@@ -88,6 +88,13 @@ struct HistoryRow: Codable {
     var data: Payload
 }
 
+/// Suggested target for the first set of an exercise, with a short reason.
+struct Suggestion {
+    let w: Double
+    let r: Int
+    let why: String
+}
+
 enum Fmt {
     static func weight(_ w: Double) -> String {
         if w.truncatingRemainder(dividingBy: 1) == 0 { return String(Int(w)) }
