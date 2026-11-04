@@ -210,7 +210,14 @@ details[open]>summary .chev{transform:rotate(90deg)}
 .wkhead:first-child{margin-top:8px}
 .wkhead b{font-size:13px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;color:var(--mute)}
 .wkhead span{font-size:13px;color:var(--mute)}
-.wo{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--acc);border-radius:16px;margin:10px 0;overflow:hidden}
+.wo{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--acc);border-radius:16px;margin:10px 0;overflow:hidden;position:relative}
+.wo>details{position:relative;z-index:1;background:var(--card);transition:transform .22s var(--ease);touch-action:pan-y}
+.wo.swiping>details{transition:none}
+.swdel{position:absolute;top:0;right:0;bottom:0;width:88px;border:0;background:#dc2626;color:#fff;font:inherit;font-size:15px;font-weight:800}
+.undo{position:fixed;left:16px;right:16px;bottom:calc(84px + env(safe-area-inset-bottom));max-width:600px;margin:0 auto;z-index:35;display:flex;align-items:center;justify-content:space-between;gap:12px;background:#e8edf2;color:#0f1216;border-radius:14px;padding:12px 14px 12px 16px;font-weight:700;font-size:15px;box-shadow:0 8px 30px rgba(0,0,0,.45);animation:rise .25s var(--ease)}
+.undo span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.undo button{flex:none;border:0;background:none;color:#dc2626;font:inherit;font-weight:800;padding:4px 2px}
+.undo[hidden]{display:none}
 .wo.run{border-left-color:var(--acc2)}
 .wo.yoga{border-left-color:var(--warn)}
 .wo>details>summary{list-style:none;display:flex;align-items:center;gap:14px;padding:14px;cursor:pointer}
@@ -361,6 +368,7 @@ details[open]>summary .chev{transform:rotate(90deg)}
 </nav>
 </div>
 <div class="toast" id="toast"></div>
+<div class="undo" id="undo" hidden><span></span><button id="undoBtn">Undo</button></div>
 
 <script>
 /* ---------- Plan (mirrors the training plan doc) ---------- */
@@ -416,7 +424,7 @@ const EFFORT = {easy:'Easy', medium:'Medium', hard:'Hard'};
 const effortSeg = (act,cur) => `<div class="segc">${Object.entries(EFFORT).map(([v,l])=>`<button class="${v===cur?'on':''}" data-act="${act}" data-v="${v}">${l}</button>`).join('')}</div>`;
 const kindOf = x => x.yoga ? 'yoga' : x.other ? 'other' : x.run ? 'run' : 'lift';
 const CHEERS = ['Nice one','Solid set','Strong','Locked in','Clean rep','Beast mode','Smooth'];
-const APP_VERSION='2026-11-04.4';
+const APP_VERSION='2026-11-04.5';
 const OWNER='jaysonl512', REPO='workouts', LOGPATH='data/log.json';
 
 /* alternatives per exercise: each alternative keeps its own history so weights stay comparable */
@@ -511,7 +519,7 @@ const allSessions = () => {
   st.repo.forEach(s=>m.set(s.id,s));
   st.sb.forEach(s=>{ const c=m.get(s.id); if(!c || verOf(s)>=verOf(c)) m.set(s.id,s) });
   st.local.forEach(s=>m.set(s.id,s));
-  return [...m.values()].filter(s=>!isDeleted(s)).sort((a,b)=> a.date<b.date?1:a.date>b.date?-1:0);
+  return [...m.values()].filter(s=>!isDeleted(s) && s.id!==st.hidden).sort((a,b)=> a.date<b.date?1:a.date>b.date?-1:0);
 };
 const isLocalOnly = s => !st.repo.some(r=>r.id===s.id && contentOf(r)===contentOf(s));
 const sid = () => st.date+'-'+st.sess;
@@ -686,6 +694,24 @@ async function deleteWorkout(id){
   delete st.draft[id]; SS('wt.draft.v1',st.draft);
   render(); toast('Workout deleted');
   await purgeDeleted();
+}
+/* Delete waits 5 seconds with an Undo bar; leaving the app finishes it straight away. */
+let pendingDel=null;
+function askDelete(id){
+  const x=allSessions().find(s=>s.id===id); if(!x) return;
+  if(pendingDel) commitDelete();
+  pendingDel={id, t:setTimeout(commitDelete,5000)};
+  st.hidden=id; render(); buzz(20);
+  const u=$('#undo'); u.querySelector('span').textContent='Deleted '+x.name+' · '+shortDate(x.date); u.hidden=false;
+}
+function commitDelete(){
+  const p=pendingDel; if(!p) return;
+  pendingDel=null; clearTimeout(p.t); $('#undo').hidden=true; st.hidden=null;
+  deleteWorkout(p.id);
+}
+function undoDelete(){
+  const p=pendingDel; if(!p) return;
+  pendingDel=null; clearTimeout(p.t); $('#undo').hidden=true; st.hidden=null; render(); toast('Restored');
 }
 let purging=false;
 async function purgeDeleted(){
@@ -1213,7 +1239,7 @@ function viewHistory(){
       const meta = (x.yoga||x.other) ? `${(x.yoga||x.other).minutes??'?'} min${x.other?.distanceKm?' · '+x.other.distanceKm+' km':''}` : x.run ? `${x.indoor?'Indoor · ':''}${x.run.distanceKm??'?'} km · ${runTime(x.run.minutes)}${paceStr(x.run)}` : `${(x.entries||[]).length} exercises${x.durationMin?' · '+x.durationMin+' min':''}`;
       const mood = (x.effort ? ' · '+EFFORT[x.effort] : '') + (x.energy ? ' · '+MOODS[x.energy-1] : '');
       const body = woBody(x,kind);
-      h += `<div class="wo ${kind}"><details><summary><div class="wdate"><small>${dt.toLocaleDateString(undefined,{weekday:'short'})}</small><b>${dt.getDate()}</b></div>
+      h += `<div class="wo ${kind}"><button class="swdel" data-act="swdel" data-id="${esc(x.id)}" tabindex="-1">Delete</button><details><summary><div class="wdate"><small>${dt.toLocaleDateString(undefined,{weekday:'short'})}</small><b>${dt.getDate()}</b></div>
         <div class="wmain"><div class="wt">${esc(x.name)}${loc?'<span class="pill loc">local</span>':''}</div><div class="wm">${meta}${mood}</div></div><span class="chev">›</span></summary><div class="wbody">${body}<button class="dellink" data-act="del" data-id="${esc(x.id)}">Delete workout</button></div></details></div>`;
     });
   });
@@ -1696,7 +1722,7 @@ app.addEventListener('click',e=>{
   else if(act==='vr'){ st.vr=b.dataset.v; render() }
   else if(act==='prall'){ st.prAll=!st.prAll; render() }
   else if(act==='prgo'){ st.progEx=b.dataset.id; st.pm='e1'; render(); const el=document.getElementById('strength'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}) }
-  else if(act==='del'){ const x=allSessions().find(s=>s.id===b.dataset.id); if(x && confirm('Delete '+x.name+' on '+fmtDate(x.date)+'? This removes it everywhere.')) deleteWorkout(x.id) }
+  else if(act==='del'||act==='swdel') askDelete(b.dataset.id);
   else if(act==='resttoggle'){ SS('wt.rest',!restOn()); if(restOn()===false) clearRest(); render() }
   else if(act==='save') save();
   else if(act==='copy') copyUnsynced();
@@ -1757,6 +1783,34 @@ async function checkUpdate(){
 function refreshApp(){ location.replace(location.pathname+'?r='+Date.now()) }
 document.getElementById('updBtn').addEventListener('click',refreshApp);
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') checkUpdate() });
+/* ---------- swipe left on a History workout to show Delete ---------- */
+(()=>{
+  const W=88; let el=null, sx=0, sy=0, dx=0, moved=false, open=null, eat=false;
+  const slide=(w,x)=>{ w.querySelector('details').style.transform = x ? `translateX(${x}px)` : '' };
+  const close=()=>{ if(open){ slide(open,0); open=null } };
+  app.addEventListener('touchstart',e=>{
+    const w=e.target.closest('.wo');
+    if(open && open!==w) close();
+    el = (w && !e.target.closest('.swdel')) ? w : null; if(!el) return;
+    sx=e.touches[0].clientX; sy=e.touches[0].clientY; dx=0; moved=false;
+  },{passive:true});
+  app.addEventListener('touchmove',e=>{
+    if(!el) return;
+    const x=e.touches[0].clientX-sx, y=e.touches[0].clientY-sy;
+    if(!moved){ if(Math.abs(x)<10) return; if(Math.abs(y)>Math.abs(x)){ el=null; return } moved=true; el.classList.add('swiping') }
+    dx=Math.min(0, Math.max(-W-40, (el===open?-W:0)+x)); slide(el,dx);
+  },{passive:true});
+  app.addEventListener('touchend',()=>{
+    if(!el) return; const w=el; el=null; w.classList.remove('swiping');
+    if(!moved) return;
+    eat=true; setTimeout(()=>eat=false,400);   // the swipe shouldn't also open the workout
+    if(dx < -W/2){ slide(w,-W); open=w } else { slide(w,0); if(open===w) open=null }
+  });
+  app.addEventListener('click',e=>{ if(eat && e.target.closest('.wo summary')){ e.preventDefault(); e.stopPropagation() } },true);
+})();
+document.getElementById('undoBtn').addEventListener('click',undoDelete);
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden') commitDelete() });
+
 /* ---------- pull to refresh (History) ---------- */
 (()=>{
   const sc=$('#scroll'), ptr=document.createElement('div'); ptr.id='ptr'; sc.prepend(ptr);
