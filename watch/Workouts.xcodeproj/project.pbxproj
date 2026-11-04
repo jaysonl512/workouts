@@ -346,12 +346,12 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Config/Workouts.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = 3SW9J9CLZ8;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Config/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Workouts;
+				INFOPLIST_KEY_CFBundleDisplayName = Session;
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Reads heart rate, energy and distance to show them during workouts.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Saves your lifts and runs, with heart rate and route, to Apple Health.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Tracks distance, pace and your route during outdoor runs.";
@@ -383,11 +383,11 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Config/Workouts.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = 3SW9J9CLZ8;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Config/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Workouts;
+				INFOPLIST_KEY_CFBundleDisplayName = Session;
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Reads heart rate, energy and distance to show them during workouts.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Saves your lifts and runs, with heart rate and route, to Apple Health.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Tracks distance, pace and your route during outdoor runs.";
@@ -417,11 +417,11 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = Config/WorkoutsWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = 3SW9J9CLZ8;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Config/WidgetInfo.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Workouts;
+				INFOPLIST_KEY_CFBundleDisplayName = Session;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -445,11 +445,11 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = Config/WorkoutsWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = 3SW9J9CLZ8;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Config/WidgetInfo.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Workouts;
+				INFOPLIST_KEY_CFBundleDisplayName = Session;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -471,10 +471,10 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = 3SW9J9CLZ8;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = Workouts;
+				INFOPLIST_KEY_CFBundleDisplayName = Session;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 1.0;
@@ -490,10 +490,10 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = 3SW9J9CLZ8;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = Workouts;
+				INFOPLIST_KEY_CFBundleDisplayName = Session;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 1.0;

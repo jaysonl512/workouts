@@ -13,7 +13,7 @@ struct WorkoutsWidget: Widget {
             WidgetView(entry: entry)
                 .containerBackground(Color(red: 0.16, green: 0.08, blue: 0.09).gradient, for: .widget)
         }
-        .configurationDisplayName("Workouts")
+        .configurationDisplayName("Session")
         .description("This week's progress and what's next.")
         .supportedFamilies([.accessoryCircular, .accessoryCorner, .accessoryInline, .accessoryRectangular])
     }
@@ -44,7 +44,7 @@ struct Provider: AppIntentTimelineProvider {
     }
 
     func recommendations() -> [AppIntentRecommendation<WorkoutsWidgetIntent>] {
-        [AppIntentRecommendation(intent: WorkoutsWidgetIntent(), description: "Workouts")]
+        [AppIntentRecommendation(intent: WorkoutsWidgetIntent(), description: "Session")]
     }
 
     private func entry(at date: Date) -> Entry {

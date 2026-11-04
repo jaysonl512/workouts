@@ -44,7 +44,7 @@ enum AppGroup {
 
 /// The widget has no settings; the intent exists so the widget can carry location relevance.
 struct WorkoutsWidgetIntent: WidgetConfigurationIntent {
-    static var title: LocalizedStringResource = "Workouts"
+    static var title: LocalizedStringResource = "Session"
     static var description = IntentDescription("This week's progress and the next workout.")
     init() {}
 }
