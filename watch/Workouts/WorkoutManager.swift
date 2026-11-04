@@ -51,7 +51,7 @@ final class WorkoutManager: NSObject, ObservableObject {
 
     func requestAuthorization() async {
         guard HKHealthStore.isHealthDataAvailable() else { return }
-        let quantities: [HKQuantityTypeIdentifier] = [.heartRate, .activeEnergyBurned, .distanceWalkingRunning, .basalEnergyBurned]
+        let quantities: [HKQuantityTypeIdentifier] = [.heartRate, .activeEnergyBurned, .distanceWalkingRunning, .distanceCycling, .basalEnergyBurned]
         var share: Set<HKSampleType> = [HKObjectType.workoutType(), HKSeriesType.workoutRoute()]
         var read: Set<HKObjectType> = [HKObjectType.workoutType(), HKSeriesType.workoutRoute()]
         for q in quantities {
@@ -212,7 +212,8 @@ final class WorkoutManager: NSObject, ObservableObject {
         let bpm = HKUnit.count().unitDivided(by: .minute())
         if let q = b.statistics(for: HKQuantityType(.heartRate))?.mostRecentQuantity() { heartRate = q.doubleValue(for: bpm) }
         if let q = b.statistics(for: HKQuantityType(.activeEnergyBurned))?.sumQuantity() { activeKcal = q.doubleValue(for: .kilocalorie()) }
-        if let q = b.statistics(for: HKQuantityType(.distanceWalkingRunning))?.sumQuantity() { distanceM = q.doubleValue(for: .meter()) }
+        let dist: HKQuantityTypeIdentifier = activity == .cycling ? .distanceCycling : .distanceWalkingRunning
+        if let q = b.statistics(for: HKQuantityType(dist))?.sumQuantity() { distanceM = q.doubleValue(for: .meter()) }
     }
 
     fileprivate func handle(_ locations: [CLLocation]) {

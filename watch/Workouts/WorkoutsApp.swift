@@ -13,6 +13,7 @@ struct WorkoutsApp: App {
                 .environmentObject(AppModel.shared.lift)
                 .environmentObject(AppModel.shared.workout)
                 .environmentObject(AppModel.shared.run)
+                .environmentObject(AppModel.shared.timed)
         }
         .onChange(of: phase) { _, p in
             if p == .active {
@@ -30,6 +31,7 @@ final class AppModel {
     let workout = WorkoutManager()
     lazy var lift = LiftStore(sync: sync)
     lazy var run = RunStore(sync: sync)
+    lazy var timed = TimedStore(sync: sync)
 }
 
 final class AppDelegate: NSObject, WKApplicationDelegate {

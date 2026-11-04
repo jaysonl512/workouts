@@ -6,9 +6,9 @@ create table if not exists public.sessions (
   id          text        not null,                       -- 'YYYY-MM-DD-sessionKey', e.g. '2026-11-04-lowerA'
   user_id     uuid        not null default auth.uid() references auth.users (id) on delete cascade,
   date        date        not null,
-  session     text        not null,                       -- upperA | lowerA | upperB | lowerB | run | run2 | yoga
+  session     text        not null,                       -- upperA | lowerA | upperB | lowerB | run | run2 | yoga | hiit | cycling | walk | sports | mobility | other
   name        text        not null,
-  type        text        not null check (type in ('lift', 'run', 'yoga')),
+  type        text        not null check (type in ('lift', 'run', 'yoga', 'other')),  -- 'other' added 2026-11-04 (migration sessions_allow_other_type)
   status      text        not null default 'complete' check (status in ('in_progress', 'complete')),
   source      text        not null default 'web' check (source in ('web', 'watch')),
   saved_at    timestamptz,

@@ -29,6 +29,12 @@ struct RunData: Codable {
     var minutes: Double?
 }
 
+/// Minutes (and distance for walks and rides) of a yoga class or other timed workout: data.yoga / data.other.
+struct Timed: Codable {
+    var minutes: Double?
+    var distanceKm: Double?
+}
+
 /// Watch extras from HealthKit, stored as data.hk.
 struct HKInfo: Codable {
     var workoutUUID: String
@@ -48,6 +54,8 @@ struct SessionData: Codable {
     var elevationGainM: Double?
     var route: String?
     var indoor: Bool?
+    var yoga: Timed?
+    var other: Timed?
     var hk: HKInfo?
     var updatedAt: String
 }

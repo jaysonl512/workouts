@@ -8,6 +8,8 @@ final class SyncStore: ObservableObject {
     @Published private(set) var lastError: String?
     @Published private(set) var lastSynced: Date?
     @Published private(set) var history: [HistoryRow] = []
+    /// This week's completed sessions (any type), for Today's checklist.
+    @Published private(set) var week: [WeekRow] = []
 
     private var flushing = false
     private var retryTask: Task<Void, Never>?
@@ -19,10 +21,12 @@ final class SyncStore: ObservableObject {
     }()
     private let queueURL = dir.appendingPathComponent("queue.json")
     private let historyURL = dir.appendingPathComponent("history.json")
+    private let weekURL = dir.appendingPathComponent("week.json")
 
     init() {
         if let d = try? Data(contentsOf: queueURL), let q = try? JSONDecoder().decode([String: SessionRow].self, from: d) { pending = q }
         if let d = try? Data(contentsOf: historyURL), let h = try? JSONDecoder().decode([HistoryRow].self, from: d) { history = h }
+        if let d = try? Data(contentsOf: weekURL), let w = try? JSONDecoder().decode([WeekRow].self, from: d) { week = w }
     }
 
     /// Only reports a problem while something is actually waiting to upload. A failed history download
@@ -37,6 +41,11 @@ final class SyncStore: ObservableObject {
         pending[row.id] = row
         persistQueue()
         if row.status == "complete", row.type == .lift { remember(row) }
+        if row.status == "complete" {
+            week.removeAll { $0.id == row.id }
+            week.append(WeekRow(id: row.id, date: row.date, session: row.session, name: row.name, type: row.type.rawValue))
+            persistWeek()
+        }
         flush()
     }
 
@@ -72,6 +81,12 @@ final class SyncStore: ObservableObject {
 
     func refreshHistory() {
         Task {
+            // This week's checklist. Sessions finished here that have not uploaded yet are kept.
+            if let rows = try? await Supabase.shared.sessions(since: WeekPlan.monday()) {
+                let ids = Set(rows.map(\.id))
+                week = rows + week.filter { !ids.contains($0.id) && pending[$0.id]?.status == "complete" }
+                persistWeek()
+            }
             do {
                 let rows = try await Supabase.shared.recentLifts()
                 let ids = Set(rows.map(\.id))
@@ -101,6 +116,7 @@ final class SyncStore: ObservableObject {
     }
 
     private func persistQueue() { try? JSONEncoder().encode(pending).write(to: queueURL, options: .atomic) }
+    private func persistWeek() { try? JSONEncoder().encode(week).write(to: weekURL, options: .atomic) }
     private func persistHistory() { try? JSONEncoder().encode(history).write(to: historyURL, options: .atomic) }
 
     private static func short(_ e: Error) -> String {

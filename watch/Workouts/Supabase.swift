@@ -107,6 +107,12 @@ actor Supabase {
     }
 
     /// Watch runs saved before routes were synced: id plus the raw `data` object, newest first.
+    /// Completed sessions on or after a date (YYYY-MM-DD), for this week's checklist.
+    func sessions(since date: String) async throws -> [WeekRow] {
+        let data = try await request("/rest/v1/sessions?select=id,date,session,name,type&status=eq.complete&date=gte.\(date)&order=date.asc")
+        return try JSONDecoder().decode([WeekRow].self, from: data)
+    }
+
     func runsWithoutRoute() async throws -> [(id: String, data: [String: Any])] {
         let raw = try await request("/rest/v1/sessions?select=id,data&type=eq.run&status=eq.complete&source=eq.watch&data->>route=is.null&order=date.desc&limit=10")
         let rows = (try JSONSerialization.jsonObject(with: raw) as? [[String: Any]]) ?? []

@@ -1,7 +1,7 @@
 import Foundation
 
 enum SessionType: String, Codable {
-    case lift, run, yoga, rest
+    case lift, run, yoga, other, rest
 }
 
 struct PlanAlt: Hashable {
@@ -50,7 +50,7 @@ extension Plan {
 
     /// Same as the web app's sessName.
     static func name(_ key: String) -> String {
-        key == "run2" ? "Run (Saturday, optional)" : (sessions[key]?.name ?? key)
+        key == "run2" ? "Run 2 (optional)" : (sessions[key]?.name ?? other(key)?.name ?? key)
     }
 
     static func todayKey(_ date: Date = Date()) -> String {
