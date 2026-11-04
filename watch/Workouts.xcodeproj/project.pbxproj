@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C10000000000000000000090 /* Workouts.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = A10000000000000000000001 /* Workouts.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		B10000000000000000000090 /* WorkoutsWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B10000000000000000000001 /* WorkoutsWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -17,6 +18,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = B10000000000000000000040;
 			remoteInfo = WorkoutsWidget;
+		};
+		C10000000000000000000091 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A10000000000000000000050 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A10000000000000000000040;
+			remoteInfo = Workouts;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -32,6 +40,17 @@
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C10000000000000000000092 /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				C10000000000000000000090 /* Workouts.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
@@ -40,6 +59,7 @@
 		A10000000000000000000003 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A10000000000000000000004 /* Workouts.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Workouts.entitlements; sourceTree = "<group>"; };
 		A10000000000000000000005 /* Secrets.example.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.example.xcconfig; sourceTree = "<group>"; };
+		C10000000000000000000001 /* WorkoutsContainer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Workouts.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B10000000000000000000001 /* WorkoutsWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = WorkoutsWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		B10000000000000000000003 /* WidgetInfo.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = WidgetInfo.plist; sourceTree = "<group>"; };
 		B10000000000000000000004 /* WorkoutsWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = WorkoutsWidget.entitlements; sourceTree = "<group>"; };
@@ -110,6 +130,7 @@
 			children = (
 				A10000000000000000000001 /* Workouts.app */,
 				B10000000000000000000001 /* WorkoutsWidget.appex */,
+				C10000000000000000000001 /* WorkoutsContainer.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -161,6 +182,23 @@
 			productReference = B10000000000000000000001 /* WorkoutsWidget.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		C10000000000000000000040 /* WorkoutsContainer */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C10000000000000000000061 /* Build configuration list for PBXNativeTarget "WorkoutsContainer" */;
+			buildPhases = (
+				C10000000000000000000042 /* Resources */,
+				C10000000000000000000092 /* Embed Watch Content */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C10000000000000000000093 /* PBXTargetDependency */,
+			);
+			name = WorkoutsContainer;
+			productName = Workouts;
+			productReference = C10000000000000000000001 /* WorkoutsContainer.app */;
+			productType = "com.apple.product-type.application.watchapp2-container";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -175,6 +213,9 @@
 						CreatedOnToolsVersion = 26.0;
 					};
 					B10000000000000000000040 = {
+						CreatedOnToolsVersion = 26.0;
+					};
+					C10000000000000000000040 = {
 						CreatedOnToolsVersion = 26.0;
 					};
 				};
@@ -195,6 +236,7 @@
 			targets = (
 				A10000000000000000000040 /* Workouts */,
 				B10000000000000000000040 /* WorkoutsWidget */,
+				C10000000000000000000040 /* WorkoutsContainer */,
 			);
 		};
 /* End PBXProject section */
@@ -208,6 +250,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		B10000000000000000000042 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C10000000000000000000042 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -238,6 +287,11 @@
 			isa = PBXTargetDependency;
 			target = B10000000000000000000040 /* WorkoutsWidget */;
 			targetProxy = B10000000000000000000091 /* PBXContainerItemProxy */;
+		};
+		C10000000000000000000093 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A10000000000000000000040 /* Workouts */;
+			targetProxy = C10000000000000000000091 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -303,6 +357,7 @@
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Tracks distance, pace and your route during outdoor runs.";
 				INFOPLIST_KEY_NSMotionUsageDescription = "Measures distance and pace on indoor runs from your steps.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_WKWatchOnly = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -338,6 +393,7 @@
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Tracks distance, pace and your route during outdoor runs.";
 				INFOPLIST_KEY_NSMotionUsageDescription = "Measures distance and pace on indoor runs from your steps.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_WKWatchOnly = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -411,6 +467,44 @@
 			};
 			name = Release;
 		};
+		C10000000000000000000072 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 3SW9J9CLZ8;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Workouts;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jaysonlong.workouts;
+				PRODUCT_NAME = Workouts;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		C10000000000000000000073 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 3SW9J9CLZ8;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Workouts;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jaysonlong.workouts;
+				PRODUCT_NAME = Workouts;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -437,6 +531,15 @@
 			buildConfigurations = (
 				B10000000000000000000072 /* Debug */,
 				B10000000000000000000073 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C10000000000000000000061 /* Build configuration list for PBXNativeTarget "WorkoutsContainer" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C10000000000000000000072 /* Debug */,
+				C10000000000000000000073 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
