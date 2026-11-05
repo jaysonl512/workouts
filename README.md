@@ -6,7 +6,6 @@ A small static web app for tracking workouts: weight and reps for every set, run
 
 - `index.html` is the whole app (no build step). The training plan is defined at the top of its script.
 - Supabase (project "Workout Tracker", tables `sessions` and `health_daily`) is the only store, shared by the web app and the Apple Watch app. Plan › Settings › Export downloads everything as JSON.
-- `data/log.json` is the old GitHub export. The web app no longer reads or writes it.
 - Saving stores the workout on the device first, then upserts it to Supabase. Anything saved offline or signed out uploads on the next load, pull-to-refresh or when the phone comes back online.
 - Swapped exercises are logged under their own id (`slot-name~alternative`) with a `slot` field pointing at the planned lift, so weights stay comparable.
 - Sessions logged during a deload week carry `"deload": true`.
