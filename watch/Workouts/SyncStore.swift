@@ -166,9 +166,10 @@ final class SyncStore: ObservableObject {
             }
             return Progression.next(step, from: x)
         }
-        // Fatigue: a later set at the same weight never aims for more reps than the set before it.
-        for i in out.indices.dropFirst() where out[i].w == out[i - 1].w && out[i].r > out[i - 1].r {
-            out[i] = Suggestion(w: out[i].w, r: out[i - 1].r, why: "Same weight · match last set", up: out[i].up)
+        // Sets build up: a later set as heavy or heavier than the one before never aims for more reps than it.
+        for i in out.indices.dropFirst()
+        where !Progression.heavier(step, out[i - 1].w, than: out[i].w) && out[i].r > out[i - 1].r {
+            out[i] = Suggestion(w: out[i].w, r: out[i - 1].r, why: out[i].w == out[i - 1].w ? "Same weight · same reps" : "Heavier · same reps", up: out[i].up)
         }
         return out
     }
@@ -191,8 +192,8 @@ final class SyncStore: ObservableObject {
             return c
         }
         if let b = base, !Progression.heavier(step, p.w, than: b.w) {
-            // Same weight as the set just done: aim for its reps, not more.
-            if b.w == p.w, b.r > p.r { return Suggestion(w: p.w, r: p.r, why: "Same weight · match last set") }
+            // As heavy or heavier than the set just done: its reps at most.
+            if b.r > p.r { return Suggestion(w: b.w, r: p.r, why: b.w == p.w ? "Same weight · match last set" : "Heavier · same reps") }
             return b
         }
         return Suggestion(w: p.w, r: p.r, why: "Same as last set")

@@ -180,5 +180,6 @@ Done when: a lift and a run logged entirely on the Watch show up in the web app 
 - During a workout (`targetFor` / `SyncStore.target`), the next set starts at its target, adjusted by the set just
   logged: hitting the top moves it up (unless last week's plan for it was already heavier), falling short of the bottom
   moves it down, and a heavier-than-planned set in range is repeated.
-- Fatigue rule (build 9): a later set at the same weight never aims for more reps than the set before it, both in
-  next week's targets and during a workout (same weight as the set just done → match its reps).
+- Build-up rule (build 10): a later set as heavy or heavier than the one before never aims for more reps than it
+  (a lighter back-off set may), both in next week's targets and during a workout. If every target is hit, the whole
+  ramp gains a rep a week until the sets reach the top of the range, then each moves up 5 lb.
