@@ -154,7 +154,7 @@ final class SyncStore: ObservableObject {
         let hist = recentSets(for: step.id, excluding: sessionId, before: date, limit: 2)
         guard let prev = hist.first, !prev.isEmpty else { return nil }
         let lo = step.slot.reps.lowerBound, q = step.slot.weightStep
-        return (0..<max(step.slot.sets, prev.count)).map { i in
+        var out: [Suggestion] = (0..<max(step.slot.sets, prev.count)).map { i in
             let x = prev[min(i, prev.count - 1)]
             // Under the range on this set two sessions running: about 10% lighter (or more assistance).
             if hist.count > 1, hist[1].indices.contains(i) {
@@ -166,6 +166,11 @@ final class SyncStore: ObservableObject {
             }
             return Progression.next(step, from: x)
         }
+        // Fatigue: a later set at the same weight never aims for more reps than the set before it.
+        for i in out.indices.dropFirst() where out[i].w == out[i - 1].w && out[i].r > out[i - 1].r {
+            out[i] = Suggestion(w: out[i].w, r: out[i - 1].r, why: "Same weight · match last set", up: out[i].up)
+        }
+        return out
     }
 
     /// Target for set `index` of this workout: last time's same set, moved up or down by the set just logged
@@ -185,7 +190,11 @@ final class SyncStore: ObservableObject {
             if let b = base, Progression.heavier(step, c.w, than: b.w) { return b }
             return c
         }
-        if let b = base, !Progression.heavier(step, p.w, than: b.w) { return b }
+        if let b = base, !Progression.heavier(step, p.w, than: b.w) {
+            // Same weight as the set just done: aim for its reps, not more.
+            if b.w == p.w, b.r > p.r { return Suggestion(w: p.w, r: p.r, why: "Same weight · match last set") }
+            return b
+        }
         return Suggestion(w: p.w, r: p.r, why: "Same as last set")
     }
 

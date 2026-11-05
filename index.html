@@ -441,7 +441,7 @@ const EFFORT = {easy:'Easy', medium:'Medium', hard:'Hard'};
 const effortSeg = (act,cur) => `<div class="segc">${Object.entries(EFFORT).map(([v,l])=>`<button class="${v===cur?'on':''}" data-act="${act}" data-v="${v}">${l}</button>`).join('')}</div>`;
 const kindOf = x => x.yoga ? 'yoga' : x.other ? 'other' : x.run ? 'run' : 'lift';
 const CHEERS = ['Nice one','Solid set','Strong','Locked in','Clean rep','Beast mode','Smooth'];
-const APP_VERSION='2026-11-05.5';
+const APP_VERSION='2026-11-05.6';
 
 /* alternatives per exercise: each alternative keeps its own history so weights stay comparable */
 const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
@@ -640,13 +640,17 @@ function setTargets(e){
   }
   if(!hist.length) return null;
   const dl=getDraft().deload, q=stepQ(e), lo=e.reps[0], hi=e.reps[1], as=isAssist(e.name), prev=hist[0];
-  return Array.from({length:Math.max(e.sets,prev.length)},(_,i)=>{
+  const out = Array.from({length:Math.max(e.sets,prev.length)},(_,i)=>{
     const x=prev[Math.min(i,prev.length-1)], w=x.w||0, y=hist[1]?.[i];
     if(dl) return as ? {w, r:lo, why:'Deload week: same assistance, easy reps'} : {w:w?roundTo(w*0.6,q):0, r:Math.round((lo+hi)/2), why:'Deload week: about 60% of your usual weight'};
     if(y && !isBodyweight(e,w) && (x.r||0)<lo && (y.r||0)<lo && (y.w||0)===w)
       return as ? {w:w+q, r:lo, why:'Under the range twice: more assistance, rebuild'} : {w:roundTo(w*0.9,q), r:lo, why:'Under the range twice: about 10% lighter, rebuild'};
     return progress(e,x);
   });
+  // Fatigue: a later set at the same weight never aims for more reps than the set before it.
+  for(let i=1;i<out.length;i++){ const a=out[i-1], b=out[i];
+    if(b.w===a.w && b.r>a.r) out[i]={...b, r:a.r, why:a.w?'Same weight as your last set: match its reps':'Match your last set'} }
+  return out;
 }
 /* Target for set i of this workout: the same set last time, progressed, then adjusted by the set just logged.
    Hit the top of the range on a set and the next one moves up; fall short of the bottom and it moves down. */
@@ -658,6 +662,8 @@ function targetFor(e,i,done){
   if(r>=hi){ const c={w:upW(e,w), r:resetR(e), up:true, why:`You hit ${hi}: moving up`}; return base && heavier(e,base.w,c.w) ? base : c }
   if(r<lo){ const c={w:downW(e,w), r:lo, why:`Under ${lo}: a little lighter`}; return base && heavier(e,c.w,base.w) ? base : c }
   if(!base || heavier(e,w,base.w)) return {w, r, why:'Same as your last set'};
+  // Same weight as the set just done: aim for its reps, not more (you are more tired now).
+  if(base.w===w && base.r>r) return {w, r, why:'Same weight: match your last set'};
   return base;
 }
 function deloadInfo(){
