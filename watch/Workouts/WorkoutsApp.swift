@@ -20,6 +20,7 @@ struct WorkoutsApp: App {
             if p == .active {
                 AppModel.shared.sync.flush()
                 AppModel.shared.sync.refreshHistory()
+                Task { await AppModel.shared.health.syncIfDue() }
             }
         }
     }
@@ -34,6 +35,7 @@ final class AppModel {
     lazy var run = RunStore(sync: sync)
     lazy var timed = TimedStore(sync: sync)
     let gym = GymStore()
+    let health = HealthSync()
 }
 
 final class AppDelegate: NSObject, WKApplicationDelegate {

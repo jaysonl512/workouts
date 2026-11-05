@@ -100,6 +100,18 @@ actor Supabase {
                               prefer: "resolution=merge-duplicates,return=minimal")
     }
 
+    /// Insert or merge daily Health values by (user_id, date). Rows are grouped by which values they carry,
+    /// because PostgREST needs the same keys in every row of a request; missing values keep what is stored.
+    func upsertHealth(_ days: [HealthDay]) async throws {
+        _ = try await token()
+        guard let uid = userId else { throw SBError.http(0, "no user id") }
+        for group in Dictionary(grouping: days, by: \.keySignature).values {
+            let body = try JSONEncoder().encode(group.map { var d = $0; d.userId = uid; return d })
+            _ = try await request("/rest/v1/health_daily?on_conflict=user_id,date", method: "POST", body: body,
+                                  prefer: "resolution=merge-duplicates,return=minimal")
+        }
+    }
+
     /// Recent completed lift sessions, newest first, for "last time".
     func recentLifts() async throws -> [HistoryRow] {
         let data = try await request("/rest/v1/sessions?select=id,date,data&type=eq.lift&status=eq.complete&order=date.desc&limit=60")

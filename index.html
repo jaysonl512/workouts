@@ -340,6 +340,17 @@ details[open]>summary .chev{transform:rotate(90deg)}
 .prrow{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;border-top:1px solid var(--line);color:var(--text);padding:12px 0;text-align:left}
 .prrow span{flex:1;display:flex;flex-direction:column;min-width:0}.prrow span b{font-size:16px}.prrow small{color:var(--mute);font-size:12px}
 .prrow em{font-style:normal;font-weight:700;font-size:17px;white-space:nowrap}.prrow i{color:var(--mute);font-style:normal;font-size:20px}
+.dpill.flat{color:var(--mute);background:#0f1318;border:1px solid var(--line)}
+.hmrow{display:flex;align-items:center;gap:12px;width:100%;background:none;border:0;border-top:1px solid var(--line);color:var(--text);padding:11px 0;text-align:left}
+.phead+.hmrow{border-top:0;padding-top:2px}
+.hic{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;flex:none;color:var(--mute);background:#0f1318;border:1px solid var(--line)}
+.hic .ico{width:20px;height:20px}
+.hic.good{color:#4ade80;background:rgba(34,197,94,.14);border-color:rgba(34,197,94,.35)}
+.hic.bad{color:#fca5a5;background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.35)}
+.hmt{flex:1;display:flex;flex-direction:column;min-width:0}.hmt b{font-size:15px}
+.hmt small{font-size:13px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hmt small.good{color:#4ade80}.hmt small.bad{color:#fca5a5}
+.hmrow em{font-style:normal;font-weight:700;font-size:18px;white-space:nowrap;display:flex;align-items:baseline;gap:3px}.hmrow em small{font-size:11px;color:var(--mute);font-weight:600}
+.hmrow>i{color:var(--mute);font-style:normal;font-size:20px}
 .insrow{display:flex;gap:12px;align-items:flex-start;border-top:1px solid var(--line);padding:12px 0}
 .insrow:first-of-type{border-top:0}
 .insrow div{display:flex;flex-direction:column}.insrow b{font-size:15px}.insrow span{color:var(--mute);font-size:13px}
@@ -424,7 +435,7 @@ const EFFORT = {easy:'Easy', medium:'Medium', hard:'Hard'};
 const effortSeg = (act,cur) => `<div class="segc">${Object.entries(EFFORT).map(([v,l])=>`<button class="${v===cur?'on':''}" data-act="${act}" data-v="${v}">${l}</button>`).join('')}</div>`;
 const kindOf = x => x.yoga ? 'yoga' : x.other ? 'other' : x.run ? 'run' : 'lift';
 const CHEERS = ['Nice one','Solid set','Strong','Locked in','Clean rep','Beast mode','Smooth'];
-const APP_VERSION='2026-11-04.5';
+const APP_VERSION='2026-11-04.6';
 const OWNER='jaysonl512', REPO='workouts', LOGPATH='data/log.json';
 
 /* alternatives per exercise: each alternative keeps its own history so weights stay comparable */
@@ -506,7 +517,7 @@ const runTime = m => { if(m==null||m===''||isNaN(+m)) return '—'; const t=Math
 const st = {
   tab:'today', date:todayStr(), sess:null, auto:true, add:null,
   repo:[], sb:[], local:LS('wt.local.v1',[]), draft:LS('wt.draft.v1',{}),
-  progEx:null, wk:null
+  progEx:null, wk:null, health:LS('wt.health.v1',[]), hm:null
 };
 const verOf = x => Date.parse(x.updatedAt||x.savedAt||'')||0;
 /* Deleted workouts: id -> time of deletion. A copy is hidden (and never re-uploaded) unless it was saved after the deletion. */
@@ -537,7 +548,7 @@ async function loadRepo(){
   }
   st.local = st.local.filter(isLocalOnly);
   SS('wt.local.v1', st.local);
-  if(sbAuth()){ try{ st.sb=await sbLoad(); await reconcile() }catch(e){} }
+  if(sbAuth()){ try{ st.sb=await sbLoad(); await reconcile() }catch(e){} try{ await loadHealth() }catch(e){} }
   purgeDeleted();
   if(!st.wk) render();
   if(tok && st.local.length) syncNow();
@@ -868,7 +879,8 @@ function render(){
   const v = {today:viewToday, history:viewHistory, progress:viewProgress, plan:viewPlan}[st.tab];
   if(st.tab==='today' && !inWk) checkNotePrompt();
   const note = st.note && st.tab==='today' && !inWk && !st.add && !st.recap ? noteSheet() : '';
-  $('#app').innerHTML = v() + (st.add&&!inWk ? addSheet() : '') + (st.recap ? recapView() : '') + note;
+  const hs = st.hm && st.tab==='progress' ? healthSheet() : '';
+  $('#app').innerHTML = v() + (st.add&&!inWk ? addSheet() : '') + (st.recap ? recapView() : '') + note + hs;
   if(st.wk){ st.wk.anim=false; st.wk.just=null }
 }
 
@@ -1257,7 +1269,12 @@ const ICO = {
   bolt:'<path d="M13 3L5 14h6l-1 7 8-11h-6l1-7z"/>',
   dumb:'<path d="M6.5 6.5v11M17.5 6.5v11M3.5 9v6M20.5 9v6M6.5 12h11"/>',
   trend:'<path d="M4 17l6-6 4 4 6-7M15 8h5v5"/>',
-  down:'<path d="M4 7l6 6 4-4 6 7M15 16h5v-5"/>'
+  down:'<path d="M4 7l6 6 4-4 6 7M15 16h5v-5"/>',
+  heart:'<path d="M12 20s-7.5-4.6-7.5-10.2A4.2 4.2 0 0 1 12 7.2a4.2 4.2 0 0 1 7.5 2.6C19.5 15.4 12 20 12 20z"/>',
+  pulse:'<path d="M3 12h4l2.2-5 4.4 10 2.2-5H21"/>',
+  gauge:'<path d="M4.5 17a8 8 0 1 1 15 0M12 15l3.5-4.5"/><circle cx="12" cy="15.5" r="1.2"/>',
+  timer:'<circle cx="12" cy="13.5" r="7"/><path d="M12 13.5V10M10 3.5h4M18 6.5l1.5-1.5"/>',
+  scale:'<rect x="4" y="4" width="16" height="16" rx="4.5"/><path d="M8.5 10a5 5 0 0 1 7 0M12 10.5l1.3-1.8"/>'
 };
 const ico = (k,cls='') => `<svg class="ico ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICO[k]}</svg>`;
 const kfmt = v => v>=1000 ? (v/1000).toFixed(v>=100000?0:1).replace(/\.0$/,'')+'k' : String(Math.round(v));
@@ -1288,7 +1305,7 @@ function lineChart(pts, fmt, invert){
     ${ticks.map(t=>`<line x1="${L}" x2="${W-R}" y1="${y(t).toFixed(1)}" y2="${y(t).toFixed(1)}" stroke="#262d36"/><text x="${L-6}" y="${(y(t)+3.5).toFixed(1)}" fill="#8b97a5" font-size="10" text-anchor="end">${fmt(t)}</text>`).join('')}
     ${area?`<path d="${area}" fill="url(#${id})"/>`:''}
     <path d="${line}" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
-    ${pts.map((p,i)=>`<circle cx="${x(i).toFixed(1)}" cy="${y(p.v).toFixed(1)}" r="${i===pts.length-1?4.5:3.5}" fill="#171c22" stroke="#ef4444" stroke-width="2"/>`).join('')}
+    ${pts.map((p,i)=>pts.length>24&&i!==pts.length-1?'':`<circle cx="${x(i).toFixed(1)}" cy="${y(p.v).toFixed(1)}" r="${i===pts.length-1?4.5:3.5}" fill="#171c22" stroke="#ef4444" stroke-width="2"/>`).join('')}
     ${pts.map((p,i)=>(i%every===0||i===pts.length-1)&&!(i!==pts.length-1&&pts.length-1-i<every)?`<text x="${x(i).toFixed(1)}" y="${H-6}" fill="#8b97a5" font-size="10" text-anchor="${pts.length>1&&i===0?'start':pts.length>1&&i===pts.length-1?'end':'middle'}">${shortDate(p.d)}</text>`:'').join('')}
   </svg>`;
 }
@@ -1423,6 +1440,8 @@ function insightsCard(){
     if(d>0&&(!best||pct>best.pct)) best={id,d,pct,a:p[0].e1,b:p[p.length-1].e1};
   });
   if(best) out.push(['trend','up',`${esc(EXMAP[best.id]?.name||best.id)} +${best.d} lb (+${Math.round(best.pct*100)}%)`,`Estimated 1RM up from ${best.a} lb to ${best.b} lb.`]);
+  const hg=HM.filter(m=>m.better).map(m=>[m,hTrend(m)]).find(([m,t])=>t&&t.tone==='good');
+  if(hg){ const [m,tr]=hg; out.push([m.ico,'up',`${m.short} ${tr.diff>0?'up':'down'} ${hFmt(m,Math.abs(tr.diff))} ${m.unit}`,`Since ${shortDate(tr.since)}. ${m.better<0?'Lower':'Higher'} is better.`]) }
   const t=todayStr(), mon=monOf(t), w=weekStats(mon);
   const planned=[...Array(7)].map((_,i)=>addDays(mon,i)).filter(d=>d<=t&&!['rest','run2'].includes(plannedFor(d))).length;
   out.push(['cal','', w.sessions>=planned?'On track':'Catch up', `${w.sessions} of 5 workouts done this week${w.sessions<planned?`, ${planned} planned by today`:''}.`]);
@@ -1435,6 +1454,92 @@ function insightsCard(){
   if(deloadInfo().recommended) out.push(['bolt','',`Deload week suggested`,`You've trained several weeks in a row. Drop to about 60% this week.`]);
   return `<div class="card pcard"><div class="phead">${ico('bolt','acc')}<b>Insights</b></div>
     ${out.slice(0,4).map(([i,c,h,n])=>`<div class="insrow">${ico(i,c)}<div><b>${h}</b><span>${n}</span></div></div>`).join('')}</div>`;
+}
+
+/* ---------- health trends (daily values the Watch uploads from Apple Health) ---------- */
+const HM=[
+  {k:'rhr', col:'rhr',         name:'Resting heart rate',     short:'Resting HR',lc:'resting heart rate',      unit:'bpm',     ico:'heart', better:-1, min:1,   dec:0, smooth:true,
+   about:'Your heart rate at rest, measured by your Watch through the day. Lower usually means a fitter heart.'},
+  {k:'hrv', col:'hrv',         name:'Heart rate variability', short:'HRV',lc:'HRV',             unit:'ms',      ico:'pulse', better:1,  min:3,   dec:0, smooth:true,
+   about:'The tiny variation between heartbeats. Higher usually means you are well recovered. It swings a lot day to day, so watch the trend.'},
+  {k:'vo2', col:'vo2max',      name:'Cardio fitness',         short:'Cardio fitness',lc:'cardio fitness',  unit:'VO₂ max', ico:'gauge', better:1,  min:0.5, dec:1,
+   about:'Estimated VO₂ max (ml/kg/min). Your Watch updates it after outdoor walks, runs and hikes. Higher is better.'},
+  {k:'rec', col:'hr_recovery', name:'Heart rate recovery',    short:'HR recovery',lc:'heart rate recovery',     unit:'bpm',     ico:'timer', better:1,  min:2,   dec:0,
+   about:'How far your heart rate drops in the first minute after a workout. A bigger drop is better.'},
+  {k:'wt',  col:'weight_kg',   name:'Weight',                 short:'Weight',lc:'weight',          unit:'lb',      ico:'scale', better:0,  min:1,   dec:1,
+   about:'From Apple Health. Shown without good or bad colors, since the right direction depends on your goal.'}
+];
+const hNum = v => v==null||v==='' ? null : +v;
+async function loadHealth(){
+  const r=await sbFetch('/rest/v1/health_daily?select=date,rhr,hrv,vo2max,hr_recovery,weight_kg&date=gte.'+addDays(todayStr(),-400)+'&order=date.asc');
+  if(!r.ok) return;
+  st.health=(await r.json()).map(h=>{ const o={d:h.date}; HM.forEach(m=>{ const v=hNum(h[m.col]); o[m.k]=v==null?null:m.k==='wt'?Math.round(v*2.20462*10)/10:v }); return o });
+  SS('wt.health.v1',st.health);
+}
+const hAvg = a => a.reduce((x,y)=>x+y,0)/a.length;
+const hFmt = (m,v) => (+v).toFixed(m.dec).replace(/\.0$/,'');
+const hSeries = (k,since) => st.health.filter(h=>h[k]!=null&&(!since||h.d>=since)).map(h=>({d:h.d,v:h[k]}));
+/* Now vs about 4 weeks earlier. Noisy daily values (resting HR, HRV) use 7-day averages. */
+function hTrend(m){
+  const s=hSeries(m.k); if(!s.length) return null;
+  const last=s[s.length-1].d;
+  const cur = m.smooth ? hAvg(s.filter(p=>p.d>addDays(last,-7)).map(p=>p.v)) : s[s.length-1].v;
+  let base=s.filter(p=>p.d<=addDays(last,-21)&&p.d>addDays(last,-35));
+  if(!base.length && s[0].d<=addDays(last,-10)) base=s.filter(p=>p.d<addDays(s[0].d,7));
+  const out={cur,last,n:s.length};
+  if(!base.length) return out;
+  const diff=+(cur-hAvg(base.map(p=>p.v))).toFixed(m.dec);
+  out.diff=diff; out.since=base[0].d;
+  out.tone = Math.abs(diff)<m.min ? 'flat' : !m.better ? 'flat' : diff*m.better>0 ? 'good' : 'bad';
+  return out;
+}
+function hChange(m,t){
+  if(t.diff==null) return {txt:'Trend shows after a couple of weeks', tone:''};
+  if(Math.abs(t.diff)<m.min) return {txt:`Steady since ${shortDate(t.since)}`, tone:'flat'};
+  return {txt:`${t.diff>0?'↑':'↓'} ${hFmt(m,Math.abs(t.diff))} ${m.unit==='VO₂ max'?'':m.unit} since ${shortDate(t.since)}`.replace('  ',' '), tone:t.tone};
+}
+function healthCard(){
+  const head=`<div class="phead">${ico('heart','acc')}<b>Health Trends</b></div>`;
+  if(!sbAuth()) return `<div class="card pcard">${head}<div class="note">Sign in to your cloud account on the Plan tab to see trends from Apple Health.</div></div>`;
+  const rows=HM.map(m=>[m,hTrend(m)]).filter(([m,t])=>t);
+  if(!rows.length) return `<div class="card pcard">${head}<div class="note">Open Session on your Apple Watch and allow Health access. Resting heart rate, HRV, cardio fitness, heart rate recovery and weight show up here.</div></div>`;
+  return `<div class="card pcard">${head}${rows.map(([m,t])=>{ const c=hChange(m,t);
+    return `<button class="hmrow" data-act="hmopen" data-k="${m.k}"><span class="hic ${c.tone}">${ico(m.ico)}</span>
+      <span class="hmt"><b>${m.short}</b><small class="${c.tone}">${c.txt}</small></span>
+      <em>${hFmt(m,t.cur)}<small>${m.unit}</small></em><i>›</i></button>` }).join('')}
+    <div class="note" style="margin-top:6px">Green is a good change, red a bad one, compared with about 4 weeks earlier.</div></div>`;
+}
+/* Weekly averages vs workouts that week: a pattern in your data, not proof of cause. */
+function hCorr(m){
+  const mon=monOf(todayStr()), busy=[], light=[];
+  for(let i=1;i<=26;i++){
+    const wm=addDays(mon,-7*i), vs=st.health.filter(h=>h[m.k]!=null&&h.d>=wm&&h.d<addDays(wm,7)).map(h=>h[m.k]);
+    if(vs.length<2) continue;
+    (weekStats(wm).sessions>=4?busy:light).push(hAvg(vs));
+  }
+  if(busy.length<2||light.length<2) return 'Once you have a few weeks of data, this compares your busier training weeks (4+ workouts) with lighter ones.';
+  const b=hAvg(busy), l=hAvg(light), d=b-l;
+  const f1=v=>Math.abs(d)<m.min*3 ? v.toFixed(m.dec+1) : hFmt(m,v);
+  const verdict = Math.abs(d)<m.min ? 'About the same either way.' : !m.better ? '' : d*m.better>0 ? 'Training more lines up with a better number.' : 'Busier weeks line up with a worse number. Check sleep and recovery in those weeks.';
+  return `In weeks with 4+ workouts your ${m.lc} averaged <b>${f1(b)} ${m.unit}</b>, vs <b>${f1(l)} ${m.unit}</b> in lighter weeks. ${verdict}`;
+}
+function healthSheet(){
+  const h=st.hm, m=HM.find(x=>x.k===h.k); if(!m){ st.hm=null; return '' }
+  const na = h.shown ? ' style="animation:none"' : ''; h.shown=true;
+  const r=h.r||'8w', t=hTrend(m);
+  const since=addDays(todayStr(), r==='1y'?-364:r==='12w'?-83:-55);
+  let pts=hSeries(m.k,since);
+  if(r==='1y'){ const wk=new Map(); pts.forEach(p=>{ const w=monOf(p.d); (wk.get(w)||wk.set(w,[]).get(w)).push(p.v) }); pts=[...wk].map(([d,a])=>({d,v:+hAvg(a).toFixed(m.dec+1)})) }
+  const c=t?hChange(m,t):null, vals=pts.map(p=>p.v);
+  const pill = c&&c.tone ? `<span class="dpill ${c.tone==='good'?'up':c.tone==='bad'?'down':'flat'}">${c.txt}</span>` : '';
+  return `<div class="sheetbg" data-act="hmclose"${na}><div class="sheet" data-stop="1"${na}>
+    <div class="phead" style="margin-bottom:4px">${ico(m.ico,'acc')}<b>${m.name}</b><button class="xbtn" data-act="hmclose" aria-label="Close">✕</button></div>
+    ${seg('hmr',r,[['8w','8W'],['12w','12W'],['1y','1Y']])}
+    ${t?`<div class="pbig"><b>${hFmt(m,t.cur)}</b><span>${m.unit}${m.smooth?' · 7-day average':' · '+shortDate(t.last)}</span>${pill}</div>`:''}
+    ${pts.length?lineChart(pts, v=>hFmt(m,v)):`<div class="note" style="margin:16px 0">No ${m.lc} readings in this range yet.</div>`}
+    ${vals.length?`<div class="tiles3 small"><div><b>${hFmt(m,hAvg(vals))}</b><span>Average</span></div><div><b>${hFmt(m,Math.min(...vals))}</b><span>Low</span></div><div><b>${hFmt(m,Math.max(...vals))}</b><span>High</span></div></div>`:''}
+    <div class="insrow" style="margin-top:8px">${ico('bolt','acc')}<div><b>Training and ${m.lc}</b><span>${hCorr(m)}</span></div></div>
+    <div class="note" style="margin-top:4px">${m.about}</div></div></div>`;
 }
 
 /* ---------- week & month in review ---------- */
@@ -1582,7 +1687,7 @@ function recapBanners(){
 
 function viewProgress(){
   chartN=0;
-  return weekCard()+strengthCard()+runCard()+prCard()+volumeCard()+insightsCard();
+  return weekCard()+healthCard()+strengthCard()+runCard()+prCard()+volumeCard()+insightsCard();
 }
 function cloudCard(){
   const a=sbAuth();
@@ -1720,6 +1825,9 @@ app.addEventListener('click',e=>{
   else if(act==='pm'){ st.pm=b.dataset.v; render() }
   else if(act==='rm'){ st.rm=b.dataset.v; render() }
   else if(act==='vr'){ st.vr=b.dataset.v; render() }
+  else if(act==='hmopen'){ st.hm={k:b.dataset.k,r:'8w'}; render() }
+  else if(act==='hmclose'){ if(e.target.closest('[data-stop]') && !b.classList.contains('xbtn')) return; st.hm=null; render() }
+  else if(act==='hmr'){ st.hm.r=b.dataset.v; chartN=0; render() }
   else if(act==='prall'){ st.prAll=!st.prAll; render() }
   else if(act==='prgo'){ st.progEx=b.dataset.id; st.pm='e1'; render(); const el=document.getElementById('strength'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}) }
   else if(act==='del'||act==='swdel') askDelete(b.dataset.id);

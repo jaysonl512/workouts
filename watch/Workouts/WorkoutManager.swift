@@ -58,6 +58,7 @@ final class WorkoutManager: NSObject, ObservableObject {
             share.insert(HKQuantityType(q))
             read.insert(HKQuantityType(q))
         }
+        read.formUnion(HealthSync.readTypes)
         try? await store.requestAuthorization(toShare: share, read: read)
         // Ask for Motion & Fitness now, not at the end of a run: a tiny pedometer query shows the prompt once.
         if CMPedometer.isDistanceAvailable(), CMPedometer.authorizationStatus() == .notDetermined {

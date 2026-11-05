@@ -58,6 +58,7 @@ struct ContentView: View {
             await AppGroup.updateGymRelevance()
             sync.flush()
             sync.refreshHistory()
+            await AppModel.shared.health.syncIfDue()
             await run.backfillRoutes(from: workout.store)
         }
     }

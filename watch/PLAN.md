@@ -135,3 +135,12 @@ Done when: a lift and a run logged entirely on the Watch show up in the web app 
 ## Starter prompt for Claude Code on the Mac
 
 > Clone `jaysonl512/workouts`. Read `watch/PLAN.md`, `README.md`, and `index.html` (PLAN, ALTS, suggestFor, save, session JSON shape). Create the watchOS project under `watch/` following Phase 1. Generate `Plan.swift` from the web app's PLAN and ALTS so ids match exactly. Build for the Watch (not just the simulator) and fix compile errors. Do not touch the web app's behaviour except the Phase 1 read-only Supabase merge. Ask me for the Supabase URL, anon key and login when you reach them, and never commit them.
+
+## Health trends (2026-11-04)
+- Watch `HealthSync` reads daily resting HR, HRV (SDNN), VO2 max, 1-minute HR recovery and body mass from HealthKit
+  and upserts them to `public.health_daily` (one row per day; missing values are left out so they never overwrite).
+  Runs on launch and when the app becomes active, at most every 3 hours: 90 days the first time, then the last 21.
+- Web Progress tab: "Health Trends" card. Each metric compares now (7-day average for resting HR and HRV, latest value
+  otherwise) with about 4 weeks earlier. Green = good change, red = bad, grey = steady or weight (goal-dependent).
+  Tapping a metric opens a chart (8W / 12W / 1Y weekly averages) with average/low/high and a busier-vs-lighter weeks comparison.
+- No sleep, by design. The Watch only holds a few weeks of history; a future iPhone app can backfill older days.
