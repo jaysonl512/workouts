@@ -101,6 +101,32 @@ struct Suggestion {
     let w: Double
     let r: Int
     let why: String
+    var up = false
+}
+
+/// Double progression with a rep ceiling, the same rules as the web app: top of the rep range → more weight
+/// (or less assistance) and 2 reps lower; inside it → one more rep; below it → back to the bottom of the range.
+enum Progression {
+    static func isBodyweight(_ s: Step, _ w: Double) -> Bool { w <= 0 && !s.isAssisted }
+    static func up(_ s: Step, _ w: Double) -> Double { s.isAssisted ? max(0, w - s.slot.weightStep) : w + s.slot.weightStep }
+    static func down(_ s: Step, _ w: Double) -> Double { s.isAssisted ? w + s.slot.weightStep : max(0, w - s.slot.weightStep) }
+    static func resetReps(_ s: Step) -> Int { max(s.slot.reps.lowerBound, s.slot.reps.upperBound - 2) }
+    /// Is weight a better than b? Less assistance on assisted moves, more weight otherwise.
+    static func heavier(_ s: Step, _ a: Double, than b: Double) -> Bool { s.isAssisted ? a < b : a > b }
+
+    static func next(_ s: Step, from x: LoggedSet) -> Suggestion {
+        let lo = s.slot.reps.lowerBound, hi = s.slot.reps.upperBound, q = Fmt.weight(s.slot.weightStep)
+        if isBodyweight(s, x.w) {
+            let inc = s.slot.repStep
+            return x.r >= hi ? Suggestion(w: 0, r: hi, why: "Top of range · hold")
+                : Suggestion(w: 0, r: min(hi, x.r + inc), why: "+\(inc) \(s.slot.id == "plank" ? "sec" : "rep")")
+        }
+        if x.r >= hi {
+            return Suggestion(w: up(s, x.w), r: resetReps(s), why: s.isAssisted ? "−\(q) lb assist · hit \(hi)" : "+\(q) lb · hit \(hi)", up: true)
+        }
+        if x.r < lo { return Suggestion(w: x.w, r: lo, why: "Same · get to \(lo)") }
+        return Suggestion(w: x.w, r: x.r + 1, why: "Same · +1 rep")
+    }
 }
 
 enum Fmt {

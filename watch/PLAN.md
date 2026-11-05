@@ -171,3 +171,12 @@ Done when: a lift and a run logged entirely on the Watch show up in the web app 
   Shown as `−60×12`, or `BW×12` without assistance.
 - **Single-arm moves** (name contains Single-arm or One-arm): `w` is per arm; volume counts both arms. Cable fly and
   rear delt fly are now "Single-arm …" in the plan (same ids, so history carries over).
+
+## Per-set targets (2026-11-05, build 8)
+- Replaces the single top-set target. Each set's target comes from the same set last time (`setTargets` on the web,
+  `SyncStore.targets` on the Watch): top of the rep range → +5 lb (2.5 on small lifts; assisted: 5 lb less assistance)
+  and aim 2 reps lower (never below the range); inside the range → same weight, +1 rep; below it → same weight, aim for
+  the bottom; below it on that set two sessions running → about 10% lighter. Reps never pass the top of the range.
+- During a workout (`targetFor` / `SyncStore.target`), the next set starts at its target, adjusted by the set just
+  logged: hitting the top moves it up (unless last week's plan for it was already heavier), falling short of the bottom
+  moves it down, and a heavier-than-planned set in range is repeated.

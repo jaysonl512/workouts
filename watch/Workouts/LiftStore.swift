@@ -99,6 +99,8 @@ final class LiftStore: ObservableObject {
         guard let step = currentStep else { return }
         draft!.changedAt = Date()
         draft!.sets[step.id, default: []].append(LoggedSet(w: w, r: r))
+        // Top of the rep range: the next set moves up, so say so with a haptic.
+        if r >= step.slot.reps.upperBound, !Progression.isBodyweight(step, w) { WKInterfaceDevice.current().play(.directionUp) }
         let done = draft!.sets[step.id]!.count
         // Superset: A → B straight away, B → rest and back to A, until both are done.
         if let p = supersetPartner(of: draft!.index) {

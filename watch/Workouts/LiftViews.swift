@@ -77,9 +77,10 @@ struct ExerciseView: View {
         guard let i = lift.steps.firstIndex(of: step) else { return false }
         return lift.supersetPartner(of: i) != nil
     }
+    /// Target for the next set: last time's same set, adjusted by the set just logged.
     private var suggestion: Suggestion? {
         guard let d = lift.draft else { return nil }
-        return sync.suggestion(for: step, excluding: d.id, before: d.date)
+        return sync.target(for: step, index: done.count, done: done, excluding: d.id, before: d.date)
     }
 
     var body: some View {
@@ -125,6 +126,7 @@ struct ExerciseView: View {
     /// The suggestion's reason ("+5 lb · hit 8s last time") before the first set, this session's sets after.
     private var lastLine: String {
         let a = step.isAssisted
+        if let s = suggestion, s.up, !done.isEmpty { return s.why }
         if !done.isEmpty { return "Done " + done.map { $0.text(assisted: a) }.joined(separator: " ") }
         if let s = suggestion { return s.why }
         guard let l = last, !l.isEmpty else { return "New" }
@@ -153,12 +155,12 @@ struct ExerciseView: View {
         .focusEffectDisabled()
     }
 
-    /// This session's last set, else the suggested target, else last time's set, else the bottom of the rep range
+    /// The set's target, else this session's last set, else last time's set, else the bottom of the rep range
     /// (the web app's initCur order).
     private func prefill() {
-        if let s = done.last {
+        if let s = suggestion {
             weight = s.w; reps = Double(s.r)
-        } else if let s = suggestion {
+        } else if let s = done.last {
             weight = s.w; reps = Double(s.r)
         } else if let l = last, !l.isEmpty {
             let s = l[min(done.count, l.count - 1)]

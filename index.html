@@ -441,7 +441,7 @@ const EFFORT = {easy:'Easy', medium:'Medium', hard:'Hard'};
 const effortSeg = (act,cur) => `<div class="segc">${Object.entries(EFFORT).map(([v,l])=>`<button class="${v===cur?'on':''}" data-act="${act}" data-v="${v}">${l}</button>`).join('')}</div>`;
 const kindOf = x => x.yoga ? 'yoga' : x.other ? 'other' : x.run ? 'run' : 'lift';
 const CHEERS = ['Nice one','Solid set','Strong','Locked in','Clean rep','Beast mode','Smooth'];
-const APP_VERSION='2026-11-05.4';
+const APP_VERSION='2026-11-05.5';
 
 /* alternatives per exercise: each alternative keeps its own history so weights stay comparable */
 const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
@@ -612,7 +612,25 @@ const hasDraftData = d => d.run.dist!==''||d.run.min!==''||Object.values(d.ex).s
 /* ---------- smart targets, deload, weekly stats ---------- */
 const roundTo = (v,q) => Math.round(v/q)*q;
 const monOf = ds => addDays(ds, -((new Date(ds+'T12:00:00').getDay()+6)%7));
-function suggestFor(e){
+/* Per-set targets: double progression with a rep ceiling.
+   Each set starts from the same set last time. Top of the rep range: add weight (5 lb, 2.5 on small lifts; on assisted
+   moves, less assistance) and aim 2 reps lower. Inside the range: same weight, one more rep. Below it: same weight,
+   get back to the bottom of the range; below it on that set two sessions running: about 10% lighter.
+   Reps never climb past the top of the range, so heavier weights do the progressing. */
+const stepQ = e => e.small?2.5:5;
+const upW = (e,w) => isAssist(e.name) ? Math.max(0,w-stepQ(e)) : w+stepQ(e);
+const downW = (e,w) => isAssist(e.name) ? w+stepQ(e) : Math.max(0,w-stepQ(e));
+const resetR = e => Math.max(e.reps[0], e.reps[1]-2);
+const isBodyweight = (e,w) => !(w>0) && !isAssist(e.name);
+function progress(e,x){
+  const lo=e.reps[0], hi=e.reps[1], w=x.w||0, r=x.r||0, q=stepQ(e), as=isAssist(e.name), same=as?'Same assistance':'Same weight';
+  if(isBodyweight(e,w)){ const inc=e.id==='plank'?5:1, u=e.id==='plank'?'sec':'rep';
+    return r>=hi ? {w:0,r:hi,why:'Top of the range: hold it there'} : {w:0,r:Math.min(hi,r+inc),why:`+${inc} ${u}`} }
+  if(r>=hi) return {w:upW(e,w), r:resetR(e), up:true, why: as ? `You hit ${hi} last time: ${q} lb less assistance` : `You hit ${hi} last time: +${q} lb`};
+  if(r<lo) return {w, r:lo, why:`${same}, get back to ${lo}`};
+  return {w, r:r+1, why:`${same}, one more rep`};
+}
+function setTargets(e){
   const hist=[];
   for(const s of allSessions()){
     if(s.id===sid()||s.date>st.date) continue;
@@ -621,18 +639,26 @@ function suggestFor(e){
     if(hist.length>=2) break;
   }
   if(!hist.length) return null;
-  const dl=getDraft().deload, q=e.small?2.5:5, lo=e.reps[0], hi=e.reps[1], as=isAssist(e.name);
-  // The top set is the heaviest one, or the one with the least assistance.
-  const topOf = sets => { const ws=sets.map(x=>x.w||0), mw=as?Math.min(...ws):Math.max(...ws); return {w:mw, minR:Math.min(...sets.filter(x=>(x.w||0)===mw).map(x=>x.r))} };
-  const {w,minR}=topOf(hist[0]);
-  if(dl) return as ? {w, r:lo, why:'Deload week: same assistance, easy reps'} : {w:w?roundTo(w*0.6,q):0, r:Math.round((lo+hi)/2), why:'Deload week: about 60% of your usual weight'};
-  if(w===0){ const inc=e.id==='plank'?5:1; return {w:0, r:minR+inc, why:`Bodyweight: add ${inc} ${e.id==='plank'?'sec':'rep'}`}; }
-  if(minR>=hi) return as ? {w:Math.max(0,w-q), r:lo, up:true, why:`You hit ${hi} on every set last time. Take ${q} lb of assistance off`}
-    : {w:w+q, r:lo, up:true, why:`You hit ${hi} on every set last time. Add ${q} lb`};
-  if(hist.length>1 && topOf(hist[0]).minR<lo && topOf(hist[1]).minR<lo) return as ? {w:w+q, r:lo, why:`Missed the rep range twice. Add ${q} lb of assistance and rebuild`}
-    : {w:roundTo(w*0.9,q), r:lo, why:'Missed the rep range twice. Drop about 10% and rebuild'};
-  const r = minR<lo ? lo : Math.min(hi,minR+1), same = as ? 'Same assistance' : 'Same weight';
-  return {w, r, why: minR<lo ? `${same}, get to ${lo}+ reps` : `${same}, aim for ${r} reps`};
+  const dl=getDraft().deload, q=stepQ(e), lo=e.reps[0], hi=e.reps[1], as=isAssist(e.name), prev=hist[0];
+  return Array.from({length:Math.max(e.sets,prev.length)},(_,i)=>{
+    const x=prev[Math.min(i,prev.length-1)], w=x.w||0, y=hist[1]?.[i];
+    if(dl) return as ? {w, r:lo, why:'Deload week: same assistance, easy reps'} : {w:w?roundTo(w*0.6,q):0, r:Math.round((lo+hi)/2), why:'Deload week: about 60% of your usual weight'};
+    if(y && !isBodyweight(e,w) && (x.r||0)<lo && (y.r||0)<lo && (y.w||0)===w)
+      return as ? {w:w+q, r:lo, why:'Under the range twice: more assistance, rebuild'} : {w:roundTo(w*0.9,q), r:lo, why:'Under the range twice: about 10% lighter, rebuild'};
+    return progress(e,x);
+  });
+}
+/* Target for set i of this workout: the same set last time, progressed, then adjusted by the set just logged.
+   Hit the top of the range on a set and the next one moves up; fall short of the bottom and it moves down. */
+function targetFor(e,i,done){
+  const t=setTargets(e), base=t ? t[Math.min(i,t.length-1)] : null, p=done[i-1];
+  if(!p) return base;
+  const lo=e.reps[0], hi=e.reps[1], w=p.w||0, r=p.r||0;
+  if(isBodyweight(e,w)) return base || {w:0, r, why:'Same as your last set'};
+  if(r>=hi){ const c={w:upW(e,w), r:resetR(e), up:true, why:`You hit ${hi}: moving up`}; return base && heavier(e,base.w,c.w) ? base : c }
+  if(r<lo){ const c={w:downW(e,w), r:lo, why:`Under ${lo}: a little lighter`}; return base && heavier(e,c.w,base.w) ? base : c }
+  if(!base || heavier(e,w,base.w)) return {w, r, why:'Same as your last set'};
+  return base;
 }
 function deloadInfo(){
   const weeks=new Map();
@@ -788,8 +814,8 @@ function goStep(i,dir){
 }
 function initCur(){
   const e=stepsFor()[st.wk.step]; if(!e||e.run||e.yoga||e.other){ if(e&&e.yoga){const d0=getDraft(); if(d0.run.min===''){d0.run.min=60;saveDraft()}} st.wk.cur=null;return}
-  const a=getDraft().ex[e.id]||[], last=lastFor(e.id), sug=suggestFor(e);
-  const src = st.wk.editing!=null ? a[st.wk.editing] : (a[a.length-1] || (sug?{w:sug.w,r:sug.r}:null) || last?.sets[last.sets.length-1]);
+  const a=getDraft().ex[e.id]||[], last=lastFor(e.id), sug=targetFor(e,a.length,a);
+  const src = st.wk.editing!=null ? a[st.wk.editing] : ((sug?{w:sug.w,r:sug.r}:null) || a[a.length-1] || last?.sets[Math.min(a.length,last.sets.length-1)]);
   st.wk.cur={w:src?.w??0, r:src?.r ?? e.reps[0]};
 }
 let restTimer=null;
@@ -835,7 +861,9 @@ function logSet(){
   a[idx]={w,r}; saveDraft();
   const wasEdit = wk.editing!=null;
   wk.editing=null; wk.just=idx;
+  const topped = !wasEdit && !isBodyweight(e,w) && r>=e.reps[1];
   if(isPR){ wk.prs[e.id]=true; burstAt(btn,44); buzz([30,40,30]); toast('New PR 🏆') }
+  else if(topped && a.length<e.sets){ burstAt(btn,24); buzz([20,30,20]); toast(`Hit ${e.reps[1]} 💪 Moving you up`) }
   else { burstAt(btn,10); buzz(15); toast(CHEERS[Math.floor(Math.random()*CHEERS.length)]) }
   const p = wasEdit ? null : ssPartner(wk.step);
   if(p!=null){
@@ -849,7 +877,9 @@ function logSet(){
     }
   }
   if(!wasEdit && a.length<e.sets && restOn() && !isManual()) startRest(restSecs(e.rest)); else clearRest();
-  wk.cur={w,r};
+  // The next set starts at its target: last time's set, moved up or down by how this one went.
+  const nt = wasEdit ? null : targetFor(e,a.length,a);
+  wk.cur = nt ? {w:nt.w, r:nt.r} : {w,r};
   render();
   const nb=$('#logBtn'); if(nb){nb.classList.add('ok')}
 }
@@ -1124,7 +1154,7 @@ function viewWorkout(){
   const a=d.ex[e.id]||[], last=lastFor(e.id);
   const tot=Math.max(e.sets,a.length), cur=wk.editing!=null?wk.editing:a.length;
   const complete = a.length>=e.sets && wk.editing==null;
-  const sug = suggestFor(e);
+  const sug = wk.editing==null && a.length<e.sets ? targetFor(e,a.length,a) : null;
   let dots='';
   for(let i=0;i<tot+(complete?0:0);i++){
     const done=i<a.length;
@@ -1142,7 +1172,7 @@ function viewWorkout(){
     ${wk.prs[e.id]?`<span class="badge">🏆 New PR</span>`:''}
     ${isAssist(e.name)?`<div class="last">Log the machine's assistance as the weight. Less assistance is harder.</div>`:isPerArm(e.name)?`<div class="last">Log the weight for one arm.</div>`:''}
     ${last?`<div class="last">Last time (${fmtDate(last.date)}): ${last.sets.map(x=>fmtSet(x,e)).join(', ')}</div>`:''}
-    ${sug?`<div class="sug">🎯 Target: <b>${sug.w?sug.w+' '+wUnit(e)+' × ':isAssist(e.name)?'Bodyweight × ':''}${sug.r}${sug.w&&!isAssist(e.name)?'':(e.id==='plank'?' sec':' reps')}</b><small>${esc(sug.why)}</small></div>`:''}
+    ${sug?`<div class="sug">🎯 Set ${a.length+1}: <b>${sug.w?sug.w+' '+wUnit(e)+' × ':isAssist(e.name)?'Bodyweight × ':''}${sug.r}${sug.w&&!isAssist(e.name)?'':(e.id==='plank'?' sec':' reps')}</b><small>${esc(sug.why)}</small></div>`:''}
     <div class="dots">${dots}</div>
     <div class="steppers">
       ${stepper('w',isAssist(e.name)?'Assistance':'Weight',w,wUnit(e))}
@@ -1784,7 +1814,7 @@ function viewPlan(){
     h += `<details class="card pl"><summary><div class="ttl"><b>${esc(S.name)}</b><span>${S.ex.length} exercises · about ${S.ex.length*7} min</span></div><span class="chev">›</span></summary><div class="body">${S.ex.map(e=>`<div class="exr"><div class="exn">${esc(e.name)}${/Main lift/.test(e.note||'')?'<i>MAIN</i>':''}</div><div class="exs">${e.sets} × ${e.reps[0]===e.reps[1]?e.reps[0]:e.reps[0]+'–'+e.reps[1]}<small>rest ${e.rest}</small></div></div>`).join('')}</div></details>`;
   });
   h += `<details class="card pl"><summary><div class="ttl"><b>Running build-up</b><span>Tuesday, plus Saturday if you feel like it</span></div><span class="chev">›</span></summary><div class="body"><ul class="bul" style="margin-bottom:6px"><li><b>Weeks 1–2:</b> 20–25 min easy</li><li><b>Weeks 3–4:</b> 30 min easy</li><li><b>Weeks 5–8:</b> build to 40–45 min, add one interval session (6 × 2 min hard / 2 min easy)</li></ul></div></details>`;
-  h += `<div class="sect">How to progress</div><div class="card" style="padding:6px 16px"><ul class="bul"><li>Work up to the top of the rep range on every set, then add 5 lb (2.5 on small lifts) and start back at the bottom.</li><li>Leave 1–2 reps in reserve on most sets.</li><li>Take a deload week about every 6th week, at roughly 60% of your usual weights.</li><li>Tap ⇄ Swap on any exercise to use an alternative. Each one keeps its own history.</li></ul></div>`;
+  h += `<div class="sect">How to progress</div><div class="card" style="padding:6px 16px"><ul class="bul"><li>Every set has its own target, from the same set last time. Hit the top of the rep range and that set moves up 5 lb (2.5 on small lifts) and aims 2 reps lower. Otherwise, same weight and one more rep.</li><li>During a workout, hitting the top of the range moves the next set up right away. Falling short of the bottom makes it a little lighter.</li><li>Reps never go past the top of the range, so the weight does the climbing. Pull-ups work the same way with less assistance.</li><li>Leave 1–2 reps in reserve on most sets.</li><li>Take a deload week about every 6th week, at roughly 60% of your usual weights.</li><li>Tap ⇄ Swap on any exercise to use an alternative. Each one keeps its own history.</li></ul></div>`;
   return h+`<div class="sect">Settings</div><details class="card set"${st.setOpen?' open':''}><summary><b>Settings</b><span>Cloud ${sbAuth()?'on':'off'}</span></summary><div style="margin-top:12px"><div class="row2"><div><b>Rest timer</b><div class="note">Counts down after each set</div></div><button class="sw ${restOn()?'on':''}" role="switch" aria-checked="${restOn()}" aria-label="Rest timer" data-act="resttoggle"><i></i></button></div><div class="sep"></div><div class="row2"><div><b>Body weight</b><div class="note">${st.health.some(h=>h.wt!=null)?'From Apple Health. This is only a fallback.':'For pull-up volume, until Apple Health has your weight'}</div></div><span class="bwin"><input id="bw" type="number" inputmode="decimal" min="50" max="600" placeholder="—" value="${esc(LS('wt.bw','')??'')}" aria-label="Body weight in pounds"><small>lb</small></span></div><div class="sep"></div>${cloudCard()}<div class="sep"></div>${exportCard()}<div class="sep"></div><div class="row2"><div><b>App version</b><div class="note">${APP_VERSION}</div></div><button class="btn ghost sm" data-act="refresh">Refresh app</button></div></div></details>`;
 }
 

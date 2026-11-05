@@ -149,35 +149,44 @@ final class SyncStore: ObservableObject {
         return out
     }
 
-    /// Next target for an exercise, the same rules as the web app's suggestFor (without deload weeks):
-    /// top of the rep range on every set → add weight; missed the bottom twice → drop about 10%; else add a rep.
-    func suggestion(for step: Step, excluding sessionId: String, before date: String) -> Suggestion? {
+    /// Targets for every set, from the same set last time (the web app's setTargets, without deload weeks).
+    func targets(for step: Step, excluding sessionId: String, before date: String) -> [Suggestion]? {
         let hist = recentSets(for: step.id, excluding: sessionId, before: date, limit: 2)
-        guard let latest = hist.first else { return nil }
-        let q = step.slot.weightStep, lo = step.slot.reps.lowerBound, hi = step.slot.reps.upperBound
-        let assisted = step.isAssisted
-        // The top set is the heaviest one, or the one with the least assistance.
-        func top(_ sets: [LoggedSet]) -> (w: Double, minR: Int) {
-            let ws = sets.map(\.w)
-            let mw = (assisted ? ws.min() : ws.max()) ?? 0
-            return (mw, sets.filter { $0.w == mw }.map(\.r).min() ?? 0)
+        guard let prev = hist.first, !prev.isEmpty else { return nil }
+        let lo = step.slot.reps.lowerBound, q = step.slot.weightStep
+        return (0..<max(step.slot.sets, prev.count)).map { i in
+            let x = prev[min(i, prev.count - 1)]
+            // Under the range on this set two sessions running: about 10% lighter (or more assistance).
+            if hist.count > 1, hist[1].indices.contains(i) {
+                let y = hist[1][i]
+                if !Progression.isBodyweight(step, x.w), x.r < lo, y.r < lo, y.w == x.w {
+                    return step.isAssisted ? Suggestion(w: x.w + q, r: lo, why: "+\(Fmt.weight(q)) lb assist · rebuild")
+                        : Suggestion(w: max(0, (x.w * 0.9 / q).rounded() * q), r: lo, why: "−10% · rebuild")
+                }
+            }
+            return Progression.next(step, from: x)
         }
-        let (w, minR) = top(latest)
-        if w == 0 {
-            let inc = step.slot.repStep
-            return Suggestion(w: 0, r: minR + inc, why: "+\(inc) \(step.slot.id == "plank" ? "sec" : "rep")")
+    }
+
+    /// Target for set `index` of this workout: last time's same set, moved up or down by the set just logged
+    /// (the web app's targetFor).
+    func target(for step: Step, index: Int, done: [LoggedSet], excluding sessionId: String, before date: String) -> Suggestion? {
+        let base = targets(for: step, excluding: sessionId, before: date).map { $0[min(index, $0.count - 1)] }
+        guard index > 0, done.indices.contains(index - 1) else { return base }
+        let p = done[index - 1], lo = step.slot.reps.lowerBound, hi = step.slot.reps.upperBound
+        if Progression.isBodyweight(step, p.w) { return base ?? Suggestion(w: 0, r: p.r, why: "Same as last set") }
+        if p.r >= hi {
+            let c = Suggestion(w: Progression.up(step, p.w), r: Progression.resetReps(step), why: "Hit \(hi) · moving up", up: true)
+            if let b = base, Progression.heavier(step, b.w, than: c.w) { return b }
+            return c
         }
-        if minR >= hi {
-            return assisted ? Suggestion(w: max(0, w - q), r: lo, why: "−\(Fmt.weight(q)) lb assist · hit \(hi)s")
-                : Suggestion(w: w + q, r: lo, why: "+\(Fmt.weight(q)) lb · hit \(hi)s last time")
+        if p.r < lo {
+            let c = Suggestion(w: Progression.down(step, p.w), r: lo, why: "Under \(lo) · a bit lighter")
+            if let b = base, Progression.heavier(step, c.w, than: b.w) { return b }
+            return c
         }
-        if hist.count > 1, top(hist[1]).minR < lo, minR < lo {
-            return assisted ? Suggestion(w: w + q, r: lo, why: "+\(Fmt.weight(q)) lb assist · missed twice")
-                : Suggestion(w: max(0, (w * 0.9 / q).rounded() * q), r: lo, why: "−10% · missed twice")
-        }
-        let r = minR < lo ? lo : min(hi, minR + 1)
-        let same = assisted ? "Same assist" : "Same weight"
-        return Suggestion(w: w, r: r, why: minR < lo ? "\(same) · get \(lo)+" : "\(same) · aim for \(r)")
+        if let b = base, !Progression.heavier(step, p.w, than: b.w) { return b }
+        return Suggestion(w: p.w, r: p.r, why: "Same as last set")
     }
 
     private func persistQueue() { try? JSONEncoder().encode(pending).write(to: queueURL, options: .atomic) }
