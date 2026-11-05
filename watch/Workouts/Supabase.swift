@@ -100,6 +100,44 @@ actor Supabase {
                               prefer: "resolution=merge-duplicates,return=minimal")
     }
 
+    /// A lift in progress: update the row only while it is still in progress, and insert it if there is none,
+    /// so a late upload from this Watch never reopens a workout already finished on the phone.
+    func upsertLive(_ row: SessionRow) async throws {
+        _ = try await token()
+        guard let uid = userId else { throw SBError.http(0, "no user id") }
+        struct Patch: Encodable { let data: SessionData; let source: String; let name: String }
+        let out = try await request("/rest/v1/sessions?id=eq.\(Self.q(row.id))&status=eq.in_progress", method: "PATCH",
+                                    body: try JSONEncoder().encode(Patch(data: row.data, source: row.source, name: row.name)),
+                                    prefer: "return=representation")
+        if let rows = try? JSONSerialization.jsonObject(with: out) as? [Any], !rows.isEmpty { return }
+        var r = row
+        r.userId = uid
+        _ = try await request("/rest/v1/sessions?on_conflict=user_id,id", method: "POST", body: try JSONEncoder().encode([r]),
+                              prefer: "resolution=ignore-duplicates,return=minimal")
+    }
+
+    /// One session by id, any status (to see what the phone did with a lift in progress).
+    func session(id: String) async throws -> SessionRow? {
+        let data = try await request("/rest/v1/sessions?select=id,date,session,name,type,status,source,saved_at,data&id=eq.\(Self.q(id))")
+        return try JSONDecoder().decode([SessionRow].self, from: data).first
+    }
+
+    /// Removes a discarded lift's in-progress row (a finished one is never touched).
+    func deleteInProgress(id: String) async throws {
+        _ = try await request("/rest/v1/sessions?id=eq.\(Self.q(id))&status=eq.in_progress", method: "DELETE", prefer: "return=minimal")
+    }
+
+    /// Adds keys the stored `data` does not have yet (for example the Watch's heart rate on a workout finished on the phone).
+    func addMissing(id: String, _ extra: [String: Any]) async throws {
+        let raw = try await request("/rest/v1/sessions?select=data&id=eq.\(Self.q(id))")
+        var d = ((try JSONSerialization.jsonObject(with: raw) as? [[String: Any]])?.first?["data"] as? [String: Any]) ?? [:]
+        for (k, v) in extra where d[k] == nil || d[k] is NSNull { d[k] = v }
+        d["updatedAt"] = ISO.string()
+        try await replaceData(id: id, data: d)
+    }
+
+    private static func q(_ id: String) -> String { id.addingPercentEncoding(withAllowedCharacters: .alphanumerics.union(CharacterSet(charactersIn: "-_~."))) ?? id }
+
     /// Insert or merge daily Health values by (user_id, date). Rows are grouped by which values they carry,
     /// because PostgREST needs the same keys in every row of a request; missing values keep what is stored.
     func upsertHealth(_ days: [HealthDay]) async throws {

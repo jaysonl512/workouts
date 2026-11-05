@@ -42,6 +42,26 @@ struct Step: Hashable {
     let id: String
     let name: String
     var isAlt: Bool { id != slot.id }
+    var isAssisted: Bool { Load.isAssisted(name) }
+    var isPerArm: Bool { Load.isPerArm(name) }
+    /// Unit shown next to the weight.
+    var weightUnit: String { isAssisted ? "lb assist" : isPerArm ? "lb / arm" : "lb" }
+}
+
+/// Same rules as the web app: assisted moves (pull-ups, chin-ups) log the machine's assistance, so less is harder;
+/// single-arm moves log one arm's weight. Both come from the name, so alternatives work too.
+enum Load {
+    static func isAssisted(_ name: String) -> Bool {
+        name.range(of: #"\b(pull|chin)-?ups?\b"#, options: [.regularExpression, .caseInsensitive]) != nil
+    }
+    static func isPerArm(_ name: String) -> Bool {
+        name.range(of: #"\b(single|one)-arm\b"#, options: [.regularExpression, .caseInsensitive]) != nil
+    }
+    /// Weight moved per rep (the web app's loadOf): body weight minus assistance (0 if body weight is unknown), both arms on single-arm moves.
+    static func perRep(name: String, w: Double, bodyWeight: Double?) -> Double {
+        if isAssisted(name) { return bodyWeight.map { max(0, $0 - w) } ?? 0 }
+        return w * (isPerArm(name) ? 2 : 1)
+    }
 }
 
 extension Plan {
@@ -89,4 +109,7 @@ enum ISO {
     }()
     /// Matches JavaScript's Date.toISOString(), e.g. 2026-11-03T17:05:12.345Z.
     static func string(_ date: Date = Date()) -> String { f.string(from: date) }
+    private static let plain = ISO8601DateFormatter()
+    /// Parses either form (with or without fractional seconds).
+    static func date(_ s: String?) -> Date? { s.flatMap { f.date(from: $0) ?? plain.date(from: $0) } }
 }

@@ -53,6 +53,13 @@ final class SyncStore: ObservableObject {
         flush()
     }
 
+    /// Forgets a queued in-progress copy (the workout was discarded or finished on the other device).
+    func dropInProgress(_ id: String) {
+        guard pending[id]?.status == "in_progress" else { return }
+        pending[id] = nil
+        persistQueue()
+    }
+
     /// Saves the answer to "How did it go?" on the workout just finished (nil = skipped).
     func rate(_ effort: String?) {
         guard var row = toRate else { return }
@@ -74,7 +81,7 @@ final class SyncStore: ObservableObject {
         defer { flushing = false; scheduleRetry() }
         for row in pending.values.sorted(by: { $0.data.updatedAt < $1.data.updatedAt }) {
             do {
-                try await Supabase.shared.upsert([row])
+                if row.status == "in_progress" { try await Supabase.shared.upsertLive(row) } else { try await Supabase.shared.upsert([row]) }
                 // Keep it if a newer copy was queued while this one was uploading.
                 if pending[row.id]?.data.updatedAt == row.data.updatedAt { pending[row.id] = nil }
                 persistQueue()
@@ -148,8 +155,11 @@ final class SyncStore: ObservableObject {
         let hist = recentSets(for: step.id, excluding: sessionId, before: date, limit: 2)
         guard let latest = hist.first else { return nil }
         let q = step.slot.weightStep, lo = step.slot.reps.lowerBound, hi = step.slot.reps.upperBound
+        let assisted = step.isAssisted
+        // The top set is the heaviest one, or the one with the least assistance.
         func top(_ sets: [LoggedSet]) -> (w: Double, minR: Int) {
-            let mw = sets.map(\.w).max() ?? 0
+            let ws = sets.map(\.w)
+            let mw = (assisted ? ws.min() : ws.max()) ?? 0
             return (mw, sets.filter { $0.w == mw }.map(\.r).min() ?? 0)
         }
         let (w, minR) = top(latest)
@@ -157,12 +167,17 @@ final class SyncStore: ObservableObject {
             let inc = step.slot.repStep
             return Suggestion(w: 0, r: minR + inc, why: "+\(inc) \(step.slot.id == "plank" ? "sec" : "rep")")
         }
-        if minR >= hi { return Suggestion(w: w + q, r: lo, why: "+\(Fmt.weight(q)) lb · hit \(hi)s last time") }
+        if minR >= hi {
+            return assisted ? Suggestion(w: max(0, w - q), r: lo, why: "−\(Fmt.weight(q)) lb assist · hit \(hi)s")
+                : Suggestion(w: w + q, r: lo, why: "+\(Fmt.weight(q)) lb · hit \(hi)s last time")
+        }
         if hist.count > 1, top(hist[1]).minR < lo, minR < lo {
-            return Suggestion(w: max(0, (w * 0.9 / q).rounded() * q), r: lo, why: "−10% · missed twice")
+            return assisted ? Suggestion(w: w + q, r: lo, why: "+\(Fmt.weight(q)) lb assist · missed twice")
+                : Suggestion(w: max(0, (w * 0.9 / q).rounded() * q), r: lo, why: "−10% · missed twice")
         }
         let r = minR < lo ? lo : min(hi, minR + 1)
-        return Suggestion(w: w, r: r, why: minR < lo ? "Same weight · get \(lo)+" : "Same weight · aim for \(r)")
+        let same = assisted ? "Same assist" : "Same weight"
+        return Suggestion(w: w, r: r, why: minR < lo ? "\(same) · get \(lo)+" : "\(same) · aim for \(r)")
     }
 
     private func persistQueue() { try? JSONEncoder().encode(pending).write(to: queueURL, options: .atomic) }

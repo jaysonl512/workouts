@@ -92,6 +92,15 @@ final class HealthSync {
         }
     }
 
+    /// Latest body weight in lb (for pull-up volume), or nil if Health has none.
+    func latestBodyWeightLb() async -> Double? {
+        guard HKHealthStore.isHealthDataAvailable() else { return nil }
+        let query = HKSampleQueryDescriptor(predicates: [.quantitySample(type: HKQuantityType(.bodyMass))],
+                                            sortDescriptors: [SortDescriptor(\.endDate, order: .reverse)], limit: 1)
+        guard let s = try? await query.result(for: store).first else { return nil }
+        return s.quantity.doubleValue(for: .pound())
+    }
+
     private func read(days: Int) async -> [HealthDay] {
         let cal = Calendar.current
         let today = cal.startOfDay(for: Date())

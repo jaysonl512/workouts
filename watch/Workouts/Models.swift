@@ -15,6 +15,8 @@ struct LoggedSet: Codable, Hashable {
     }
 
     var text: String { (w > 0 ? "\(Fmt.weight(w))×" : "") + "\(r)" }
+    /// "−60×12" for 60 lb of assistance, "BW×12" without, like the web app.
+    func text(assisted: Bool) -> String { assisted ? (w > 0 ? "−\(Fmt.weight(w))×" : "BW×") + "\(r)" : text }
 }
 
 struct Entry: Codable, Hashable {
@@ -59,6 +61,10 @@ struct SessionData: Codable {
     var hk: HKInfo?
     /// "easy" | "medium" | "hard", asked right after a workout (same field the web app uses).
     var effort: String?
+    var notes: String?
+    var deload: Bool?
+    /// When a lift in progress started, so a workout continued on the other device keeps its full length.
+    var startedAt: String?
     var updatedAt: String
 }
 

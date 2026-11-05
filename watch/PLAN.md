@@ -154,3 +154,20 @@ Done when: a lift and a run logged entirely on the Watch show up in the web app 
 - GitHub token setup, "Copy unsynced" and the GitHub half of delete are gone; any old `wt.token` is cleared on load.
 - Plan › Settings › Export downloads `{sessions, health}` as JSON.
 - GitHub still hosts the web app (Pages). Earlier notes in this file about `data/log.json` exports are historical.
+
+## Handoff, assisted and single-arm lifts (2026-11-05, build 7)
+- **Handoff.** A lift can move between the Watch and the phone mid-workout. Both upload the lift as `status = in_progress`
+  (`data.startedAt`, and `data.updatedAt` = time of the last change to the sets) and check for a newer copy: the web app
+  every 8 s while the workout screen is open, the Watch every 10 s while the app is on screen. The newest copy wins
+  and replaces the other's sets. In-progress uploads PATCH only rows still `in_progress` (otherwise insert with
+  ignore-duplicates), so a late upload never reopens a finished workout. When one device saves the lift as complete,
+  the other notices: the web app leaves the workout screen; the Watch ends its HealthKit workout and adds its heart rate
+  and calories to the phone's copy (`addMissing`). Discarding on the Watch deletes the in-progress row. The web app
+  shows "In progress on your Watch" for in-progress lifts updated in the last 6 hours.
+  (This replaces the older rule above that the web app ignores in-progress rows.)
+- **Assisted moves** (name contains pull-up or chin-up): `w` is the machine's assistance. Less is better for PRs and
+  targets (hit the top of the range → take 5 lb off). Volume and 1RM use body weight − assistance, from Apple Health
+  (web: `health_daily`, then Settings › Body weight; Watch: latest HealthKit body mass), and count 0 without it.
+  Shown as `−60×12`, or `BW×12` without assistance.
+- **Single-arm moves** (name contains Single-arm or One-arm): `w` is per arm; volume counts both arms. Cable fly and
+  rear delt fly are now "Single-arm …" in the plan (same ids, so history carries over).

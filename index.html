@@ -354,6 +354,7 @@ details[open]>summary .chev{transform:rotate(90deg)}
 .hic.bad{color:#fca5a5;background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.35)}
 .hmt{flex:1;display:flex;flex-direction:column;min-width:0}.hmt b{font-size:15px}
 .hmt small{font-size:13px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hmt small.good{color:#4ade80}.hmt small.bad{color:#fca5a5}
+.bwin{display:flex;align-items:center;gap:6px}.bwin input{width:84px;text-align:right}.bwin small{color:var(--mute);font-size:13px}
 .hmrow em{font-style:normal;font-weight:700;font-size:18px;white-space:nowrap;display:flex;align-items:baseline;gap:3px}.hmrow em small{font-size:11px;color:var(--mute);font-weight:600}
 .hmrow>i{color:var(--mute);font-style:normal;font-size:20px}
 .insrow{display:flex;gap:12px;align-items:flex-start;border-top:1px solid var(--line);padding:12px 0}
@@ -409,8 +410,8 @@ const PLAN = {
       {id:'cable-row',name:'Seated cable row',sets:4,reps:[8,12],rest:'75 sec'},
       {id:'ohp',name:'Barbell overhead press',sets:3,reps:[6,10],rest:'90 sec'},
       {id:'pullup',name:'Pull-ups',sets:3,reps:[6,12],rest:'90 sec',note:'As many clean reps as you can each set, stopping 1-2 short of failure'},
-      {id:'fly',name:'Cable fly',sets:3,reps:[12,15],rest:'1 min',small:1},
-      {id:'rear',name:'Rear delt fly',sets:3,reps:[15,15],rest:'1 min',small:1},
+      {id:'fly',name:'Single-arm cable fly',sets:3,reps:[12,15],rest:'1 min',small:1},
+      {id:'rear',name:'Single-arm rear delt fly',sets:3,reps:[15,15],rest:'1 min',small:1},
       {id:'ss-curl',name:'EZ-bar curl',sets:3,reps:[10,12],rest:'1 min',small:1,superset:'arms'},
       {id:'ss-tri',name:'Overhead triceps extension',sets:3,reps:[10,12],rest:'1 min',small:1,superset:'arms'}]},
     lowerB:{name:'Lower B · hinge + core',type:'lift',ex:[
@@ -440,7 +441,7 @@ const EFFORT = {easy:'Easy', medium:'Medium', hard:'Hard'};
 const effortSeg = (act,cur) => `<div class="segc">${Object.entries(EFFORT).map(([v,l])=>`<button class="${v===cur?'on':''}" data-act="${act}" data-v="${v}">${l}</button>`).join('')}</div>`;
 const kindOf = x => x.yoga ? 'yoga' : x.other ? 'other' : x.run ? 'run' : 'lift';
 const CHEERS = ['Nice one','Solid set','Strong','Locked in','Clean rep','Beast mode','Smooth'];
-const APP_VERSION='2026-11-05.3';
+const APP_VERSION='2026-11-05.4';
 
 /* alternatives per exercise: each alternative keeps its own history so weights stay comparable */
 const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
@@ -488,7 +489,29 @@ const SS = (k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
 const todayStr = () => new Date().toLocaleDateString('en-CA');
 const fmtDate = d => new Date(d+'T12:00:00').toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
 const num = v => (v===''||v==null||isNaN(+v)) ? null : +v;
-const fmtSet = s => (s.w ? s.w+'×' : '') + s.r;
+/* Assisted moves (pull-ups, chin-ups): the weight is the machine's assistance, so less is harder.
+   Single-arm moves: the weight is per arm. Both come from the name, so alternatives get it right too. */
+const isAssist = n => /\b(pull|chin)-?ups?\b/i.test(n||'');
+const isPerArm = n => /\b(single|one)-arm\b/i.test(n||'');
+const exName = en => (EXMAP[en.id]||en).name;
+const wUnit = e => isAssist(exName(e)) ? 'lb assist' : isPerArm(exName(e)) ? 'lb per arm' : 'lb';
+/* "−60×12" for 60 lb of assistance, "BW×12" for unassisted pull-ups. */
+const fmtSet = (s,en) => en&&isAssist(exName(en)) ? (s.w ? '−'+s.w+'×' : 'BW×')+s.r : (s.w ? s.w+'×' : '') + s.r;
+/* Body weight on a date from Apple Health (lb), else the one typed in Settings. */
+function bwOn(date){
+  let v=null;
+  for(const h of st.health){ if(h.wt==null) continue; if(h.d<=date) v=h.wt; else { if(v==null) v=h.wt; break } }
+  return v ?? num(LS('wt.bw',null));
+}
+/* Weight moved per rep: body weight minus assistance on assisted moves (0 while body weight is unknown), both arms on single-arm moves. */
+function loadOf(en,w,date){
+  const n=exName(en);
+  if(isAssist(n)){ const bw=bwOn(date); return bw ? Math.max(0,bw-(w||0)) : 0 }
+  return (w||0)*(isPerArm(n)?2:1);
+}
+const setVol = (en,x,date) => Math.round(loadOf(en,x.w,date)*(x.r||0));
+/* Is weight a better than b? Less assistance on assisted moves, more weight otherwise. */
+const heavier = (en,a,b) => isAssist(exName(en)) ? a<b : a>b;
 const buzz = ms => { try{navigator.vibrate&&navigator.vibrate(ms)}catch(e){} };
 let toastT;
 function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('show'),1500)}
@@ -521,7 +544,8 @@ const runTime = m => { if(m==null||m===''||isNaN(+m)) return '—'; const t=Math
 const st = {
   tab:'today', date:todayStr(), sess:null, auto:true, add:null,
   sb:[], local:LS('wt.local.v1',[]), draft:LS('wt.draft.v1',{}),
-  progEx:null, wk:null, health:LS('wt.health.v1',[]), hm:null
+  progEx:null, wk:null, health:LS('wt.health.v1',[]), hm:null,
+  live:{} // workouts in progress (from the Watch or this app), by id
 };
 const verOf = x => Date.parse(x.updatedAt||x.savedAt||'')||0;
 /* Deleted workouts: id -> time of deletion. A copy is hidden (and never re-uploaded) unless it was saved after the deletion. */
@@ -541,6 +565,7 @@ const sid = () => st.date+'-'+st.sess;
 async function loadData(){
   if(sbAuth()){
     try{ st.sb=await sbLoad(); await syncLocal() }catch(e){}
+    try{ await loadLive() }catch(e){}
     try{ await loadHealth() }catch(e){}
     purgeDeleted();
   }
@@ -555,15 +580,18 @@ function lastFor(exId){
   }
   return null;
 }
+/* Best weight ever logged for an exercise (least assistance on assisted moves), or null if never logged. */
 function bestEver(exId){
-  let b=0;
-  allSessions().forEach(s=>{ if(s.id===sid()) return; (s.entries||[]).forEach(e=>{ if(e.id===exId) e.sets.forEach(x=>{ if((x.w||0)>b) b=x.w }) }) });
+  let b=null; const en={id:exId};
+  allSessions().forEach(s=>{ if(s.id===sid()) return; (s.entries||[]).forEach(e=>{ if(e.id===exId) e.sets.forEach(x=>{ if(b==null||heavier(en,x.w||0,b)) b=x.w||0 }) }) });
   return b;
 }
 
 /* ---------- draft ---------- */
 function getDraft(){
-  const id=sid(), ex=allSessions().find(s=>s.id===id);
+  const id=sid(), ex=allSessions().find(s=>s.id===id), lv=st.live[id];
+  // A workout in progress on the Watch (or another device) that is newer than this draft replaces it.
+  if(lv && !(ex && verOf(ex)>=verOf(lv)) && verOf(lv)>(st.draft[id]?.touchedAt||0)) adoptLive(id,lv);
   // A saved session wins over a draft that is untouched, empty, or older than the save (e.g. a web draft started
   // before the Watch logged the same workout), so Edit always opens what was actually logged.
   const dr=st.draft[id];
@@ -578,7 +606,7 @@ function fromSession(s){
   (s.entries||[]).forEach(e=>{d.ex[e.id]=e.sets.map(x=>({w:x.w??0,r:x.r})); if(e.slot) d.swaps[e.slot]=e.id});
   return d;
 }
-const saveDraft = () => { const d0=st.draft[sid()]; if(d0){ d0.touched=true; d0.touchedAt=Date.now() } SS('wt.draft.v1', st.draft) };
+const saveDraft = () => { const d0=st.draft[sid()]; if(d0){ d0.touched=true; d0.touchedAt=Date.now() } SS('wt.draft.v1', st.draft); if(st.wk) queueLive() };
 const hasDraftData = d => d.run.dist!==''||d.run.min!==''||Object.values(d.ex).some(a=>a.length);
 
 /* ---------- smart targets, deload, weekly stats ---------- */
@@ -593,15 +621,18 @@ function suggestFor(e){
     if(hist.length>=2) break;
   }
   if(!hist.length) return null;
-  const dl=getDraft().deload, q=e.small?2.5:5, lo=e.reps[0], hi=e.reps[1];
-  const topOf = sets => { const mw=Math.max(...sets.map(x=>x.w||0)); return {w:mw, minR:Math.min(...sets.filter(x=>(x.w||0)===mw).map(x=>x.r))} };
+  const dl=getDraft().deload, q=e.small?2.5:5, lo=e.reps[0], hi=e.reps[1], as=isAssist(e.name);
+  // The top set is the heaviest one, or the one with the least assistance.
+  const topOf = sets => { const ws=sets.map(x=>x.w||0), mw=as?Math.min(...ws):Math.max(...ws); return {w:mw, minR:Math.min(...sets.filter(x=>(x.w||0)===mw).map(x=>x.r))} };
   const {w,minR}=topOf(hist[0]);
-  if(dl) return {w:w?roundTo(w*0.6,q):0, r:Math.round((lo+hi)/2), why:'Deload week: about 60% of your usual weight'};
+  if(dl) return as ? {w, r:lo, why:'Deload week: same assistance, easy reps'} : {w:w?roundTo(w*0.6,q):0, r:Math.round((lo+hi)/2), why:'Deload week: about 60% of your usual weight'};
   if(w===0){ const inc=e.id==='plank'?5:1; return {w:0, r:minR+inc, why:`Bodyweight: add ${inc} ${e.id==='plank'?'sec':'rep'}`}; }
-  if(minR>=hi) return {w:w+q, r:lo, up:true, why:`You hit ${hi} on every set last time. Add ${q} lb`};
-  if(hist.length>1 && topOf(hist[0]).minR<lo && topOf(hist[1]).minR<lo) return {w:roundTo(w*0.9,q), r:lo, why:'Missed the rep range twice. Drop about 10% and rebuild'};
-  const r = minR<lo ? lo : Math.min(hi,minR+1);
-  return {w, r, why: minR<lo ? `Same weight, get to ${lo}+ reps` : `Same weight, aim for ${r} reps`};
+  if(minR>=hi) return as ? {w:Math.max(0,w-q), r:lo, up:true, why:`You hit ${hi} on every set last time. Take ${q} lb of assistance off`}
+    : {w:w+q, r:lo, up:true, why:`You hit ${hi} on every set last time. Add ${q} lb`};
+  if(hist.length>1 && topOf(hist[0]).minR<lo && topOf(hist[1]).minR<lo) return as ? {w:w+q, r:lo, why:`Missed the rep range twice. Add ${q} lb of assistance and rebuild`}
+    : {w:roundTo(w*0.9,q), r:lo, why:'Missed the rep range twice. Drop about 10% and rebuild'};
+  const r = minR<lo ? lo : Math.min(hi,minR+1), same = as ? 'Same assistance' : 'Same weight';
+  return {w, r, why: minR<lo ? `${same}, get to ${lo}+ reps` : `${same}, aim for ${r} reps`};
 }
 function deloadInfo(){
   const weeks=new Map();
@@ -626,7 +657,7 @@ function weekStats(mon){
     if(s.yoga||s.other){o.extra.push(s.name);o.extraMin+=(s.yoga||s.other).minutes||0;return}
     o.sessions++;
     if(s.run){o.runs++;o.km+=s.run.distanceKm||0;o.min+=s.run.minutes||0}
-    else {o.lifts++;(s.entries||[]).forEach(e=>e.sets.forEach(x=>{o.volume+=(x.w||0)*(x.r||0)}))}
+    else {o.lifts++;(s.entries||[]).forEach(e=>e.sets.forEach(x=>{o.volume+=setVol(e,x,s.date)}))}
   });
   return o;
 }
@@ -747,6 +778,7 @@ function startWorkout(resume){
   if(resume){ const i=steps.findIndex(e=>!e.run && (d.ex[e.id]||[]).length<e.sets); first = i<0? steps.length : i }
   st.wk={step:first,dir:1,anim:true,editing:null,just:null,rest:null,cur:null,prs:{}};
   initCur(); document.body.classList.add('wk'); render(); toTop();
+  pullLive();
 }
 function exitWorkout(){ clearRest(); st.wk=null; document.body.classList.remove('wk'); render(); toTop() }
 function goStep(i,dir){
@@ -795,8 +827,10 @@ function logSet(){
   const btn=$('#logBtn');
   if(!r||r<=0){ btn.classList.remove('shake'); void btn.offsetWidth; btn.classList.add('shake'); return }
   const idx = wk.editing!=null ? wk.editing : a.length;
-  const prior = Math.max(bestEver(e.id), ...a.filter((_,i)=>i!==idx).map(x=>x.w||0), 0);
-  const isPR = w>0 && prior>0 && w>prior;
+  const be=bestEver(e.id), others=a.filter((_,i)=>i!==idx).map(x=>x.w||0);
+  // A PR beats every earlier set: heavier, or with less assistance on pull-ups (only once there is history).
+  const isPR = isAssist(e.name) ? be!=null && w<Math.min(be,...others)
+    : (()=>{ const prior=Math.max(be||0,...others,0); return w>0 && prior>0 && w>prior })();
   if(!isManual()){ const nowT=Date.now(); if(!d.firstAt) d.firstAt=nowT; d.lastAt=nowT }
   a[idx]={w,r}; saveDraft();
   const wasEdit = wk.editing!=null;
@@ -820,6 +854,69 @@ function logSet(){
   const nb=$('#logBtn'); if(nb){nb.classList.add('ok')}
 }
 
+
+/* ---------- live handoff: start a lift on the Watch and continue here, or the other way round ----------
+   While a lift is in progress, each device uploads it as status in_progress and checks for a newer copy.
+   The newest copy wins. A finished workout is never reopened: in-progress updates only touch rows still in progress. */
+async function loadLive(){
+  const since=new Date(Date.now()-6*3600e3).toISOString();
+  const r=await sbFetch('/rest/v1/sessions?select=*&status=eq.in_progress&updated_at=gte.'+encodeURIComponent(since));
+  if(!r.ok) return;
+  st.live={}; (await r.json()).forEach(row=>{ const x=rowToSess(row); if(x.type==='lift') st.live[x.id]=x });
+}
+function adoptLive(id,lv){
+  const prev=st.draft[id], d=fromSession(lv), started=Date.parse(lv.startedAt||'')||prev?.startedAt||Date.now();
+  d.touched=true; d.touchedAt=verOf(lv); d.startedAt=started; delete d.savedAt;
+  d.firstAt=Math.min(prev?.firstAt||started, started); d.lastAt=Math.max(prev?.lastAt||0, verOf(lv));
+  if(prev){ d.energy=prev.energy; d.effort=prev.effort||d.effort; d.notes=prev.notes||d.notes; d.deload=prev.deload||d.deload }
+  d.liveFrom=lv.source||'';
+  st.draft[id]=d; SS('wt.draft.v1',st.draft);
+}
+let liveT=null;
+function queueLive(){ clearTimeout(liveT); liveT=setTimeout(()=>pushLive().catch(()=>{}),700) }
+async function pushLive(){
+  const d=st.draft[sid()], S=sessDef(st.sess);
+  if(!d||!st.wk||!sbAuth()||isManual()||S.type!=='lift'||!hasDraftData(d)) return;
+  const t=await sbToken(), uid=t&&jwtSub(t); if(!uid) return;
+  const rec={id:sid(), date:st.date, session:st.sess, name:sessLabel(), type:'lift', source:'web', entries:entriesOf(S,d),
+    startedAt:new Date(d.startedAt||Date.now()).toISOString(), updatedAt:new Date(d.touchedAt||Date.now()).toISOString()};
+  if(d.deload) rec.deload=true;
+  const row={...sessToRow(rec,uid), status:'in_progress'};
+  // Update the row only while it is still in progress; if there is none yet, insert it (never over a finished one).
+  let r=await sbFetch('/rest/v1/sessions?id=eq.'+encodeURIComponent(rec.id)+'&status=eq.in_progress',{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify({data:row.data,source:'web',name:row.name})});
+  if(r.ok && (await r.json()).length) return;
+  await sbFetch('/rest/v1/sessions?on_conflict=user_id,id',{method:'POST',headers:{Prefer:'resolution=ignore-duplicates,return=minimal'},body:JSON.stringify([row])});
+}
+/* During a lift: pick up sets logged on the Watch, and notice when the Watch finishes the workout. */
+let pulling=false;
+async function pullLive(){
+  if(pulling||!st.wk||!sbAuth()||isManual()||sessDef(st.sess).type!=='lift') return;
+  pulling=true;
+  try{
+    const id=sid(), r=await sbFetch('/rest/v1/sessions?select=*&id=eq.'+encodeURIComponent(id));
+    if(!r.ok) return;
+    const row=(await r.json())[0]; if(!row||!st.wk||sid()!==id) return;
+    const x=rowToSess(row), d=st.draft[id];
+    if(verOf(x)<=(d?.touchedAt||0)) return;
+    if(row.status==='complete'){
+      const i=st.sb.findIndex(y=>y.id===id); if(i>=0) st.sb[i]=x; else st.sb.push(x);
+      delete st.live[id]; delete st.draft[id]; SS('wt.draft.v1',st.draft);
+      clearRest(); st.wk=null; st.auto=true; render(); toTop(); toast(x.source==='watch'?'Finished on your Watch ✓':'Workout saved ✓');
+      return;
+    }
+    st.live[id]=x; adoptLive(id,x);
+    const wk=st.wk;
+    if(wk.editing==null){
+      const steps=stepsFor(), dd=getDraft(), i=steps.findIndex(e=>(dd.ex[e.id]||[]).length<e.sets);
+      const to=i<0?steps.length:i;
+      if(to!==wk.step){ clearRest(); wk.dir=to>wk.step?1:-1; wk.step=to; wk.anim=true; wk.just=null }
+      initCur();
+    }
+    render(); toast(x.source==='watch'?'Updated from your Watch ⌚':'Updated');
+  }catch(e){} finally{ pulling=false }
+}
+setInterval(()=>{ if(st.wk && document.visibilityState==='visible') pullLive() }, 8000);
+
 /* ---------- render ---------- */
 function render(){
   const inWk = !!st.wk && st.tab==='today';
@@ -841,7 +938,7 @@ const MOODS=['😫','😕','😐','🙂','🔥'];
 function sessStats(x){
   if(x.yoga||x.other){ const o=x.yoga||x.other; return [[o.minutes??'—','minutes'],...(o.distanceKm?[[o.distanceKm,'km']]:[]),...(x.hk?.activeKcal?[[x.hk.activeKcal,'kcal']]:[]),...(x.hk?.avgHR?[[x.hk.avgHR,'avg bpm']]:[])].slice(0,3) }
   if(x.run){ const p=(x.run.distanceKm&&x.run.minutes)?x.run.minutes/x.run.distanceKm:null; return [[x.run.distanceKm??'—','km'],[runTime(x.run.minutes),'time'],[p?mmss(Math.round(p*60)):'—','/km']] }
-  let sets=0,vol=0; (x.entries||[]).forEach(e=>e.sets.forEach(t=>{sets++;vol+=(t.w||0)*(t.r||0)}));
+  let sets=0,vol=0; (x.entries||[]).forEach(e=>e.sets.forEach(t=>{sets++;vol+=setVol(e,t,x.date)}));
   return [[sets,'sets'],[vol>=1000?(vol/1000).toFixed(1)+'k':vol,'lb lifted'],[x.durationMin??'—','minutes']];
 }
 /* This week's planned workouts and the logged session (if any) that covers each. Runs fill the run slots
@@ -931,10 +1028,12 @@ function todayHero(wp){
       <details class="recap"><summary><span>Workout details</span><span class="chev">›</span></summary><div class="wbody">${woBody(lg, kindOf(lg), true)}</div></details>
       <button class="editlink" data-act="edit">Edit this workout</button></div>`;
   }
+  const onWatch = S.type==='lift' && st.live[sid()]?.source==='watch' && resume && st.date===t;
   const what = S.type==='run'?'Distance and time':S.type==='yoga'?'Class length':S.type==='other'?'Timed workout':steps.length+' exercises';
   return h + `<div class="hero"><h2>${esc(sessLabel())}</h2>
     <div class="meta">${what} · about ${mins} min</div>
     ${S.type==='lift'?`<div class="chips">${steps.map(e=>`<span class="${done(e)?'ok':''}">${esc(e.name.split(/[\/(]/)[0].trim())}</span>`).join('')}</div>`:S.note?`<div class="note" style="margin-bottom:16px">${esc(S.note)}</div>`:''}
+    ${onWatch?`<div class="note" style="text-align:center;margin-bottom:10px">⌚ In progress on your Watch. Resume here to keep going on your phone.</div>`:''}
     ${st.date>t ? `<div class="note" style="text-align:center">Coming up. You can log it on the day.</div>`
       : `<button class="btn big ${isManual()?'':'pulse'}" data-act="start" data-resume="${resume?1:0}">${resume?(isManual()?'Continue adding':'Resume workout'):(isManual()?'Add workout manually':S.type==='run'?'Start run':'Start workout')}</button>`}</div>`;
 }
@@ -1029,7 +1128,7 @@ function viewWorkout(){
   let dots='';
   for(let i=0;i<tot+(complete?0:0);i++){
     const done=i<a.length;
-    dots+=`<button class="dot ${done?'done':''} ${i===cur&&!complete?'now':''} ${wk.just===i?'pop':''}" data-act="dot" data-i="${i}">${done?esc(fmtSet(a[i])):'Set '+(i+1)}</button>`;
+    dots+=`<button class="dot ${done?'done':''} ${i===cur&&!complete?'now':''} ${wk.just===i?'pop':''}" data-act="dot" data-i="${i}">${done?esc(fmtSet(a[i],e)):'Set '+(i+1)}</button>`;
   }
   const w=wk.cur.w, r=wk.cur.r, wstep=e.small?2.5:5;
   const label = wk.editing!=null ? `Update set ${wk.editing+1}` : complete ? 'Log extra set' : `Log set ${a.length+1}`;
@@ -1041,11 +1140,12 @@ function viewWorkout(){
     <div class="tgt">${e.sets} × ${e.reps[0]===e.reps[1]?e.reps[0]:e.reps[0]+'–'+e.reps[1]} · rest ${e.rest}${sp!=null?' after each pair':''}${e.note?' · '+esc(e.note):''}</div>
     ${sp!=null?`<div class="ssnote">Alternate with <b>${esc(steps[sp].name)}</b>: one set each, then rest.</div>`:''}
     ${wk.prs[e.id]?`<span class="badge">🏆 New PR</span>`:''}
-    ${last?`<div class="last">Last time (${fmtDate(last.date)}): ${last.sets.map(fmtSet).join(', ')}</div>`:''}
-    ${sug?`<div class="sug">🎯 Target: <b>${sug.w?sug.w+' lb × ':''}${sug.r}${sug.w?'':(e.id==='plank'?' sec':' reps')}</b><small>${esc(sug.why)}</small></div>`:''}
+    ${isAssist(e.name)?`<div class="last">Log the machine's assistance as the weight. Less assistance is harder.</div>`:isPerArm(e.name)?`<div class="last">Log the weight for one arm.</div>`:''}
+    ${last?`<div class="last">Last time (${fmtDate(last.date)}): ${last.sets.map(x=>fmtSet(x,e)).join(', ')}</div>`:''}
+    ${sug?`<div class="sug">🎯 Target: <b>${sug.w?sug.w+' '+wUnit(e)+' × ':isAssist(e.name)?'Bodyweight × ':''}${sug.r}${sug.w&&!isAssist(e.name)?'':(e.id==='plank'?' sec':' reps')}</b><small>${esc(sug.why)}</small></div>`:''}
     <div class="dots">${dots}</div>
     <div class="steppers">
-      ${stepper('w','Weight',w,'lb')}
+      ${stepper('w',isAssist(e.name)?'Assistance':'Weight',w,wUnit(e))}
       ${stepper('r',e.id==='plank'?'Seconds':'Reps',r,'')}
     </div>
     ${rest?`<div class="rest"><svg class="ring" width="44" height="44" viewBox="0 0 36 36"><circle class="bg" cx="18" cy="18" r="16"/><circle class="fg" id="restFg" cx="18" cy="18" r="16" stroke-dasharray="100.5" stroke-dashoffset="${(100.5*(1-left/rest.total)).toFixed(1)}"/></svg>
@@ -1094,7 +1194,7 @@ function viewRunStep(e,cls){
 function viewSummary(cls){
   const d=getDraft(), steps=stepsFor();
   let sets=0,vol=0,prs=Object.keys(st.wk.prs).length;
-  steps.forEach(e=>{ (d.ex[e.id]||[]).forEach(s=>{sets++;vol+=(s.w||0)*(s.r||0)}) });
+  steps.forEach(e=>{ (d.ex[e.id]||[]).forEach(s=>{sets++;vol+=setVol(e,s,st.date)}) });
   const mins=(d.firstAt&&d.lastAt)?Math.max(1,Math.round((d.lastAt-d.firstAt)/60000)):(d.dur||null);
   const isRun=steps[0]&&steps[0].run, isYoga=steps[0]&&(steps[0].yoga||steps[0].other);
   const stats = isYoga ? [[d.run.min||'—','minutes'],...(num(d.run.dist)?[[d.run.dist,'km']]:[])] : isRun
@@ -1118,7 +1218,7 @@ function woBody(x,kind,compact){
   if(kind==='lift'){
     const st3=sessStats(x);
     if(!compact) body += `<div class="wsum"><span><b>${st3[0][0]}</b> sets</span><span><b>${st3[1][0]}</b> lb lifted</span>${x.deload?'<span>deload week</span>':''}</div>`;
-    body += (x.entries||[]).map(e=>`<div class="wex"><b>${esc(EXMAP[e.id]?.name||e.name)}</b><div class="chips2">${e.sets.map(t=>`<span class="sc">${esc(fmtSet(t))}</span>`).join('')}</div></div>`).join('');
+    body += (x.entries||[]).map(e=>`<div class="wex"><b>${esc(EXMAP[e.id]?.name||e.name)}</b><div class="chips2">${e.sets.map(t=>`<span class="sc">${esc(fmtSet(t,e))}</span>`).join('')}</div></div>`).join('');
   } else if(kind==='run'){
     if(x.indoor) body += `<div class="note" style="padding-top:10px">Indoor run (treadmill). Distance and pace from the Watch's motion sensors.</div>`;
     body += runStats(x);
@@ -1282,9 +1382,11 @@ function liftPoints(exId){
   const pts=[];
   [...allSessions()].reverse().forEach(s=>{
     const e=(s.entries||[]).find(x=>x.id===exId); if(!e||!e.sets.length) return;
-    const top=e.sets.reduce((m,x)=>((x.w||0)>(m.w||0)||((x.w||0)===(m.w||0)&&x.r>m.r))?x:m, e.sets[0]);
-    const e1=Math.max(...e.sets.map(x=>Math.round((x.w||0)*(1+(x.r||0)/30))));
-    pts.push({d:s.date, w:top.w||0, r:top.r, e1, vol:e.sets.reduce((a,x)=>a+(x.w||0)*(x.r||0),0)});
+    const top=e.sets.reduce((m,x)=>(heavier(e,x.w||0,m.w||0)||((x.w||0)===(m.w||0)&&x.r>m.r))?x:m, e.sets[0]);
+    // 1RM uses the weight actually moved: body weight minus assistance (per arm stays per arm).
+    const ld=x=>isAssist(exName(e))?loadOf(e,x.w,s.date):(x.w||0);
+    const e1=Math.max(...e.sets.map(x=>Math.round(ld(x)*(1+(x.r||0)/30))));
+    pts.push({d:s.date, w:top.w||0, r:top.r, e1, vol:e.sets.reduce((a,x)=>a+setVol(e,x,s.date),0)});
   });
   return pts;
 }
@@ -1295,12 +1397,16 @@ function runPoints(){
 function prList(){
   const best=new Map();
   allSessions().forEach(s=>(s.entries||[]).forEach(e=>e.sets.forEach(x=>{
-    if(!(x.w>0)) return;
+    const as=isAssist(exName(e)), w=x.w||0;
+    if(!as && !(w>0)) return;
     const b=best.get(e.id);
-    if(!b||x.w>b.w||(x.w===b.w&&x.r>b.r)) best.set(e.id,{id:e.id,name:(EXMAP[e.id]||e).name,w:x.w,r:x.r,d:s.date});
+    if(!b||heavier(e,w,b.w)||(w===b.w&&x.r>b.r)) best.set(e.id,{id:e.id,name:exName(e),w,r:x.r,d:s.date,as});
   })));
-  return [...best.values()].sort((a,b)=>b.w*(1+b.r/30)-a.w*(1+a.r/30));
+  // Assisted moves go last: their weight is assistance, not load.
+  const key=p=>p.as?-1:p.w*(1+p.r/30);
+  return [...best.values()].sort((a,b)=>key(b)-key(a));
 }
+const prText = p => p.as ? (p.w ? `${p.w} lb assist × ${p.r}` : `Bodyweight × ${p.r}`) : `${p.w} lb × ${p.r}`;
 
 function weekCard(){
   const w=weekStats(monOf(todayStr())), pct=Math.min(100,Math.round(w.sessions/5*100));
@@ -1320,16 +1426,19 @@ function strengthCard(){
   if(!exs.length) return `<div class="card pcard"><div class="phead">${ico('bars','acc')}<b>Strength Progress</b></div><div class="note">Log a lift and your progress shows up here.</div></div>`;
   if(!st.progEx || !have.has(st.progEx)) st.progEx=exs[0].id;
   const m=st.pm||'e1', pts=liftPoints(st.progEx);
-  const key={e1:'e1',w:'w',vol:'vol'}[m], label={e1:'Estimated 1RM',w:'Best weight',vol:'Session volume'}[m];
+  const as=isAssist(EXMAP[st.progEx].name), inv=as&&m==='w';
+  const key={e1:'e1',w:'w',vol:'vol'}[m], label={e1:'Estimated 1RM',w:as?'Least assistance':'Best weight',vol:'Session volume'}[m];
   const series=pts.map(p=>({d:p.d,v:p[key]})), cur=series[series.length-1].v, first=series[0].v, diff=cur-first;
-  const heavy=pts.reduce((a,p)=>(p.w>a.w||(p.w===a.w&&p.r>a.r))?p:a, pts[0]);
+  const heavy=pts.reduce((a,p)=>(heavier({id:st.progEx},p.w,a.w)||(p.w===a.w&&p.r>a.r))?p:a, pts[0]);
+  const noBw = as && m!=='w' && !bwOn(todayStr());
   return `<div class="card pcard" id="strength"><div class="phead">${ico('bars','acc')}<b>Strength Progress</b>
       <select id="progEx" class="pselect">${exs.map(e=>`<option value="${e.id}" ${e.id===st.progEx?'selected':''}>${esc(e.name)}</option>`).join('')}</select></div>
     ${seg('pm',m,[['e1','Est. 1RM'],['w','Best Weight'],['vol','Volume']])}
-    <div class="pbig"><b>${kfmt(cur)} lb</b><span>${label}</span>${series.length>1&&diff!==0?delta(`${diff>0?'+':'−'}${kfmt(Math.abs(diff))} lb (${diff>0?'+':'−'}${Math.round(Math.abs(diff)/(first||1)*100)}%)`,diff>0):''}</div>
-    ${lineChart(series, v=>kfmt(v))}
+    <div class="pbig"><b>${kfmt(cur)} lb</b><span>${label}</span>${series.length>1&&diff!==0?delta(`${diff>0?'+':'−'}${kfmt(Math.abs(diff))} lb (${diff>0?'+':'−'}${Math.round(Math.abs(diff)/(first||1)*100)}%)`,inv?diff<0:diff>0):''}</div>
+    ${noBw?`<div class="note">Pull-ups count body weight minus assistance. Add your weight in Apple Health or Settings to see this.</div>`:''}
+    ${lineChart(series, v=>kfmt(v), inv)}
     ${series.length<2?`<div class="note" style="text-align:center">Log it again to see the trend.</div>`:''}
-    <div class="tiles2"><div>${ico('dumb','acc')}<span>Heaviest Set<b>${heavy.w?heavy.w+' lb × '+heavy.r:heavy.r+' reps'}</b></span></div>
+    <div class="tiles2"><div>${ico('dumb','acc')}<span>${as?'Least Assistance':'Heaviest Set'}<b>${as?prText({...heavy,as}):heavy.w?heavy.w+' lb × '+heavy.r:heavy.r+' reps'}</b></span></div>
       <div>${ico('layers','acc')}<span>Sessions<b>${pts.length}</b></span></div></div></div>`;
 }
 
@@ -1365,7 +1474,7 @@ function prCard(){
   const prs=prList(); if(!prs.length) return '';
   const list=st.prAll?prs:prs.slice(0,3);
   return `<div class="card pcard"><div class="phead">${ico('trophy','gold')}<b>Personal Records</b>${prs.length>3?`<button class="plink" data-act="prall">${st.prAll?'Show less':'View All'} ›</button>`:''}</div>
-    ${list.map(p=>`<button class="prrow" data-act="prgo" data-id="${esc(p.id)}"><span><b>${esc(p.name)}</b><small>Heaviest set · ${shortDate(p.d)}</small></span><em>${p.w} lb × ${p.r}</em><i>›</i></button>`).join('')}</div>`;
+    ${list.map(p=>`<button class="prrow" data-act="prgo" data-id="${esc(p.id)}"><span><b>${esc(p.name)}</b><small>${p.as?'Least assistance':'Heaviest set'} · ${shortDate(p.d)}</small></span><em>${prText(p)}</em><i>›</i></button>`).join('')}</div>`;
 }
 
 function volumeCard(){
@@ -1374,7 +1483,7 @@ function volumeCard(){
   if(r==='1y'){
     const now=new Date(todayStr()+'T12:00:00');
     bars=Array.from({length:12},(_,i)=>{ const d=new Date(now.getFullYear(),now.getMonth()-11+i,1), ym=d.toLocaleDateString('en-CA').slice(0,7); let v=0;
-      allSessions().forEach(s=>{ if(s.date.slice(0,7)===ym) (s.entries||[]).forEach(e=>e.sets.forEach(x=>{v+=(x.w||0)*(x.r||0)})) });
+      allSessions().forEach(s=>{ if(s.date.slice(0,7)===ym) (s.entries||[]).forEach(e=>e.sets.forEach(x=>{v+=setVol(e,x,s.date)})) });
       return {label:d.toLocaleDateString(undefined,{month:'narrow'}), v} });
   } else {
     const n=r==='12w'?12:8;
@@ -1512,15 +1621,15 @@ function periodReview(kind,key){
   const agg = L => { const o={n:0,lifts:0,runs:0,extras:0,vol:0,km:0,min:0};
     L.forEach(s=>{ o.n++; o.min+=sessMin(s);
       if(s.run){o.runs++;o.km+=+s.run.distanceKm||0} else if(s.yoga||s.other) o.extras++;
-      else {o.lifts++;(s.entries||[]).forEach(e=>e.sets.forEach(x=>o.vol+=(x.w||0)*(x.r||0)))} });
+      else {o.lifts++;(s.entries||[]).forEach(e=>e.sets.forEach(x=>o.vol+=setVol(e,x,s.date)))} });
     return o };
   const cur=agg(list), was=agg(all.filter(s=>s.date>=pStart&&s.date<=pEnd));
   // A PR is a heavier set than anything logged for that exercise before this period (first-timers don't count).
   const before=new Map();
-  all.filter(s=>s.date<start).forEach(s=>(s.entries||[]).forEach(e=>e.sets.forEach(x=>{ if((x.w||0)>(before.get(e.id)??-1)) before.set(e.id,x.w||0) })));
+  all.filter(s=>s.date<start).forEach(s=>(s.entries||[]).forEach(e=>e.sets.forEach(x=>{ const b=before.get(e.id); if(b==null||heavier(e,x.w||0,b)) before.set(e.id,x.w||0) })));
   const prs=new Map();
-  list.forEach(s=>(s.entries||[]).forEach(e=>e.sets.forEach(x=>{ const b=before.get(e.id);
-    if(b!=null&&x.w>0&&x.w>b){ const p=prs.get(e.id); if(!p||x.w>p.w||(x.w===p.w&&x.r>p.r)) prs.set(e.id,{name:(EXMAP[e.id]||e).name.split(/ [\/(]/)[0],w:x.w,r:x.r}) } })));
+  list.forEach(s=>(s.entries||[]).forEach(e=>e.sets.forEach(x=>{ const b=before.get(e.id), w=x.w||0, as=isAssist(exName(e));
+    if(b!=null&&(as||w>0)&&heavier(e,w,b)){ const p=prs.get(e.id); if(!p||heavier(e,w,p.w)||(w===p.w&&x.r>p.r)) prs.set(e.id,{name:exName(e).split(/ [\/(]/)[0],w,r:x.r,as}) } })));
   let gain=null;
   new Set(list.flatMap(s=>(s.entries||[]).map(e=>e.id))).forEach(id=>{
     const pts=liftPoints(id), a=pts.filter(p=>p.d<start).pop(), b=pts.filter(p=>p.d>=start&&p.d<=end).pop();
@@ -1529,7 +1638,7 @@ function periodReview(kind,key){
   const runs=list.filter(s=>s.run&&+s.run.distanceKm>=1&&+s.run.minutes>0);
   const bestPace=runs.length?Math.min(...runs.map(s=>Math.round(s.run.minutes*60/s.run.distanceKm))):null;
   const days={}; list.forEach(s=>{ (days[s.date] ||= []).push(kindOf(s)) });
-  const R={kind,key,start,end,cur,was,prs:[...prs.values()].sort((a,b)=>b.w-a.w),gain,bestPace,days};
+  const R={kind,key,start,end,cur,was,prs:[...prs.values()].sort((a,b)=>(b.as?-1:b.w)-(a.as?-1:a.w)),gain,bestPace,days};
   if(kind==='week'){
     R.done=weekPlan(start).doneN;
     let k=0, m=start; while(k<52 && weekPlan(m).doneN>=5){k++;m=addDays(m,-7)} R.streak=k;
@@ -1538,8 +1647,8 @@ function periodReview(kind,key){
     R.weeks=mons.length; R.weeksHit=mons.filter(m=>weekPlan(m).doneN>=5).length;
   }
   const hl=[];
-  if(R.prs.length>2){ const p=R.prs[0]; hl.push(`${R.prs.length} new PRs`, `Top PR: ${p.name} ${p.w} lb × ${p.r}`) }
-  else R.prs.forEach(p=>hl.push(`New PR: ${p.name} ${p.w} lb × ${p.r}`));
+  if(R.prs.length>2){ const p=R.prs[0]; hl.push(`${R.prs.length} new PRs`, `Top PR: ${p.name} ${prText(p)}`) }
+  else R.prs.forEach(p=>hl.push(`New PR: ${p.name} ${prText(p)}`));
   if(gain) hl.push(`${gain.name} est. 1RM +${gain.d} lb`);
   if(kind==='week'&&R.streak>=2) hl.push(`${R.streak} weeks in a row at 5/5`);
   if(was.vol>0&&cur.vol>0){ const p=Math.round((cur.vol-was.vol)/was.vol*100); hl.push(`Volume ${p>=0?'up':'down'} ${Math.abs(p)}% vs last ${kind}`) }
@@ -1676,7 +1785,7 @@ function viewPlan(){
   });
   h += `<details class="card pl"><summary><div class="ttl"><b>Running build-up</b><span>Tuesday, plus Saturday if you feel like it</span></div><span class="chev">›</span></summary><div class="body"><ul class="bul" style="margin-bottom:6px"><li><b>Weeks 1–2:</b> 20–25 min easy</li><li><b>Weeks 3–4:</b> 30 min easy</li><li><b>Weeks 5–8:</b> build to 40–45 min, add one interval session (6 × 2 min hard / 2 min easy)</li></ul></div></details>`;
   h += `<div class="sect">How to progress</div><div class="card" style="padding:6px 16px"><ul class="bul"><li>Work up to the top of the rep range on every set, then add 5 lb (2.5 on small lifts) and start back at the bottom.</li><li>Leave 1–2 reps in reserve on most sets.</li><li>Take a deload week about every 6th week, at roughly 60% of your usual weights.</li><li>Tap ⇄ Swap on any exercise to use an alternative. Each one keeps its own history.</li></ul></div>`;
-  return h+`<div class="sect">Settings</div><details class="card set"${st.setOpen?' open':''}><summary><b>Settings</b><span>Cloud ${sbAuth()?'on':'off'}</span></summary><div style="margin-top:12px"><div class="row2"><div><b>Rest timer</b><div class="note">Counts down after each set</div></div><button class="sw ${restOn()?'on':''}" role="switch" aria-checked="${restOn()}" aria-label="Rest timer" data-act="resttoggle"><i></i></button></div><div class="sep"></div>${cloudCard()}<div class="sep"></div>${exportCard()}<div class="sep"></div><div class="row2"><div><b>App version</b><div class="note">${APP_VERSION}</div></div><button class="btn ghost sm" data-act="refresh">Refresh app</button></div></div></details>`;
+  return h+`<div class="sect">Settings</div><details class="card set"${st.setOpen?' open':''}><summary><b>Settings</b><span>Cloud ${sbAuth()?'on':'off'}</span></summary><div style="margin-top:12px"><div class="row2"><div><b>Rest timer</b><div class="note">Counts down after each set</div></div><button class="sw ${restOn()?'on':''}" role="switch" aria-checked="${restOn()}" aria-label="Rest timer" data-act="resttoggle"><i></i></button></div><div class="sep"></div><div class="row2"><div><b>Body weight</b><div class="note">${st.health.some(h=>h.wt!=null)?'From Apple Health. This is only a fallback.':'For pull-up volume, until Apple Health has your weight'}</div></div><span class="bwin"><input id="bw" type="number" inputmode="decimal" min="50" max="600" placeholder="—" value="${esc(LS('wt.bw','')??'')}" aria-label="Body weight in pounds"><small>lb</small></span></div><div class="sep"></div>${cloudCard()}<div class="sep"></div>${exportCard()}<div class="sep"></div><div class="row2"><div><b>App version</b><div class="note">${APP_VERSION}</div></div><button class="btn ghost sm" data-act="refresh">Refresh app</button></div></div></details>`;
 }
 
 /* ---------- events ---------- */
@@ -1688,6 +1797,7 @@ app.addEventListener('change',e=>{
   if(t.id==='date'){st.date=t.value||todayStr();st.auto=true;render()}
   else if(t.id==='sess'){st.sess=t.value;render()}
   else if(t.id==='progEx'){st.progEx=t.value;render()}
+  else if(t.id==='bw'){ const v=num(t.value); if(v&&v>=50&&v<=600) SS('wt.bw',v); else { try{localStorage.removeItem('wt.bw')}catch(e){} t.value='' } toast(v?'Body weight saved':'Body weight cleared') }
 });
 function fldObj(f){ return (f==='dist'||f==='min') ? getDraft().run : st.wk.cur }
 function paceUpdate(){
@@ -1786,6 +1896,17 @@ app.addEventListener('click',e=>{
   else if(act==='save') save();
 });
 
+/* Entries in plan order: each slot's planned exercise, then its alternatives (the Watch does the same). */
+function entriesOf(S,d){
+  const out=[];
+  S.ex.forEach(slotEx=>{
+    [slotEx.id,...(ALTS[slotEx.id]||[]).map(n=>altId(slotEx.id,n))].forEach(id=>{
+      const sets=(d.ex[id]||[]).map(s=>({w:num(s.w)||0,r:num(s.r)})).filter(s=>s.r!=null);
+      if(sets.length) out.push({id,name:EXMAP[id].name,...(id!==slotEx.id?{slot:slotEx.id}:{}),sets});
+    });
+  });
+  return out;
+}
 function save(){
   const S=sessDef(st.sess), d=getDraft();
   const rec={id:sid(), date:st.date, session:st.sess, name:sessLabel(), type:S.type,
@@ -1808,13 +1929,7 @@ function save(){
     if(dist==null && min==null) return toast('Enter distance or time');
     rec.run={distanceKm:dist, minutes:min};
   } else if(S.type==='lift'){
-    rec.entries=[];
-    S.ex.forEach(slotEx=>{
-      [slotEx.id,...(ALTS[slotEx.id]||[]).map(n=>altId(slotEx.id,n))].forEach(id=>{
-        const sets=(d.ex[id]||[]).map(s=>({w:num(s.w)||0,r:num(s.r)})).filter(s=>s.r!=null);
-        if(sets.length) rec.entries.push({id,name:EXMAP[id].name,...(id!==slotEx.id?{slot:slotEx.id}:{}),sets});
-      });
-    });
+    rec.entries=entriesOf(S,d);
     if(d.deload) rec.deload=true;
     if(!rec.entries.length) return toast('Nothing logged yet');
   } else return toast('Rest day');
@@ -1835,7 +1950,8 @@ async function checkUpdate(){
 }
 function refreshApp(){ location.replace(location.pathname+'?r='+Date.now()) }
 document.getElementById('updBtn').addEventListener('click',refreshApp);
-document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') checkUpdate() });
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState!=='visible') return; checkUpdate();
+  if(st.wk) pullLive(); else if(sbAuth()) loadLive().then(()=>{ if(!st.wk) render() }).catch(()=>{}) });
 /* ---------- swipe left on a History workout to show Delete ---------- */
 (()=>{
   const W=88; let el=null, sx=0, sy=0, dx=0, moved=false, open=null, eat=false;

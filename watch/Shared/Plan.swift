@@ -87,12 +87,12 @@ enum Plan {
                 PlanAlt(id: "pullup~lat-pulldown", name: "Lat pulldown"),
                 PlanAlt(id: "pullup~chin-ups", name: "Chin-ups")
             ]),
-            PlanExercise(id: "fly", name: "Cable fly", sets: 3, reps: 12...15, rest: "1 min", restSeconds: 60, note: nil, small: true, superset: nil, alts: [
+            PlanExercise(id: "fly", name: "Single-arm cable fly", sets: 3, reps: 12...15, rest: "1 min", restSeconds: 60, note: nil, small: true, superset: nil, alts: [
                 PlanAlt(id: "fly~pec-deck", name: "Pec deck"),
                 PlanAlt(id: "fly~dumbbell-fly", name: "Dumbbell fly"),
                 PlanAlt(id: "fly~cable-crossover", name: "Cable crossover")
             ]),
-            PlanExercise(id: "rear", name: "Rear delt fly", sets: 3, reps: 15...15, rest: "1 min", restSeconds: 60, note: nil, small: true, superset: nil, alts: [
+            PlanExercise(id: "rear", name: "Single-arm rear delt fly", sets: 3, reps: 15...15, rest: "1 min", restSeconds: 60, note: nil, small: true, superset: nil, alts: [
                 PlanAlt(id: "rear~face-pull", name: "Face pull"),
                 PlanAlt(id: "rear~reverse-pec-deck", name: "Reverse pec deck"),
                 PlanAlt(id: "rear~rear-delt-cable-fly", name: "Rear delt cable fly")

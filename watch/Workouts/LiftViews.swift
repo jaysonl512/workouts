@@ -3,10 +3,13 @@ import SwiftUI
 /// Active lift: every screen here fits a 40 mm Watch without scrolling.
 struct LiftFlowView: View {
     @EnvironmentObject var lift: LiftStore
+    @Environment(\.scenePhase) private var phase
 
     var body: some View {
         NavigationStack {
-            if lift.restEnd != nil {
+            if lift.finishedElsewhere != nil {
+                FinishedElsewhereView()
+            } else if lift.restEnd != nil {
                 RestView()
             } else if lift.nextUp, let step = lift.currentStep {
                 NextUpView(step: step)
@@ -15,6 +18,40 @@ struct LiftFlowView: View {
             } else {
                 FinishView()
             }
+        }
+        // Handoff: every 10 seconds while the app is on screen, pick up sets logged on the phone.
+        .task(id: phase) {
+            guard phase == .active else { return }
+            while !Task.isCancelled {
+                await lift.pullRemote()
+                try? await Task.sleep(for: .seconds(10))
+            }
+        }
+        .overlay(alignment: .top) {
+            if let note = lift.handoffNote {
+                Text(note).font(.system(size: 13, weight: .semibold)).padding(.horizontal, 10).padding(.vertical, 5)
+                    .background(Capsule().fill(Color.brand)).foregroundStyle(.white)
+                    .task { try? await Task.sleep(for: .seconds(2.5)); lift.handoffNote = nil }
+            }
+        }
+    }
+}
+
+/// The phone saved this lift. End the Watch workout (its heart rate is added to the phone's copy) and show the summary.
+struct FinishedElsewhereView: View {
+    @EnvironmentObject var lift: LiftStore
+    @EnvironmentObject var workout: WorkoutManager
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Image(systemName: "iphone").font(.system(size: 30)).foregroundStyle(Color.brand)
+            Text("Finished on your phone").font(.system(size: 17, weight: .semibold)).multilineTextAlignment(.center)
+            ProgressView()
+        }
+        .task {
+            let r = await workout.end()
+            let bw = await AppModel.shared.health.latestBodyWeightLb()
+            await lift.finishElsewhere(with: r, bodyWeight: bw)
         }
     }
 }
@@ -59,15 +96,15 @@ struct ExerciseView: View {
     private var logger: some View {
         VStack(spacing: 5) {
             VStack(alignment: .leading, spacing: 0) {
-                Text(isSuperset ? "Superset · \(step.name)" : step.name).font(.system(size: 16, weight: .semibold)).foregroundStyle(Color.brand)
-                Text("Set \(min(done.count + 1, step.slot.sets)) of \(step.slot.sets) · \(step.slot.repsText)\(isPlank ? " sec" : "") · \(lastLine)")
+                Text(step.name).font(.system(size: 19, weight: .semibold)).foregroundStyle(Color.brand)
+                Text("\(isSuperset ? "Superset · " : "")Set \(min(done.count + 1, step.slot.sets)) of \(step.slot.sets) · \(step.slot.repsText)\(isPlank ? " sec" : "") · \(lastLine)")
                     .font(.system(size: 12)).foregroundStyle(.secondary)
             }
             .lineLimit(1)
             .minimumScaleFactor(0.6)
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            valueRow(.weight, text: Fmt.weight(weight), unit: "lb",
+            valueRow(.weight, text: Fmt.weight(weight), unit: step.weightUnit,
                      minus: { weight = max(0, weight - step.slot.weightStep) },
                      plus: { weight = min(1000, weight + step.slot.weightStep) })
                 .digitalCrownRotation(detent: $weight, from: 0, through: 1000, by: 0.25,
@@ -87,10 +124,11 @@ struct ExerciseView: View {
 
     /// The suggestion's reason ("+5 lb · hit 8s last time") before the first set, this session's sets after.
     private var lastLine: String {
-        if !done.isEmpty { return "Done " + done.map(\.text).joined(separator: " ") }
+        let a = step.isAssisted
+        if !done.isEmpty { return "Done " + done.map { $0.text(assisted: a) }.joined(separator: " ") }
         if let s = suggestion { return s.why }
         guard let l = last, !l.isEmpty else { return "New" }
-        return "Last " + l.map(\.text).joined(separator: " ")
+        return "Last " + l.map { $0.text(assisted: a) }.joined(separator: " ")
     }
 
     /// − value + ; tapping the value gives it the Digital Crown (red outline).
@@ -248,7 +286,7 @@ struct FinishView: View {
     @State private var saving = false
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 6) {
             Spacer(minLength: 0)
             Text("\(lift.totalSets)").font(.system(size: 40, weight: .semibold, design: .rounded))
             Text("sets logged").font(.footnote).foregroundStyle(.secondary)
@@ -257,16 +295,24 @@ struct FinishView: View {
                 saving = true
                 Task {
                     let r = await workout.end()
-                    lift.finish(with: r)
+                    let bw = await AppModel.shared.health.latestBodyWeightLb()
+                    lift.finish(with: r, bodyWeight: bw)
                     saving = false
                 }
             }
             .buttonStyle(PrimaryButtonStyle())
             .disabled(saving || lift.totalSets == 0)
-            Button("Back") { lift.go(to: lift.steps.count - 1) }.buttonStyle(PillButtonStyle())
         }
         .navigationTitle("Finish")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            // Back to the last exercise, in the top corner so it never gets cut off at the bottom.
+            ToolbarItem(placement: .cancellationAction) {
+                Button { lift.go(to: lift.steps.count - 1) } label: { Image(systemName: "chevron.left") }
+                    .accessibilityLabel("Back")
+                    .disabled(saving)
+            }
+        }
     }
 }
 
