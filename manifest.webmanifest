@@ -1,6 +1,6 @@
 {
-  "name": "Lift & Run Log",
-  "short_name": "Lift & Run",
+  "name": "Session - Lift & Run",
+  "short_name": "Session",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

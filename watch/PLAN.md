@@ -144,3 +144,6 @@ Done when: a lift and a run logged entirely on the Watch show up in the web app 
   otherwise) with about 4 weeks earlier. Green = good change, red = bad, grey = steady or weight (goal-dependent).
   Tapping a metric opens a chart (8W / 12W / 1Y weekly averages) with average/low/high and a busier-vs-lighter weeks comparison.
 - No sleep, by design. The Watch only holds a few weeks of history; a future iPhone app can backfill older days.
+- Background uploads (build 5): HKObserverQuery + enableBackgroundDelivery(.hourly) for each metric (entitlement
+  com.apple.developer.healthkit.background-delivery), plus a WKApplicationRefreshBackgroundTask requested hourly that
+  flushes queued workouts, refreshes this week (complication) and uploads Health values. Throttle: 45 min.

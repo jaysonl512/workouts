@@ -7,10 +7,10 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
-<meta name="apple-mobile-web-app-title" content="Lift & Run">
+<meta name="apple-mobile-web-app-title" content="Session">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<title>Lift & Run Log</title>
+<title>Session</title>
 <style>
 :root{--bg:#0f1216;--card:#171c22;--line:#262d36;--text:#e8edf2;--mute:#8b97a5;--acc:#ef4444;--acc2:#fb923c;--warn:#fbbf24;--r:16px;--ease:cubic-bezier(.2,.9,.3,1)}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -435,7 +435,7 @@ const EFFORT = {easy:'Easy', medium:'Medium', hard:'Hard'};
 const effortSeg = (act,cur) => `<div class="segc">${Object.entries(EFFORT).map(([v,l])=>`<button class="${v===cur?'on':''}" data-act="${act}" data-v="${v}">${l}</button>`).join('')}</div>`;
 const kindOf = x => x.yoga ? 'yoga' : x.other ? 'other' : x.run ? 'run' : 'lift';
 const CHEERS = ['Nice one','Solid set','Strong','Locked in','Clean rep','Beast mode','Smooth'];
-const APP_VERSION='2026-11-04.6';
+const APP_VERSION='2026-11-05.1';
 const OWNER='jaysonl512', REPO='workouts', LOGPATH='data/log.json';
 
 /* alternatives per exercise: each alternative keeps its own history so weights stay comparable */
@@ -1919,15 +1919,16 @@ document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==
 document.getElementById('undoBtn').addEventListener('click',undoDelete);
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden') commitDelete() });
 
-/* ---------- pull to refresh (History) ---------- */
+/* ---------- pull to refresh (every tab; not during a live workout or inside a sheet) ---------- */
 (()=>{
   const sc=$('#scroll'), ptr=document.createElement('div'); ptr.id='ptr'; sc.prepend(ptr);
-  const PULL=60; let y0=null, dy=0, busy=false;
-  sc.addEventListener('touchstart',e=>{ y0=(st.tab==='history'&&!busy&&sc.scrollTop<=0)?e.touches[0].clientY:null; dy=0 },{passive:true});
+  const PULL=60; let y0=null, x0=0, dy=0, busy=false;
+  const can = e => !busy && sc.scrollTop<=0 && !(st.wk&&st.tab==='today') && !e.target.closest('.sheetbg,.recapbg');
+  sc.addEventListener('touchstart',e=>{ y0=can(e)?e.touches[0].clientY:null; x0=e.touches[0].clientX; dy=0 },{passive:true});
   sc.addEventListener('touchmove',e=>{
     if(y0==null) return;
     dy=Math.max(0,(e.touches[0].clientY-y0)*0.5);
-    if(sc.scrollTop>0){ dy=0 }
+    if(sc.scrollTop>0 || Math.abs(e.touches[0].clientX-x0)>dy*2){ dy=0 }
     ptr.style.transition='none'; ptr.style.height=Math.min(80,dy)+'px'; ptr.classList.toggle('ready',dy>=PULL);
   },{passive:true});
   sc.addEventListener('touchend',async()=>{
@@ -1935,7 +1936,7 @@ document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==
     if(dy<PULL){ ptr.style.height='0'; return }
     busy=true; ptr.classList.remove('ready'); ptr.classList.add('spin'); ptr.style.height='40px'; buzz(10);
     try{ await loadRepo() }catch(e){}
-    render(); busy=false; ptr.classList.remove('spin'); ptr.style.height='0'; toast('History up to date');
+    checkUpdate(); render(); busy=false; ptr.classList.remove('spin'); ptr.style.height='0'; toast('Up to date');
   });
 })();
 render(); loadRepo(); checkUpdate();

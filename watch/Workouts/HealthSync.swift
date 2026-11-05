@@ -24,7 +24,7 @@ struct HealthDay: Encodable {
 }
 
 /// Reads daily resting heart rate, HRV, cardio fitness, heart rate recovery and weight from HealthKit
-/// and upserts them to Supabase. The Watch keeps only a few weeks of this history, which is fine:
+/// and upserts them to Supabase: when the app opens, when HealthKit wakes it with new values, and on background refresh. The Watch keeps only a few weeks of this history, which is fine:
 /// once a day is uploaded it stays in the cloud.
 @MainActor
 final class HealthSync {
@@ -52,13 +52,34 @@ final class HealthSync {
     /// Types the app asks to read for Health Trends (added to the workout authorization request).
     static var readTypes: Set<HKObjectType> { Set(metrics.map { HKQuantityType($0.id) }) }
 
-    /// Uploads at most every 3 hours. The first upload sends 90 days, later ones the last 3 weeks
+    private var observing = false
+
+    /// Asks watchOS to wake the app (at most hourly) when the Watch saves a new value for any metric,
+    /// then uploads. Must run at every launch, including background launches, so the queries exist when woken.
+    func startObserving() {
+        guard HKHealthStore.isHealthDataAvailable(), !observing else { return }
+        observing = true
+        for m in Self.metrics {
+            let type = HKQuantityType(m.id)
+            let query = HKObserverQuery(sampleType: type, predicate: nil) { [weak self] _, done, error in
+                guard error == nil else { done(); return }
+                Task { @MainActor in
+                    await self?.syncIfDue()
+                    done()
+                }
+            }
+            store.execute(query)
+            store.enableBackgroundDelivery(for: type, frequency: .hourly) { _, _ in }
+        }
+    }
+
+    /// Uploads at most every 45 minutes. The first upload sends 90 days, later ones the last 3 weeks
     /// (recent days can still change, e.g. a VO2 max estimate after an outdoor walk).
     func syncIfDue() async {
         guard HKHealthStore.isHealthDataAvailable(), !running else { return }
         let defaults = UserDefaults.standard
         let last = defaults.object(forKey: lastKey) as? Date
-        if let last, Date().timeIntervalSince(last) < 3 * 3600 { return }
+        if let last, Date().timeIntervalSince(last) < 45 * 60 { return }
         running = true
         defer { running = false }
         let days = await read(days: last == nil ? 90 : 21)

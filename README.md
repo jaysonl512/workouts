@@ -1,4 +1,4 @@
-# Lift & Run Log
+# Session (Lift & Run)
 
 A small static web app for tracking workouts: weight and reps for every set, runs, history and progress charts. Hosted on GitHub Pages.
 

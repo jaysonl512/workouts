@@ -64,22 +64,25 @@ final class SyncStore: ObservableObject {
     }
 
     func flush() {
+        Task { await flushNow() }
+    }
+
+    /// Uploads the queue and returns when done (background refresh waits for this).
+    func flushNow() async {
         guard !flushing, !pending.isEmpty else { return }
         flushing = true
-        Task {
-            defer { flushing = false; scheduleRetry() }
-            for row in pending.values.sorted(by: { $0.data.updatedAt < $1.data.updatedAt }) {
-                do {
-                    try await Supabase.shared.upsert([row])
-                    // Keep it if a newer copy was queued while this one was uploading.
-                    if pending[row.id]?.data.updatedAt == row.data.updatedAt { pending[row.id] = nil }
-                    persistQueue()
-                    lastError = nil
-                    lastSynced = Date()
-                } catch {
-                    lastError = Self.short(error)
-                    return
-                }
+        defer { flushing = false; scheduleRetry() }
+        for row in pending.values.sorted(by: { $0.data.updatedAt < $1.data.updatedAt }) {
+            do {
+                try await Supabase.shared.upsert([row])
+                // Keep it if a newer copy was queued while this one was uploading.
+                if pending[row.id]?.data.updatedAt == row.data.updatedAt { pending[row.id] = nil }
+                persistQueue()
+                lastError = nil
+                lastSynced = Date()
+            } catch {
+                lastError = Self.short(error)
+                return
             }
         }
     }
@@ -93,14 +96,17 @@ final class SyncStore: ObservableObject {
         }
     }
 
+    /// This week's checklist. Sessions finished here that have not uploaded yet are kept.
+    func refreshWeek() async {
+        guard let rows = try? await Supabase.shared.sessions(since: WeekPlan.monday()) else { return }
+        let ids = Set(rows.map(\.id))
+        week = rows + week.filter { !ids.contains($0.id) && pending[$0.id]?.status == "complete" }
+        persistWeek()
+    }
+
     func refreshHistory() {
         Task {
-            // This week's checklist. Sessions finished here that have not uploaded yet are kept.
-            if let rows = try? await Supabase.shared.sessions(since: WeekPlan.monday()) {
-                let ids = Set(rows.map(\.id))
-                week = rows + week.filter { !ids.contains($0.id) && pending[$0.id]?.status == "complete" }
-                persistWeek()
-            }
+            await refreshWeek()
             do {
                 let rows = try await Supabase.shared.recentLifts()
                 let ids = Set(rows.map(\.id))
