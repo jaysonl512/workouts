@@ -147,3 +147,10 @@ Done when: a lift and a run logged entirely on the Watch show up in the web app 
 - Background uploads (build 5): HKObserverQuery + enableBackgroundDelivery(.hourly) for each metric (entitlement
   com.apple.developer.healthkit.background-delivery), plus a WKApplicationRefreshBackgroundTask requested hourly that
   flushes queued workouts, refreshes this week (complication) and uploads Health values. Throttle: 45 min.
+
+## Supabase only (2026-11-05)
+- The web app no longer syncs to GitHub. Supabase is the only store; `st.local` is just an upload queue for workouts
+  saved offline or signed out (`syncLocal`, which drops local copies the cloud already has in the same or newer version).
+- GitHub token setup, "Copy unsynced" and the GitHub half of delete are gone; any old `wt.token` is cleared on load.
+- Plan › Settings › Export downloads `{sessions, health}` as JSON.
+- GitHub still hosts the web app (Pages). Earlier notes in this file about `data/log.json` exports are historical.

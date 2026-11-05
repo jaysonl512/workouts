@@ -435,8 +435,7 @@ const EFFORT = {easy:'Easy', medium:'Medium', hard:'Hard'};
 const effortSeg = (act,cur) => `<div class="segc">${Object.entries(EFFORT).map(([v,l])=>`<button class="${v===cur?'on':''}" data-act="${act}" data-v="${v}">${l}</button>`).join('')}</div>`;
 const kindOf = x => x.yoga ? 'yoga' : x.other ? 'other' : x.run ? 'run' : 'lift';
 const CHEERS = ['Nice one','Solid set','Strong','Locked in','Clean rep','Beast mode','Smooth'];
-const APP_VERSION='2026-11-05.1';
-const OWNER='jaysonl512', REPO='workouts', LOGPATH='data/log.json';
+const APP_VERSION='2026-11-05.2';
 
 /* alternatives per exercise: each alternative keeps its own history so weights stay comparable */
 const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
@@ -516,7 +515,7 @@ const runTime = m => { if(m==null||m===''||isNaN(+m)) return '—'; const t=Math
 /* ---------- state ---------- */
 const st = {
   tab:'today', date:todayStr(), sess:null, auto:true, add:null,
-  repo:[], sb:[], local:LS('wt.local.v1',[]), draft:LS('wt.draft.v1',{}),
+  sb:[], local:LS('wt.local.v1',[]), draft:LS('wt.draft.v1',{}),
   progEx:null, wk:null, health:LS('wt.health.v1',[]), hm:null
 };
 const verOf = x => Date.parse(x.updatedAt||x.savedAt||'')||0;
@@ -527,31 +526,20 @@ const canon = v => JSON.stringify(v,(k,val)=> val&&typeof val==='object'&&!Array
 const contentOf = x => canon({entries:x.entries||null,run:x.run||null,yoga:x.yoga||null,other:x.other||null,energy:x.energy??null,effort:x.effort||null,notes:x.notes||null,durationMin:x.durationMin??null,deload:!!x.deload,hk:x.hk||null,route:x.route||null,indoor:!!x.indoor});
 const allSessions = () => {
   const m = new Map();
-  st.repo.forEach(s=>m.set(s.id,s));
   st.sb.forEach(s=>{ const c=m.get(s.id); if(!c || verOf(s)>=verOf(c)) m.set(s.id,s) });
   st.local.forEach(s=>m.set(s.id,s));
   return [...m.values()].filter(s=>!isDeleted(s) && s.id!==st.hidden).sort((a,b)=> a.date<b.date?1:a.date>b.date?-1:0);
 };
-const isLocalOnly = s => !st.repo.some(r=>r.id===s.id && contentOf(r)===contentOf(s));
 const sid = () => st.date+'-'+st.sess;
 
-async function loadRepo(){
-  let got=false;
-  const tok=getToken();
-  if(tok){ try{ st.repo=(await ghGet(tok)).arr; got=true }catch(e){} }
-  if(!got){
-    try{
-      const r = await fetch('data/log.json?'+Date.now(), {cache:'no-store'});
-      if(!r.ok) throw 0;
-      st.repo = await r.json();
-    }catch(e){ st.repo = st.repo||[] }
+/* Supabase is the only store. st.local holds workouts saved on this device that have not reached it yet. */
+async function loadData(){
+  if(sbAuth()){
+    try{ st.sb=await sbLoad(); await syncLocal() }catch(e){}
+    try{ await loadHealth() }catch(e){}
+    purgeDeleted();
   }
-  st.local = st.local.filter(isLocalOnly);
-  SS('wt.local.v1', st.local);
-  if(sbAuth()){ try{ st.sb=await sbLoad(); await reconcile() }catch(e){} try{ await loadHealth() }catch(e){} }
-  purgeDeleted();
   if(!st.wk) render();
-  if(tok && st.local.length) syncNow();
 }
 
 function lastFor(exId){
@@ -638,8 +626,6 @@ function weekStats(mon){
   return o;
 }
 
-/* ---------- GitHub sync ---------- */
-const getToken = () => LS('wt.token','');
 /* ---------- Supabase (live database shared with the Watch) ---------- */
 const SB_URL='https://hgqlyhvkwggdioehwdpo.supabase.co', SB_KEY='sb_publishable_k9usCgbCilwfbZCDDZoQ8w_qeePU6lT';
 const sbAuth = () => LS('wt.sb', null);
@@ -682,23 +668,26 @@ async function sbUpsert(list){
     const r=await sbFetch('/rest/v1/sessions?on_conflict=user_id,id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(list.map(x=>sessToRow(x,uid)))});
     if(!r.ok) return false;
     list.forEach(x=>{ const i=st.sb.findIndex(y=>y.id===x.id); if(i>=0) st.sb[i]=x; else st.sb.push(x) });
+    st.local=st.local.filter(l=>!list.some(x=>x.id===l.id&&verOf(x)>=verOf(l))); SS('wt.local.v1',st.local);
     return true;
   }catch(e){ return false }
 }
-/* Two-way catch-up: newer copy wins. GitHub stays a full export for analysis. */
-async function reconcile(){
-  if(!sbAuth()) return;
-  const gh=new Map(); st.repo.forEach(x=>gh.set(x.id,x)); st.local.forEach(x=>gh.set(x.id,x));
-  const sbm=new Map(st.sb.map(x=>[x.id,x])), toSb=[], toGh=[];
-  gh.forEach((x,id)=>{ if(isDeleted(x)) return; const y=sbm.get(id); if(!y || (contentOf(x)!==contentOf(y) && verOf(x)>=verOf(y))) toSb.push(x) });
-  sbm.forEach((y,id)=>{ if(isDeleted(y)) return; const x=gh.get(id); if(!x || (contentOf(x)!==contentOf(y) && verOf(y)>verOf(x))) toGh.push(y) });
-  if(toSb.length) await sbUpsert(toSb);
-  if(toGh.length && getToken()){
-    toGh.forEach(y=>{ st.local=st.local.filter(l=>l.id!==y.id); st.local.push(y) });
-    SS('wt.local.v1',st.local);
-  }
+/* Upload workouts saved on this device while offline or signed out. A copy the cloud already has (same or newer) is dropped. */
+let syncingLocal=false;
+async function syncLocal(manual){
+  if(!sbAuth()){ if(manual) toast('Sign in to your cloud account first (Plan tab)'); return false }
+  if(syncingLocal) return false;
+  syncingLocal=true;
+  try{
+    const sbm=new Map(st.sb.map(x=>[x.id,x]));
+    const up=st.local.filter(x=>{ if(isDeleted(x)) return false; const y=sbm.get(x.id); return !y || (contentOf(x)!==contentOf(y) && verOf(x)>=verOf(y)) });
+    st.local=st.local.filter(x=>up.includes(x)); SS('wt.local.v1',st.local);
+    const ok = !up.length || await sbUpsert(up);
+    if(manual) toast(ok?'Uploaded ☁️':'Still offline. Saved on this phone');
+    return ok;
+  } finally { syncingLocal=false; if(!st.wk) render() }
 }
-/* Delete a saved workout from this device, Supabase and GitHub. */
+/* Delete a saved workout from this device and Supabase. */
 async function deleteWorkout(id){
   const t=tombs(); t[id]=Date.now(); SS('wt.deleted.v1',t);
   st.local=st.local.filter(x=>x.id!==id); SS('wt.local.v1',st.local);
@@ -734,72 +723,10 @@ async function purgeDeleted(){
       const r=await sbFetch('/rest/v1/sessions?id=in.('+sbIds.map(i=>'"'+i+'"').join(',')+')',{method:'DELETE'});
       if(r.ok) st.sb=st.sb.filter(x=>!sbIds.includes(x.id));
     }
-    const tok=getToken();
-    if(tok && dead(st.repo).length){
-      for(let attempt=0;attempt<3;attempt++){
-        const cur=await ghGet(tok), ids=dead(cur.arr);
-        if(!ids.length){ st.repo=cur.arr; break }
-        const kept=cur.arr.filter(x=>!ids.includes(x.id));
-        const res=await ghPut(tok,kept,cur.sha,'Delete workout: '+ids.join(', '));
-        if(res.status===409||res.status===422) continue;
-        if(res.ok) st.repo=kept;
-        break;
-      }
-    }
   }catch(e){}
   purging=false;
 }
 const restOn = () => LS('wt.rest', false);
-const b64enc = str => { const bytes=new TextEncoder().encode(str); let bin=''; for(let i=0;i<bytes.length;i+=8192) bin+=String.fromCharCode(...bytes.subarray(i,i+8192)); return btoa(bin) };
-const b64dec = b64 => new TextDecoder().decode(Uint8Array.from(atob(b64.replace(/\s/g,'')),c=>c.charCodeAt(0)));
-const ghHeaders = tok => ({Authorization:'Bearer '+tok, Accept:'application/vnd.github+json'});
-const ghUrl = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${LOGPATH}`;
-async function ghGet(tok){
-  const r=await fetch(ghUrl+'?ref=main&t='+Date.now(),{headers:ghHeaders(tok),cache:'no-store'});
-  if(r.status===404) return {arr:[],sha:undefined};
-  if(!r.ok) throw new Error('HTTP '+r.status);
-  const j=await r.json(); let arr=[]; try{arr=JSON.parse(b64dec(j.content))}catch(e){}
-  return {arr:Array.isArray(arr)?arr:[], sha:j.sha};
-}
-async function ghPut(tok,arr,sha,message){
-  return fetch(ghUrl,{method:'PUT',headers:{...ghHeaders(tok),'Content-Type':'application/json'},
-    body:JSON.stringify({message,content:b64enc(JSON.stringify(arr,null,1)+'\n'),branch:'main',...(sha?{sha}:{})})});
-}
-let syncing=false;
-async function syncNow(manual){
-  const tok=getToken();
-  if(!tok){ if(manual) toast('Add your GitHub token first'); return false }
-  if(!st.local.length){ if(manual) toast('Already synced'); return true }
-  if(syncing) return false;
-  syncing=true; let ok=false;
-  try{
-    for(let attempt=0;attempt<3&&!ok;attempt++){
-      const cur=await ghGet(tok), m=new Map();
-      cur.arr.forEach(s=>m.set(s.id,s)); st.local.forEach(s=>m.set(s.id,s));
-      const merged=[...m.values()].sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
-      const res=await ghPut(tok,merged,cur.sha,'Log workout: '+st.local.map(s=>s.id).join(', '));
-      if(res.status===409||res.status===422) continue;
-      if(res.status===401||res.status===403||res.status===404) throw new Error('Token not allowed to write to the repo');
-      if(!res.ok) throw new Error('HTTP '+res.status);
-      st.repo=merged; st.local=[]; SS('wt.local.v1',st.local); ok=true;
-    }
-    toast(ok?'Synced to GitHub ☁️':'Sync failed. Saved on this phone');
-  }catch(e){ toast('Sync failed. Saved on this phone') }
-  syncing=false;
-  if(!st.wk) render();
-  return ok;
-}
-async function connectToken(){
-  const el=$('#tok'), tok=(el&&el.value||'').trim();
-  if(!tok) return toast('Paste your token first');
-  try{
-    const r=await fetch(ghUrl+'?ref=main',{headers:ghHeaders(tok),cache:'no-store'});
-    if(r.status===401||r.status===403) return toast('GitHub rejected that token');
-    if(!r.ok&&r.status!==404) return toast('Could not reach GitHub ('+r.status+')');
-    SS('wt.token',tok); toast('Connected ✅'); await loadRepo(); syncNow();
-  }catch(e){ toast('No connection. Try again online') }
-}
-
 /* ---------- workout flow ---------- */
 const stepsFor = () => {
   const S=sessDef(st.sess);
@@ -1013,7 +940,6 @@ function saveNote(){
   st.local=st.local.filter(l=>l.id!==rec.id); st.local.push(rec); SS('wt.local.v1',st.local);
   render(); toast('Saved');
   if(sbAuth()) sbUpsert([rec]).then(ok=>{ if(!ok) toast('Saved here. Cloud sync will retry') });
-  if(getToken()) setTimeout(()=>syncNow(),900);
 }
 
 /* The + sheet: a workout outside the plan on the day picked in the week strip. Today it starts live (with a clock);
@@ -1234,8 +1160,8 @@ function viewHistory(){
   const all = allSessions(), unsynced = st.local.length;
   let h = '';
   if(unsynced) h += `<div class="card"><b>${unsynced} workout${unsynced>1?'s':''} saved only on this device.</b>
-    <div class="note">${getToken()?'It will sync to GitHub when you are online.':'Turn on auto-sync in the Plan tab, or copy them and paste into chat.'}</div>
-    <div class="tools2">${getToken()?`<button class="btn sm" data-act="sync">Sync now</button>`:''}<button class="btn ghost sm" data-act="copy">Copy unsynced</button></div></div>`;
+    <div class="note">${sbAuth()?'They upload to the cloud when you are back online.':'Sign in to your cloud account in Plan › Settings to back them up and share them with your Watch.'}</div>
+    ${sbAuth()?`<div class="tools2"><button class="btn sm" data-act="sync">Upload now</button></div>`:''}</div>`;
   if(!all.length) return h+`<div class="empty">No workouts logged yet.<br>Log your first one on the Today tab.</div>`;
   const thisMon=monOf(todayStr()), lastMon=addDays(thisMon,-7), groups=new Map();
   const months=[...new Set(all.map(x=>x.date.slice(0,7)))].filter(m=>m<todayStr().slice(0,7));
@@ -1697,18 +1623,16 @@ function cloudCard(){
     <input id="sbPass" type="password" autocomplete="current-password" placeholder="Password" style="margin-top:8px">
     <div class="tools2"><button class="btn sm" data-act="sbin">Sign in</button></div></div>`;
 }
-function syncCard(){
-  if(getToken()) return `<div><b>GitHub sync is on ✅</b>
-    <div class="note">Workouts save to ${OWNER}/${REPO} when you finish.${st.local.length?` ${st.local.length} waiting to sync.`:' Everything is synced.'}</div>
-    <div class="tools2"><button class="btn sm" data-act="sync">Sync now</button><button class="btn ghost sm" data-act="disconnect">Disconnect</button></div></div>`;
-  return `<div class="steps"><b>Turn on auto-sync</b>
-    <div class="note">So you never have to copy and paste workouts. The token only lives on this phone.</div>
-    <ol><li>Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">GitHub token settings</a></li>
-    <li>Repository access: <b>Only select repositories</b>, pick <b>${REPO}</b></li>
-    <li>Permissions, Repository: set <b>Contents</b> to Read and write</li>
-    <li>Generate the token and paste it here</li></ol>
-    <input id="tok" type="password" autocomplete="off" autocapitalize="off" placeholder="github_pat_…" style="margin-top:12px">
-    <div class="tools2"><button class="btn sm" data-act="connect">Connect</button></div></div>`;
+function exportCard(){
+  return `<div class="row2"><div><b>Export</b><div class="note">Download all your workouts and health trends as a file.</div></div><button class="btn ghost sm" data-act="export">Export</button></div>`;
+}
+/* A JSON file of every workout plus daily health values: your own backup, shared or saved to Files. */
+function exportData(){
+  const data={app:'Session', exportedAt:new Date().toISOString(), sessions:[...allSessions()].reverse(), health:st.health||[]};
+  const name='session-export-'+todayStr()+'.json';
+  const file=new File([JSON.stringify(data,null,1)],name,{type:'application/json'});
+  if(navigator.canShare&&navigator.canShare({files:[file]})) navigator.share({files:[file]}).catch(()=>{});
+  else { const a=document.createElement('a'), u=URL.createObjectURL(file); a.href=u; a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(u),5000); toast('Export saved') }
 }
 function viewPlan(){
   const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], todayDow=new Date(todayStr()+'T12:00:00').getDay();
@@ -1724,7 +1648,7 @@ function viewPlan(){
   });
   h += `<details class="card pl"><summary><div class="ttl"><b>Running build-up</b><span>Tuesday, plus Saturday if you feel like it</span></div><span class="chev">›</span></summary><div class="body"><ul class="bul" style="margin-bottom:6px"><li><b>Weeks 1–2:</b> 20–25 min easy</li><li><b>Weeks 3–4:</b> 30 min easy</li><li><b>Weeks 5–8:</b> build to 40–45 min, add one interval session (6 × 2 min hard / 2 min easy)</li></ul></div></details>`;
   h += `<div class="sect">How to progress</div><div class="card" style="padding:6px 16px"><ul class="bul"><li>Work up to the top of the rep range on every set, then add 5 lb (2.5 on small lifts) and start back at the bottom.</li><li>Leave 1–2 reps in reserve on most sets.</li><li>Take a deload week about every 6th week, at roughly 60% of your usual weights.</li><li>Tap ⇄ Swap on any exercise to use an alternative. Each one keeps its own history.</li></ul></div>`;
-  return h+`<div class="sect">Settings</div><details class="card set"><summary><b>Settings</b><span>Cloud ${sbAuth()?'on':'off'} · GitHub ${getToken()?'on':'off'}</span></summary><div style="margin-top:12px"><div class="row2"><div><b>Rest timer</b><div class="note">Counts down after each set</div></div><button class="btn sm ${restOn()?'':'ghost'}" data-act="resttoggle">${restOn()?'On':'Off'}</button></div><div class="sep"></div>${cloudCard()}<div class="sep"></div>${syncCard()}<div class="sep"></div><div class="row2"><div><b>App version</b><div class="note">${APP_VERSION}</div></div><button class="btn ghost sm" data-act="refresh">Refresh app</button></div></div></details>`;
+  return h+`<div class="sect">Settings</div><details class="card set"><summary><b>Settings</b><span>Cloud ${sbAuth()?'on':'off'}</span></summary><div style="margin-top:12px"><div class="row2"><div><b>Rest timer</b><div class="note">Counts down after each set</div></div><button class="btn sm ${restOn()?'':'ghost'}" data-act="resttoggle">${restOn()?'On':'Off'}</button></div><div class="sep"></div>${cloudCard()}<div class="sep"></div>${exportCard()}<div class="sep"></div><div class="row2"><div><b>App version</b><div class="note">${APP_VERSION}</div></div><button class="btn ghost sm" data-act="refresh">Refresh app</button></div></div></details>`;
 }
 
 /* ---------- events ---------- */
@@ -1812,13 +1736,12 @@ app.addEventListener('click',e=>{
     saveDraft(); wk.sheet=false; wk.editing=null; clearRest(); initCur(); render(); toast('Swapped to '+EXMAP[id].name);
   }
   else if(act==='deload'){ const d2=getDraft(); d2.deload=!d2.deload; saveDraft(); render() }
-  else if(act==='connect') connectToken();
-  else if(act==='disconnect'){ try{localStorage.removeItem('wt.token')}catch(err){} toast('Disconnected'); render() }
-  else if(act==='sync') syncNow(true);
+  else if(act==='sync') syncLocal(true);
+  else if(act==='export') exportData();
   else if(act==='sbin'){
     const em=($('#sbEmail').value||'').trim(), pw=$('#sbPass').value||'';
     if(!em||!pw) return toast('Enter email and password');
-    sbSignIn(em,pw).then(async()=>{ toast('Signed in ✅'); await loadRepo() }).catch(err=>toast(err.message||'Sign in failed'));
+    sbSignIn(em,pw).then(async()=>{ toast('Signed in ✅'); await loadData() }).catch(err=>toast(err.message||'Sign in failed'));
   }
   else if(act==='sbout'){ try{localStorage.removeItem('wt.sb')}catch(err){} st.sb=[]; toast('Signed out'); render() }
   else if(act==='refresh') refreshApp();
@@ -1833,7 +1756,6 @@ app.addEventListener('click',e=>{
   else if(act==='del'||act==='swdel') askDelete(b.dataset.id);
   else if(act==='resttoggle'){ SS('wt.rest',!restOn()); if(restOn()===false) clearRest(); render() }
   else if(act==='save') save();
-  else if(act==='copy') copyUnsynced();
 });
 
 function save(){
@@ -1872,12 +1794,7 @@ function save(){
   st.local=st.local.filter(x=>x.id!==rec.id); st.local.push(rec); SS('wt.local.v1',st.local);
   delete st.draft[rec.id]; saveDraft();
   clearRest(); st.wk=null; st.tab='history'; st.auto=true;
-  setTimeout(()=>{render();toTop();toast('Saved 🎉'); if(getToken()) setTimeout(()=>syncNow(),900); if(sbAuth()) sbUpsert([rec]).then(ok=>{ if(!ok) toast('Saved here. Cloud sync will retry') })},350);
-}
-async function copyUnsynced(){
-  const txt='Log these workouts into the tracker repo:\n'+JSON.stringify(st.local,null,1);
-  try{await navigator.clipboard.writeText(txt);toast('Copied. Paste it into chat.')}
-  catch(e){prompt('Copy this:',txt)}
+  setTimeout(()=>{render();toTop();toast('Saved 🎉'); if(sbAuth()) sbUpsert([rec]).then(ok=>{ if(!ok) toast('Saved here. Cloud sync will retry') })},350);
 }
 
 ['gesturestart','gesturechange','gestureend'].forEach(ev=>document.addEventListener(ev,e=>e.preventDefault()));
@@ -1935,11 +1852,13 @@ document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==
     if(y0==null) return; y0=null; ptr.style.transition='';
     if(dy<PULL){ ptr.style.height='0'; return }
     busy=true; ptr.classList.remove('ready'); ptr.classList.add('spin'); ptr.style.height='40px'; buzz(10);
-    try{ await loadRepo() }catch(e){}
+    try{ await loadData() }catch(e){}
     checkUpdate(); render(); busy=false; ptr.classList.remove('spin'); ptr.style.height='0'; toast('Up to date');
   });
 })();
-render(); loadRepo(); checkUpdate();
+try{localStorage.removeItem('wt.token')}catch(e){}  // GitHub sync was removed; forget any old token
+render(); loadData(); checkUpdate();
+addEventListener('online',()=>{ if(st.local.length) syncLocal() });
 </script>
 </body>
 </html>
