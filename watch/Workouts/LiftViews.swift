@@ -36,6 +36,10 @@ struct ExerciseView: View {
         return sync.lastSets(for: step.id, excluding: d.id, before: d.date)?.sets
     }
     private var isPlank: Bool { step.slot.id == "plank" }
+    private var isSuperset: Bool {
+        guard let i = lift.steps.firstIndex(of: step) else { return false }
+        return lift.supersetPartner(of: i) != nil
+    }
     private var suggestion: Suggestion? {
         guard let d = lift.draft else { return nil }
         return sync.suggestion(for: step, excluding: d.id, before: d.date)
@@ -55,7 +59,7 @@ struct ExerciseView: View {
     private var logger: some View {
         VStack(spacing: 5) {
             VStack(alignment: .leading, spacing: 0) {
-                Text(step.name).font(.system(size: 16, weight: .semibold)).foregroundStyle(Color.brand)
+                Text(isSuperset ? "Superset · \(step.name)" : step.name).font(.system(size: 16, weight: .semibold)).foregroundStyle(Color.brand)
                 Text("Set \(min(done.count + 1, step.slot.sets)) of \(step.slot.sets) · \(step.slot.repsText)\(isPlank ? " sec" : "") · \(lastLine)")
                     .font(.system(size: 12)).foregroundStyle(.secondary)
             }

@@ -18,6 +18,8 @@ struct PlanExercise: Hashable, Identifiable {
     let restSeconds: Int
     let note: String?
     let small: Bool
+    /// Neighbouring exercises with the same tag are done as a superset: one set each, then rest.
+    let superset: String?
     let alts: [PlanAlt]
 
     var repsText: String { reps.lowerBound == reps.upperBound ? "\(reps.lowerBound)" : "\(reps.lowerBound)–\(reps.upperBound)" }

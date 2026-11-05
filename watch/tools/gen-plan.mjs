@@ -39,7 +39,7 @@ for (const [key, S] of Object.entries(PLAN.sessions)) {
   lines.push(`        ${q(key)}: PlanSession(key: ${q(key)}, name: ${q(S.name)}, type: .${S.type}, note: ${S.note ? q(S.note) : 'nil'}, exercises: [`);
   for (const e of S.ex || []) {
     const alts = (ALTS[e.id] || []).map(n => `PlanAlt(id: ${q(altId(e.id, n))}, name: ${q(n)})`);
-    lines.push(`            PlanExercise(id: ${q(e.id)}, name: ${q(e.name)}, sets: ${e.sets}, reps: ${e.reps[0]}...${e.reps[1]}, rest: ${q(e.rest)}, restSeconds: ${restSecs(e.rest)}, note: ${e.note ? q(e.note) : 'nil'}, small: ${!!e.small}, alts: [`);
+    lines.push(`            PlanExercise(id: ${q(e.id)}, name: ${q(e.name)}, sets: ${e.sets}, reps: ${e.reps[0]}...${e.reps[1]}, rest: ${q(e.rest)}, restSeconds: ${restSecs(e.rest)}, note: ${e.note ? q(e.note) : 'nil'}, small: ${!!e.small}, superset: ${e.superset ? q(e.superset) : 'nil'}, alts: [`);
     alts.forEach((a, i) => lines.push(`                ${a}${i < alts.length - 1 ? ',' : ''}`));
     lines.push('            ]),');
   }

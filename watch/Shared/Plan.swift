@@ -6,103 +6,103 @@ enum Plan {
 
     static let sessions: [String: PlanSession] = [
         "upperA": PlanSession(key: "upperA", name: "Upper A · heavy", type: .lift, note: nil, exercises: [
-            PlanExercise(id: "bench", name: "Bench press", sets: 4, reps: 5...8, rest: "2 min", restSeconds: 120, note: "Main lift", small: false, alts: [
+            PlanExercise(id: "bench", name: "Bench press", sets: 4, reps: 5...8, rest: "2 min", restSeconds: 120, note: "Main lift", small: false, superset: nil, alts: [
                 PlanAlt(id: "bench~dumbbell-bench-press", name: "Dumbbell bench press"),
                 PlanAlt(id: "bench~machine-chest-press", name: "Machine chest press"),
                 PlanAlt(id: "bench~smith-machine-bench", name: "Smith machine bench")
             ]),
-            PlanExercise(id: "row", name: "Chest-supported row", sets: 4, reps: 6...10, rest: "90 sec", restSeconds: 90, note: nil, small: false, alts: [
+            PlanExercise(id: "row", name: "Chest-supported row", sets: 4, reps: 6...10, rest: "90 sec", restSeconds: 90, note: nil, small: false, superset: nil, alts: [
                 PlanAlt(id: "row~barbell-row", name: "Barbell row"),
                 PlanAlt(id: "row~seated-cable-row", name: "Seated cable row"),
                 PlanAlt(id: "row~t-bar-row", name: "T-bar row"),
                 PlanAlt(id: "row~one-arm-dumbbell-row", name: "One-arm dumbbell row")
             ]),
-            PlanExercise(id: "ohp-db", name: "Seated dumbbell shoulder press", sets: 3, reps: 8...10, rest: "75 sec", restSeconds: 75, note: nil, small: false, alts: [
+            PlanExercise(id: "ohp-db", name: "Seated dumbbell shoulder press", sets: 3, reps: 8...10, rest: "75 sec", restSeconds: 75, note: nil, small: false, superset: nil, alts: [
                 PlanAlt(id: "ohp-db~machine-shoulder-press", name: "Machine shoulder press"),
                 PlanAlt(id: "ohp-db~arnold-press", name: "Arnold press"),
                 PlanAlt(id: "ohp-db~barbell-overhead-press", name: "Barbell overhead press")
             ]),
-            PlanExercise(id: "pulldown", name: "Lat pulldown", sets: 3, reps: 8...12, rest: "75 sec", restSeconds: 75, note: nil, small: false, alts: [
+            PlanExercise(id: "pulldown", name: "Lat pulldown", sets: 3, reps: 8...12, rest: "75 sec", restSeconds: 75, note: nil, small: false, superset: nil, alts: [
                 PlanAlt(id: "pulldown~pull-ups", name: "Pull-ups"),
                 PlanAlt(id: "pulldown~assisted-pull-ups", name: "Assisted pull-ups"),
                 PlanAlt(id: "pulldown~close-grip-pulldown", name: "Close-grip pulldown")
             ]),
-            PlanExercise(id: "pushdown", name: "Triceps pushdown", sets: 2, reps: 10...12, rest: "1 min", restSeconds: 60, note: nil, small: true, alts: [
+            PlanExercise(id: "pushdown", name: "Triceps pushdown", sets: 2, reps: 10...12, rest: "1 min", restSeconds: 60, note: nil, small: true, superset: nil, alts: [
                 PlanAlt(id: "pushdown~seated-triceps-press-machine", name: "Seated triceps press machine"),
                 PlanAlt(id: "pushdown~rope-pushdown", name: "Rope pushdown"),
                 PlanAlt(id: "pushdown~overhead-triceps-extension", name: "Overhead triceps extension"),
                 PlanAlt(id: "pushdown~dips", name: "Dips")
             ]),
-            PlanExercise(id: "db-curl", name: "Dumbbell curl", sets: 2, reps: 10...12, rest: "1 min", restSeconds: 60, note: nil, small: true, alts: [
+            PlanExercise(id: "db-curl", name: "Dumbbell curl", sets: 2, reps: 10...12, rest: "1 min", restSeconds: 60, note: nil, small: true, superset: nil, alts: [
                 PlanAlt(id: "db-curl~ez-bar-curl", name: "EZ-bar curl"),
                 PlanAlt(id: "db-curl~cable-curl", name: "Cable curl"),
                 PlanAlt(id: "db-curl~hammer-curl", name: "Hammer curl")
             ]),
         ]),
         "lowerA": PlanSession(key: "lowerA", name: "Lower A · squat", type: .lift, note: nil, exercises: [
-            PlanExercise(id: "squat", name: "Back squat", sets: 4, reps: 5...8, rest: "2 min", restSeconds: 120, note: "Main lift", small: false, alts: [
+            PlanExercise(id: "squat", name: "Back squat", sets: 4, reps: 5...8, rest: "2 min", restSeconds: 120, note: "Main lift", small: false, superset: nil, alts: [
                 PlanAlt(id: "squat~leg-press", name: "Leg press"),
                 PlanAlt(id: "squat~hack-squat", name: "Hack squat"),
                 PlanAlt(id: "squat~goblet-squat", name: "Goblet squat"),
                 PlanAlt(id: "squat~smith-machine-squat", name: "Smith machine squat")
             ]),
-            PlanExercise(id: "rdl", name: "Romanian deadlift", sets: 3, reps: 8...10, rest: "90 sec", restSeconds: 90, note: nil, small: false, alts: [
+            PlanExercise(id: "rdl", name: "Romanian deadlift", sets: 3, reps: 8...10, rest: "90 sec", restSeconds: 90, note: nil, small: false, superset: nil, alts: [
                 PlanAlt(id: "rdl~dumbbell-rdl", name: "Dumbbell RDL"),
                 PlanAlt(id: "rdl~good-morning", name: "Good morning"),
                 PlanAlt(id: "rdl~back-extension", name: "Back extension")
             ]),
-            PlanExercise(id: "lunge", name: "Bulgarian split squat (per leg)", sets: 3, reps: 8...10, rest: "75 sec", restSeconds: 75, note: nil, small: false, alts: [
+            PlanExercise(id: "lunge", name: "Bulgarian split squat (per leg)", sets: 3, reps: 8...10, rest: "75 sec", restSeconds: 75, note: nil, small: false, superset: nil, alts: [
                 PlanAlt(id: "lunge~walking-lunge", name: "Walking lunge"),
                 PlanAlt(id: "lunge~step-up", name: "Step-up"),
                 PlanAlt(id: "lunge~reverse-lunge", name: "Reverse lunge")
             ]),
-            PlanExercise(id: "leg-curl", name: "Leg curl", sets: 3, reps: 10...12, rest: "1 min", restSeconds: 60, note: nil, small: true, alts: [
+            PlanExercise(id: "leg-curl", name: "Leg curl", sets: 3, reps: 10...12, rest: "1 min", restSeconds: 60, note: nil, small: true, superset: nil, alts: [
                 PlanAlt(id: "leg-curl~seated-leg-curl", name: "Seated leg curl"),
                 PlanAlt(id: "leg-curl~lying-leg-curl", name: "Lying leg curl"),
                 PlanAlt(id: "leg-curl~nordic-curl", name: "Nordic curl")
             ]),
-            PlanExercise(id: "calf-st", name: "Standing calf raise", sets: 4, reps: 10...15, rest: "1 min", restSeconds: 60, note: nil, small: true, alts: [
+            PlanExercise(id: "calf-st", name: "Standing calf raise", sets: 4, reps: 10...15, rest: "1 min", restSeconds: 60, note: nil, small: true, superset: nil, alts: [
                 PlanAlt(id: "calf-st~leg-press-calf-raise", name: "Leg press calf raise"),
                 PlanAlt(id: "calf-st~smith-calf-raise", name: "Smith calf raise")
             ]),
         ]),
         "upperB": PlanSession(key: "upperB", name: "Upper B · volume", type: .lift, note: nil, exercises: [
-            PlanExercise(id: "inc-db", name: "Incline dumbbell press", sets: 4, reps: 8...12, rest: "90 sec", restSeconds: 90, note: "Main lift", small: false, alts: [
+            PlanExercise(id: "inc-db", name: "Incline dumbbell press", sets: 4, reps: 8...12, rest: "90 sec", restSeconds: 90, note: "Main lift", small: false, superset: nil, alts: [
                 PlanAlt(id: "inc-db~incline-barbell-press", name: "Incline barbell press"),
                 PlanAlt(id: "inc-db~incline-machine-press", name: "Incline machine press"),
                 PlanAlt(id: "inc-db~dumbbell-bench-press", name: "Dumbbell bench press")
             ]),
-            PlanExercise(id: "cable-row", name: "Seated cable row", sets: 4, reps: 8...12, rest: "75 sec", restSeconds: 75, note: nil, small: false, alts: [
+            PlanExercise(id: "cable-row", name: "Seated cable row", sets: 4, reps: 8...12, rest: "75 sec", restSeconds: 75, note: nil, small: false, superset: nil, alts: [
                 PlanAlt(id: "cable-row~chest-supported-row", name: "Chest-supported row"),
                 PlanAlt(id: "cable-row~machine-row", name: "Machine row"),
                 PlanAlt(id: "cable-row~barbell-row", name: "Barbell row")
             ]),
-            PlanExercise(id: "ohp", name: "Barbell overhead press", sets: 3, reps: 6...10, rest: "90 sec", restSeconds: 90, note: nil, small: false, alts: [
+            PlanExercise(id: "ohp", name: "Barbell overhead press", sets: 3, reps: 6...10, rest: "90 sec", restSeconds: 90, note: nil, small: false, superset: nil, alts: [
                 PlanAlt(id: "ohp~machine-shoulder-press", name: "Machine shoulder press"),
                 PlanAlt(id: "ohp~seated-dumbbell-press", name: "Seated dumbbell press"),
                 PlanAlt(id: "ohp~landmine-press", name: "Landmine press")
             ]),
-            PlanExercise(id: "pullup", name: "Pull-ups (AMRAP)", sets: 3, reps: 6...12, rest: "90 sec", restSeconds: 90, note: "Stop 1-2 reps shy of failure", small: false, alts: [
+            PlanExercise(id: "pullup", name: "Pull-ups", sets: 3, reps: 6...12, rest: "90 sec", restSeconds: 90, note: "As many clean reps as you can each set, stopping 1-2 short of failure", small: false, superset: nil, alts: [
                 PlanAlt(id: "pullup~assisted-pull-ups", name: "Assisted pull-ups"),
                 PlanAlt(id: "pullup~lat-pulldown", name: "Lat pulldown"),
                 PlanAlt(id: "pullup~chin-ups", name: "Chin-ups")
             ]),
-            PlanExercise(id: "fly", name: "Cable fly", sets: 3, reps: 12...15, rest: "1 min", restSeconds: 60, note: nil, small: true, alts: [
+            PlanExercise(id: "fly", name: "Cable fly", sets: 3, reps: 12...15, rest: "1 min", restSeconds: 60, note: nil, small: true, superset: nil, alts: [
                 PlanAlt(id: "fly~pec-deck", name: "Pec deck"),
                 PlanAlt(id: "fly~dumbbell-fly", name: "Dumbbell fly"),
                 PlanAlt(id: "fly~cable-crossover", name: "Cable crossover")
             ]),
-            PlanExercise(id: "rear", name: "Rear delt fly", sets: 3, reps: 15...15, rest: "1 min", restSeconds: 60, note: nil, small: true, alts: [
+            PlanExercise(id: "rear", name: "Rear delt fly", sets: 3, reps: 15...15, rest: "1 min", restSeconds: 60, note: nil, small: true, superset: nil, alts: [
                 PlanAlt(id: "rear~face-pull", name: "Face pull"),
                 PlanAlt(id: "rear~reverse-pec-deck", name: "Reverse pec deck"),
                 PlanAlt(id: "rear~rear-delt-cable-fly", name: "Rear delt cable fly")
             ]),
-            PlanExercise(id: "ss-curl", name: "Superset: EZ-bar curl", sets: 3, reps: 10...12, rest: "1 min", restSeconds: 60, note: nil, small: true, alts: [
+            PlanExercise(id: "ss-curl", name: "EZ-bar curl", sets: 3, reps: 10...12, rest: "1 min", restSeconds: 60, note: nil, small: true, superset: "arms", alts: [
                 PlanAlt(id: "ss-curl~dumbbell-curl", name: "Dumbbell curl"),
                 PlanAlt(id: "ss-curl~cable-curl", name: "Cable curl"),
                 PlanAlt(id: "ss-curl~preacher-curl", name: "Preacher curl")
             ]),
-            PlanExercise(id: "ss-tri", name: "Superset: overhead triceps extension", sets: 3, reps: 10...12, rest: "1 min", restSeconds: 60, note: nil, small: true, alts: [
+            PlanExercise(id: "ss-tri", name: "Overhead triceps extension", sets: 3, reps: 10...12, rest: "1 min", restSeconds: 60, note: nil, small: true, superset: "arms", alts: [
                 PlanAlt(id: "ss-tri~seated-triceps-press-machine", name: "Seated triceps press machine"),
                 PlanAlt(id: "ss-tri~triceps-pushdown", name: "Triceps pushdown"),
                 PlanAlt(id: "ss-tri~skull-crushers", name: "Skull crushers"),
@@ -110,35 +110,35 @@ enum Plan {
             ]),
         ]),
         "lowerB": PlanSession(key: "lowerB", name: "Lower B · hinge + core", type: .lift, note: nil, exercises: [
-            PlanExercise(id: "deadlift", name: "Deadlift", sets: 3, reps: 4...6, rest: "2 min", restSeconds: 120, note: "Main lift. Keep 1-2 reps in reserve", small: false, alts: [
+            PlanExercise(id: "deadlift", name: "Deadlift", sets: 3, reps: 4...6, rest: "2 min", restSeconds: 120, note: "Main lift. Keep 1-2 reps in reserve", small: false, superset: nil, alts: [
                 PlanAlt(id: "deadlift~trap-bar-deadlift", name: "Trap-bar deadlift"),
                 PlanAlt(id: "deadlift~rack-pull", name: "Rack pull"),
                 PlanAlt(id: "deadlift~sumo-deadlift", name: "Sumo deadlift")
             ]),
-            PlanExercise(id: "front-sq", name: "Front squat", sets: 3, reps: 8...10, rest: "90 sec", restSeconds: 90, note: nil, small: false, alts: [
+            PlanExercise(id: "front-sq", name: "Front squat", sets: 3, reps: 8...10, rest: "90 sec", restSeconds: 90, note: nil, small: false, superset: nil, alts: [
                 PlanAlt(id: "front-sq~hack-squat", name: "Hack squat"),
                 PlanAlt(id: "front-sq~leg-press", name: "Leg press"),
                 PlanAlt(id: "front-sq~goblet-squat", name: "Goblet squat")
             ]),
-            PlanExercise(id: "hip-thrust", name: "Hip thrust", sets: 3, reps: 8...12, rest: "75 sec", restSeconds: 75, note: nil, small: false, alts: [
+            PlanExercise(id: "hip-thrust", name: "Hip thrust", sets: 3, reps: 8...12, rest: "75 sec", restSeconds: 75, note: nil, small: false, superset: nil, alts: [
                 PlanAlt(id: "hip-thrust~glute-bridge", name: "Glute bridge"),
                 PlanAlt(id: "hip-thrust~cable-pull-through", name: "Cable pull-through"),
                 PlanAlt(id: "hip-thrust~back-extension", name: "Back extension")
             ]),
-            PlanExercise(id: "leg-ext", name: "Leg extension", sets: 3, reps: 12...15, rest: "1 min", restSeconds: 60, note: nil, small: true, alts: [
+            PlanExercise(id: "leg-ext", name: "Leg extension", sets: 3, reps: 12...15, rest: "1 min", restSeconds: 60, note: nil, small: true, superset: nil, alts: [
                 PlanAlt(id: "leg-ext~sissy-squat", name: "Sissy squat"),
                 PlanAlt(id: "leg-ext~single-leg-extension", name: "Single-leg extension")
             ]),
-            PlanExercise(id: "calf-seat", name: "Seated calf raise", sets: 3, reps: 12...15, rest: "1 min", restSeconds: 60, note: nil, small: true, alts: [
+            PlanExercise(id: "calf-seat", name: "Seated calf raise", sets: 3, reps: 12...15, rest: "1 min", restSeconds: 60, note: nil, small: true, superset: nil, alts: [
                 PlanAlt(id: "calf-seat~standing-calf-raise", name: "Standing calf raise"),
                 PlanAlt(id: "calf-seat~leg-press-calf-raise", name: "Leg press calf raise")
             ]),
-            PlanExercise(id: "knee-raise", name: "Hanging knee raise", sets: 3, reps: 10...15, rest: "1 min", restSeconds: 60, note: nil, small: false, alts: [
+            PlanExercise(id: "knee-raise", name: "Hanging knee raise", sets: 3, reps: 10...15, rest: "1 min", restSeconds: 60, note: nil, small: false, superset: nil, alts: [
                 PlanAlt(id: "knee-raise~cable-crunch", name: "Cable crunch"),
                 PlanAlt(id: "knee-raise~ab-wheel", name: "Ab wheel"),
                 PlanAlt(id: "knee-raise~decline-sit-up", name: "Decline sit-up")
             ]),
-            PlanExercise(id: "plank", name: "Plank (seconds in the reps box)", sets: 3, reps: 45...60, rest: "50 sec", restSeconds: 50, note: nil, small: false, alts: [
+            PlanExercise(id: "plank", name: "Plank (seconds in the reps box)", sets: 3, reps: 45...60, rest: "50 sec", restSeconds: 50, note: nil, small: false, superset: nil, alts: [
                 PlanAlt(id: "plank~side-plank", name: "Side plank"),
                 PlanAlt(id: "plank~dead-bug", name: "Dead bug"),
                 PlanAlt(id: "plank~hollow-hold", name: "Hollow hold")

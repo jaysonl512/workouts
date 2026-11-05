@@ -172,6 +172,11 @@ table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:6px 4px;b
 .row2{display:flex;justify-content:space-between;align-items:center;gap:12px}
 .row2 .btn{flex:none;min-width:64px}
 .sep{height:1px;background:var(--line);margin:14px 0}
+.sw{flex:none;width:51px;height:31px;border-radius:99px;border:0;padding:0;background:#3a434e;position:relative;transition:background .2s var(--ease)}
+.sw i{position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 2px 4px rgba(0,0,0,.3);transition:transform .2s var(--ease)}
+.sw.on{background:#22c55e}.sw.on i{transform:translateX(20px)}
+.sstag{color:var(--acc);font-weight:700}
+.ssnote{font-size:13px;color:var(--mute);background:#0f1318;border:1px solid var(--line);border-radius:12px;padding:8px 10px;margin:8px 0 2px}.ssnote b{color:var(--text)}
 .set summary{list-style:none;display:flex;justify-content:space-between;align-items:center;cursor:pointer}
 .set summary::-webkit-details-marker{display:none}
 .set summary span{color:var(--mute);font-size:14px}
@@ -403,11 +408,11 @@ const PLAN = {
       {id:'inc-db',name:'Incline dumbbell press',sets:4,reps:[8,12],rest:'90 sec',note:'Main lift'},
       {id:'cable-row',name:'Seated cable row',sets:4,reps:[8,12],rest:'75 sec'},
       {id:'ohp',name:'Barbell overhead press',sets:3,reps:[6,10],rest:'90 sec'},
-      {id:'pullup',name:'Pull-ups (AMRAP)',sets:3,reps:[6,12],rest:'90 sec',note:'Stop 1-2 reps shy of failure'},
+      {id:'pullup',name:'Pull-ups',sets:3,reps:[6,12],rest:'90 sec',note:'As many clean reps as you can each set, stopping 1-2 short of failure'},
       {id:'fly',name:'Cable fly',sets:3,reps:[12,15],rest:'1 min',small:1},
       {id:'rear',name:'Rear delt fly',sets:3,reps:[15,15],rest:'1 min',small:1},
-      {id:'ss-curl',name:'Superset: EZ-bar curl',sets:3,reps:[10,12],rest:'1 min',small:1},
-      {id:'ss-tri',name:'Superset: overhead triceps extension',sets:3,reps:[10,12],rest:'1 min',small:1}]},
+      {id:'ss-curl',name:'EZ-bar curl',sets:3,reps:[10,12],rest:'1 min',small:1,superset:'arms'},
+      {id:'ss-tri',name:'Overhead triceps extension',sets:3,reps:[10,12],rest:'1 min',small:1,superset:'arms'}]},
     lowerB:{name:'Lower B · hinge + core',type:'lift',ex:[
       {id:'deadlift',name:'Deadlift',sets:3,reps:[4,6],rest:'2 min',note:'Main lift. Keep 1-2 reps in reserve'},
       {id:'front-sq',name:'Front squat',sets:3,reps:[8,10],rest:'90 sec'},
@@ -435,7 +440,7 @@ const EFFORT = {easy:'Easy', medium:'Medium', hard:'Hard'};
 const effortSeg = (act,cur) => `<div class="segc">${Object.entries(EFFORT).map(([v,l])=>`<button class="${v===cur?'on':''}" data-act="${act}" data-v="${v}">${l}</button>`).join('')}</div>`;
 const kindOf = x => x.yoga ? 'yoga' : x.other ? 'other' : x.run ? 'run' : 'lift';
 const CHEERS = ['Nice one','Solid set','Strong','Locked in','Clean rep','Beast mode','Smooth'];
-const APP_VERSION='2026-11-05.2';
+const APP_VERSION='2026-11-05.3';
 
 /* alternatives per exercise: each alternative keeps its own history so weights stay comparable */
 const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
@@ -774,6 +779,16 @@ function tickRest(){
 /* Live clock on a timed workout (HIIT, walk, ...) started from the + button. */
 setInterval(()=>{ const el=document.getElementById('elT'); if(el&&st.wk){ const d=getDraft(); if(d.startedAt) el.textContent=mmss(Math.floor((Date.now()-d.startedAt)/1000)) } },1000);
 
+/* Supersets: two neighbouring exercises with the same `superset` tag (alternates keep their slot's tag).
+   Sets alternate A, B, rest, A, B, rest... */
+const ssTag = e => e && (e.superset || (e.slot && EXMAP[e.slot]?.superset)) || null;
+function ssPartner(i){
+  const steps=stepsFor(), t=ssTag(steps[i]); if(!t) return null;
+  if(ssTag(steps[i+1])===t) return i+1;
+  if(ssTag(steps[i-1])===t) return i-1;
+  return null;
+}
+function moveStep(i){ const wk=st.wk; wk.dir=i>wk.step?1:-1; wk.step=i; wk.anim=true; wk.editing=null; wk.just=null; initCur(); render(); toTop() }
 function logSet(){
   const wk=st.wk, e=stepsFor()[wk.step], d=getDraft(), a=(d.ex[e.id] ||= []);
   const w=num(wk.cur.w)||0, r=num(wk.cur.r);
@@ -788,6 +803,17 @@ function logSet(){
   wk.editing=null; wk.just=idx;
   if(isPR){ wk.prs[e.id]=true; burstAt(btn,44); buzz([30,40,30]); toast('New PR 🏆') }
   else { burstAt(btn,10); buzz(15); toast(CHEERS[Math.floor(Math.random()*CHEERS.length)]) }
+  const p = wasEdit ? null : ssPartner(wk.step);
+  if(p!=null){
+    const pe=stepsFor()[p], pn=(d.ex[pe.id]||[]).length, isA=wk.step<p;
+    if(pn<pe.sets && (isA ? pn<a.length : pn<=a.length)){
+      // A → B straight away; B → rest, then back to A.
+      if(!isA && restOn() && !isManual()) startRest(restSecs(e.rest)); else clearRest();
+      wk.cur={w,r}; render();
+      setTimeout(()=>{ if(st.wk===wk && wk.step!==p) moveStep(p) }, 450);
+      return;
+    }
+  }
   if(!wasEdit && a.length<e.sets && restOn() && !isManual()) startRest(restSecs(e.rest)); else clearRest();
   wk.cur={w,r};
   render();
@@ -1009,9 +1035,11 @@ function viewWorkout(){
   const label = wk.editing!=null ? `Update set ${wk.editing+1}` : complete ? 'Log extra set' : `Log set ${a.length+1}`;
   const rest=wk.rest, left=rest?Math.max(0,Math.ceil((rest.end-Date.now())/1000)):0;
   const isLast = wk.step===n-1;
-  h+=`<div class="${cls}"><div class="kicker">Exercise ${wk.step+1} of ${n}</div>
+  const sp=ssPartner(wk.step);
+  h+=`<div class="${cls}"><div class="kicker">Exercise ${wk.step+1} of ${n}${sp!=null?` · <span class="sstag">Superset</span>`:''}</div>
     <div class="hdr"><h2>${esc(e.name)}</h2><button class="btn ghost sm" data-act="swapopen">⇄ Swap</button></div>
-    <div class="tgt">${e.sets} × ${e.reps[0]===e.reps[1]?e.reps[0]:e.reps[0]+'–'+e.reps[1]} · rest ${e.rest}${e.note?' · '+esc(e.note):''}</div>
+    <div class="tgt">${e.sets} × ${e.reps[0]===e.reps[1]?e.reps[0]:e.reps[0]+'–'+e.reps[1]} · rest ${e.rest}${sp!=null?' after each pair':''}${e.note?' · '+esc(e.note):''}</div>
+    ${sp!=null?`<div class="ssnote">Alternate with <b>${esc(steps[sp].name)}</b>: one set each, then rest.</div>`:''}
     ${wk.prs[e.id]?`<span class="badge">🏆 New PR</span>`:''}
     ${last?`<div class="last">Last time (${fmtDate(last.date)}): ${last.sets.map(fmtSet).join(', ')}</div>`:''}
     ${sug?`<div class="sug">🎯 Target: <b>${sug.w?sug.w+' lb × ':''}${sug.r}${sug.w?'':(e.id==='plank'?' sec':' reps')}</b><small>${esc(sug.why)}</small></div>`:''}
@@ -1155,7 +1183,7 @@ async function showMaps(root){
     m.fitBounds(line.getBounds(),{padding:[18,18]});
   });
 }
-document.addEventListener('toggle',e=>{ if(e.target.open) showMaps(e.target) },true);
+document.addEventListener('toggle',e=>{ if(e.target.classList?.contains('set')) st.setOpen=e.target.open; if(e.target.open) showMaps(e.target) },true);
 function viewHistory(){
   const all = allSessions(), unsynced = st.local.length;
   let h = '';
@@ -1648,7 +1676,7 @@ function viewPlan(){
   });
   h += `<details class="card pl"><summary><div class="ttl"><b>Running build-up</b><span>Tuesday, plus Saturday if you feel like it</span></div><span class="chev">›</span></summary><div class="body"><ul class="bul" style="margin-bottom:6px"><li><b>Weeks 1–2:</b> 20–25 min easy</li><li><b>Weeks 3–4:</b> 30 min easy</li><li><b>Weeks 5–8:</b> build to 40–45 min, add one interval session (6 × 2 min hard / 2 min easy)</li></ul></div></details>`;
   h += `<div class="sect">How to progress</div><div class="card" style="padding:6px 16px"><ul class="bul"><li>Work up to the top of the rep range on every set, then add 5 lb (2.5 on small lifts) and start back at the bottom.</li><li>Leave 1–2 reps in reserve on most sets.</li><li>Take a deload week about every 6th week, at roughly 60% of your usual weights.</li><li>Tap ⇄ Swap on any exercise to use an alternative. Each one keeps its own history.</li></ul></div>`;
-  return h+`<div class="sect">Settings</div><details class="card set"><summary><b>Settings</b><span>Cloud ${sbAuth()?'on':'off'}</span></summary><div style="margin-top:12px"><div class="row2"><div><b>Rest timer</b><div class="note">Counts down after each set</div></div><button class="btn sm ${restOn()?'':'ghost'}" data-act="resttoggle">${restOn()?'On':'Off'}</button></div><div class="sep"></div>${cloudCard()}<div class="sep"></div>${exportCard()}<div class="sep"></div><div class="row2"><div><b>App version</b><div class="note">${APP_VERSION}</div></div><button class="btn ghost sm" data-act="refresh">Refresh app</button></div></div></details>`;
+  return h+`<div class="sect">Settings</div><details class="card set"${st.setOpen?' open':''}><summary><b>Settings</b><span>Cloud ${sbAuth()?'on':'off'}</span></summary><div style="margin-top:12px"><div class="row2"><div><b>Rest timer</b><div class="note">Counts down after each set</div></div><button class="sw ${restOn()?'on':''}" role="switch" aria-checked="${restOn()}" aria-label="Rest timer" data-act="resttoggle"><i></i></button></div><div class="sep"></div>${cloudCard()}<div class="sep"></div>${exportCard()}<div class="sep"></div><div class="row2"><div><b>App version</b><div class="note">${APP_VERSION}</div></div><button class="btn ghost sm" data-act="refresh">Refresh app</button></div></div></details>`;
 }
 
 /* ---------- events ---------- */
@@ -1754,7 +1782,7 @@ app.addEventListener('click',e=>{
   else if(act==='prall'){ st.prAll=!st.prAll; render() }
   else if(act==='prgo'){ st.progEx=b.dataset.id; st.pm='e1'; render(); const el=document.getElementById('strength'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}) }
   else if(act==='del'||act==='swdel') askDelete(b.dataset.id);
-  else if(act==='resttoggle'){ SS('wt.rest',!restOn()); if(restOn()===false) clearRest(); render() }
+  else if(act==='resttoggle'){ SS('wt.rest',!restOn()); if(!restOn()) clearRest(); b.classList.toggle('on',restOn()); b.setAttribute('aria-checked',String(restOn())); buzz(10) }
   else if(act==='save') save();
 });
 

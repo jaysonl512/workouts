@@ -76,10 +76,33 @@ final class LiftStore: ObservableObject {
         persist()
     }
 
+    /// The other half of a superset: the neighbouring step with the same tag.
+    func supersetPartner(of index: Int) -> Int? {
+        let s = steps
+        guard s.indices.contains(index), let tag = s[index].slot.superset else { return nil }
+        if s.indices.contains(index + 1), s[index + 1].slot.superset == tag { return index + 1 }
+        if s.indices.contains(index - 1), s[index - 1].slot.superset == tag { return index - 1 }
+        return nil
+    }
+
     func logSet(w: Double, r: Int) {
         guard let step = currentStep else { return }
         draft!.sets[step.id, default: []].append(LoggedSet(w: w, r: r))
         let done = draft!.sets[step.id]!.count
+        // Superset: A → B straight away, B → rest and back to A, until both are done.
+        if let p = supersetPartner(of: draft!.index) {
+            let partner = steps[p]
+            let pn = sets(for: partner.id).count
+            let isA = draft!.index < p
+            if pn < partner.slot.sets, isA ? pn < done : pn <= done {
+                draft!.index = p
+                nextUp = false
+                persist()
+                upload(status: "in_progress")
+                if isA { stopRest() } else { startRest(TimeInterval(step.slot.restSeconds)) }
+                return
+            }
+        }
         if done >= step.slot.sets {
             draft!.index += 1
             nextUp = draft!.index < steps.count
