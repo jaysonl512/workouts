@@ -116,6 +116,12 @@ actor Supabase {
                               prefer: "resolution=ignore-duplicates,return=minimal")
     }
 
+    /// Plans for every lift from the "plans" Edge Function (the same progression rules as the web app).
+    func plans(today: String) async throws -> PlansResponse {
+        let data = try await request("/functions/v1/plans?today=\(today)")
+        return try JSONDecoder().decode(PlansResponse.self, from: data)
+    }
+
     /// One session by id, any status (to see what the phone did with a lift in progress).
     func session(id: String) async throws -> SessionRow? {
         let data = try await request("/rest/v1/sessions?select=id,date,session,name,type,status,source,saved_at,data&id=eq.\(Self.q(id))")

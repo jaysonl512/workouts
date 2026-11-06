@@ -17,7 +17,7 @@ final class SyncStore: ObservableObject {
     private var flushing = false
     private var retryTask: Task<Void, Never>?
 
-    private static let dir: URL = {
+    static let dir: URL = {
         let d = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         try? FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
         return d
@@ -79,11 +79,14 @@ final class SyncStore: ObservableObject {
         guard !flushing, !pending.isEmpty else { return }
         flushing = true
         defer { flushing = false; scheduleRetry() }
+        var finished = false
+        defer { if finished { Task { await AppModel.shared.plans.refresh() } } }
         for row in pending.values.sorted(by: { $0.data.updatedAt < $1.data.updatedAt }) {
             do {
                 if row.status == "in_progress" { try await Supabase.shared.upsertLive(row) } else { try await Supabase.shared.upsert([row]) }
                 // Keep it if a newer copy was queued while this one was uploading.
                 if pending[row.id]?.data.updatedAt == row.data.updatedAt { pending[row.id] = nil }
+                if row.status == "complete", row.type == .lift { finished = true }
                 persistQueue()
                 lastError = nil
                 lastSynced = Date()
@@ -149,56 +152,6 @@ final class SyncStore: ObservableObject {
         return out
     }
 
-    /// Targets for every set, from the same set last time (the web app's setTargets, without deload weeks).
-    func targets(for step: Step, excluding sessionId: String, before date: String) -> [Suggestion]? {
-        let hist = recentSets(for: step.id, excluding: sessionId, before: date, limit: 2)
-        guard let prev = hist.first, !prev.isEmpty else { return nil }
-        let lo = step.slot.reps.lowerBound, q = step.slot.weightStep
-        var out: [Suggestion] = (0..<max(step.slot.sets, prev.count)).map { i in
-            let x = prev[min(i, prev.count - 1)]
-            // Under the range on this set two sessions running: about 10% lighter (or more assistance).
-            if hist.count > 1, hist[1].indices.contains(i) {
-                let y = hist[1][i]
-                if !Progression.isBodyweight(step, x.w), x.r < lo, y.r < lo, y.w == x.w {
-                    return step.isAssisted ? Suggestion(w: x.w + q, r: lo, why: "+\(Fmt.weight(q)) lb assist · rebuild")
-                        : Suggestion(w: max(0, (x.w * 0.9 / q).rounded() * q), r: lo, why: "−10% · rebuild")
-                }
-            }
-            return Progression.next(step, from: x)
-        }
-        // Sets build up: a later set as heavy or heavier than the one before never aims for more reps than it.
-        for i in out.indices.dropFirst()
-        where !Progression.heavier(step, out[i - 1].w, than: out[i].w) && out[i].r > out[i - 1].r {
-            out[i] = Suggestion(w: out[i].w, r: out[i - 1].r, why: out[i].w == out[i - 1].w ? "Same weight · same reps" : "Heavier · same reps", up: out[i].up)
-        }
-        return out
-    }
-
-    /// Target for set `index` of this workout: last time's same set, moved up or down by the set just logged
-    /// (the web app's targetFor).
-    func target(for step: Step, index: Int, done: [LoggedSet], excluding sessionId: String, before date: String) -> Suggestion? {
-        let base = targets(for: step, excluding: sessionId, before: date).map { $0[min(index, $0.count - 1)] }
-        guard index > 0, done.indices.contains(index - 1) else { return base }
-        let p = done[index - 1], lo = step.slot.reps.lowerBound, hi = step.slot.reps.upperBound
-        if Progression.isBodyweight(step, p.w) { return base ?? Suggestion(w: 0, r: p.r, why: "Same as last set") }
-        if p.r >= hi {
-            let c = Suggestion(w: Progression.up(step, p.w), r: Progression.resetReps(step), why: "Hit \(hi) · moving up", up: true)
-            if let b = base, Progression.heavier(step, b.w, than: c.w) { return b }
-            return c
-        }
-        if p.r < lo {
-            let c = Suggestion(w: Progression.down(step, p.w), r: lo, why: "Under \(lo) · a bit lighter")
-            if let b = base, Progression.heavier(step, c.w, than: b.w) { return b }
-            return c
-        }
-        if let b = base, !Progression.heavier(step, p.w, than: b.w) {
-            // As heavy or heavier than the set just done: its reps at most.
-            if b.r > p.r { return Suggestion(w: b.w, r: p.r, why: b.w == p.w ? "Same weight · match last set" : "Heavier · same reps") }
-            return b
-        }
-        return Suggestion(w: p.w, r: p.r, why: "Same as last set")
-    }
-
     private func persistQueue() { try? JSONEncoder().encode(pending).write(to: queueURL, options: .atomic) }
     /// Saves this week's sessions and hands them to the watch-face complication.
     private func persistWeek() {
@@ -217,4 +170,30 @@ final class SyncStore: ObservableObject {
         if (e as? URLError) != nil { return "offline" }
         return String((e as? LocalizedError)?.errorDescription?.prefix(60) ?? "\(e)".prefix(60))
     }
+}
+
+/// The latest workout plans from the "plans" Edge Function, saved on the Watch so a lift can start with full
+/// targets offline. Refreshed whenever the chance comes up (launch, opening the app, after an upload, and in
+/// background refreshes when watchOS grants them); nothing depends on any of these happening on time.
+@MainActor
+final class PlanCache: ObservableObject {
+    @Published private(set) var plans: PlansResponse?
+    private var refreshing = false
+    private let url = SyncStore.dir.appendingPathComponent("plans.json")
+
+    init() {
+        if let d = try? Data(contentsOf: url), let p = try? JSONDecoder().decode(PlansResponse.self, from: d) { plans = p }
+    }
+
+    func refresh() async {
+        guard !refreshing else { return }
+        refreshing = true
+        defer { refreshing = false }
+        guard let p = try? await Supabase.shared.plans(today: Day.string()) else { return }
+        plans = p
+        if let d = try? JSONEncoder().encode(p) { try? d.write(to: url, options: .atomic) }
+    }
+
+    /// Every exercise's plan (including alternatives) for a lift, or empty when nothing is cached yet.
+    func session(_ key: String) -> [String: ExercisePlan] { plans?.sessions[Plan.base(key)] ?? [:] }
 }

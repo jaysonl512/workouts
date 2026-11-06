@@ -77,11 +77,9 @@ struct ExerciseView: View {
         guard let i = lift.steps.firstIndex(of: step) else { return false }
         return lift.supersetPartner(of: i) != nil
     }
-    /// Target for the next set: last time's same set, adjusted by the set just logged.
-    private var suggestion: Suggestion? {
-        guard let d = lift.draft else { return nil }
-        return sync.target(for: step, index: done.count, done: done, excluding: d.id, before: d.date)
-    }
+    /// The next set and its planned target (frozen when the lift started; never changes during the workout).
+    private var item: LiftStore.NextItem { lift.nextItem(for: step) }
+    private var working: [LoggedSet] { done.filter { !$0.isWarmup } }
 
     var body: some View {
         TabView(selection: $page) {
@@ -98,14 +96,14 @@ struct ExerciseView: View {
         VStack(spacing: 5) {
             VStack(alignment: .leading, spacing: 0) {
                 Text(step.name).font(.system(size: 19, weight: .semibold)).foregroundStyle(Color.brand)
-                Text("\(isSuperset ? "Superset · " : "")Set \(min(done.count + 1, step.slot.sets)) of \(step.slot.sets) · \(step.slot.repsText)\(isPlank ? " sec" : "") · \(lastLine)")
+                Text(subtitle)
                     .font(.system(size: 12)).foregroundStyle(.secondary)
             }
             .lineLimit(1)
             .minimumScaleFactor(0.6)
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            valueRow(.weight, text: Fmt.weight(weight), unit: step.weightUnit,
+            valueRow(.weight, text: Fmt.weight(weight), unit: lift.planFor(step.id)?.unit.map(Self.shortUnit) ?? step.weightUnit,
                      minus: { weight = max(0, weight - step.slot.weightStep) },
                      plus: { weight = min(1000, weight + step.slot.weightStep) })
                 .digitalCrownRotation(detent: $weight, from: 0, through: 1000, by: 0.25,
@@ -117,20 +115,37 @@ struct ExerciseView: View {
                 .digitalCrownRotation(detent: $reps, from: 0, through: 300, by: Double(step.slot.repStep),
                                       sensitivity: .medium, isContinuous: false, isHapticFeedbackEnabled: true)
 
-            Button("Log Set") { lift.logSet(w: weight, r: Int(reps)) }
+            Button(item.warmup ? "Log Warm-up" : "Log Set") { lift.logSet(w: weight, r: Int(reps)) }
                 .buttonStyle(PrimaryButtonStyle(height: 38))
         }
         .padding(.horizontal, 2)
     }
 
-    /// The suggestion's reason ("+5 lb · hit 8s last time") before the first set, this session's sets after.
-    private var lastLine: String {
-        let a = step.isAssisted
-        if let s = suggestion, s.up, !done.isEmpty { return s.why }
-        if !done.isEmpty { return "Done " + done.map { $0.text(assisted: a) }.joined(separator: " ") }
-        if let s = suggestion { return s.why }
-        guard let l = last, !l.isEmpty else { return "New" }
-        return "Last " + l.map { $0.text(assisted: a) }.joined(separator: " ")
+    /// "Set 2 of 4 · Target 45×10", "Warm-up 1 of 2 · 25×8", or without a plan "Set 2 of 4 · 8–12 · Last 45×10".
+    private var subtitle: String {
+        let it = item, a = step.isAssisted, ss = isSuperset ? "Superset · " : ""
+        if it.warmup, let t = it.target { return "Warm-up \(it.index + 1) of \(it.total) · \(Self.text(t, assisted: a))" }
+        let n = "Set \(min(it.index + 1, max(it.total, it.index + 1))) of \(it.total)"
+        if let t = it.target { return "\(ss)\(n) · Target \(Self.text(t, assisted: a))\(stale)" }
+        if it.index >= it.total { return "\(ss)Extra set · Done " + working.map { $0.text(assisted: a) }.joined(separator: " ") }
+        guard let l = last, !l.isEmpty else { return "\(ss)\(n) · \(step.slot.repsText)\(isPlank ? " sec" : "")" }
+        return "\(ss)\(n) · Last " + l.filter { !$0.isWarmup }.map { $0.text(assisted: a) }.joined(separator: " ")
+    }
+
+    /// The cached plan predates a session logged here since (it could not refresh): say which date it is from.
+    private var stale: String {
+        guard let d = lift.draft, let based = lift.planFor(step.id)?.basedOn,
+              let newer = sync.lastSets(for: step.id, excluding: d.id, before: d.date)?.date, newer > based else { return "" }
+        return " · plan from \(based.suffix(5))"
+    }
+
+    static func text(_ t: PlanSet, assisted: Bool) -> String {
+        guard let w = t.w else { return "\(t.r) reps" }
+        return LoggedSet(w: w, r: t.r).text(assisted: assisted)
+    }
+
+    static func shortUnit(_ u: String) -> String {
+        u == "lb per dumbbell" ? "lb each" : u == "lb per arm" ? "lb / arm" : u
     }
 
     /// − value + ; tapping the value gives it the Digital Crown (red outline).
@@ -155,16 +170,16 @@ struct ExerciseView: View {
         .focusEffectDisabled()
     }
 
-    /// The set's target, else this session's last set, else last time's set, else the bottom of the rep range
-    /// (the web app's initCur order).
+    /// The planned target (weight from the last set when the plan has none yet), else this session's last set,
+    /// else last time's set, else the bottom of the rep range (the web app's initCur order).
     private func prefill() {
-        if let s = suggestion {
-            weight = s.w; reps = Double(s.r)
+        let lastWorking = working.last ?? last?.filter { !$0.isWarmup }.last
+        if let t = item.target {
+            weight = t.w ?? lastWorking?.w ?? 0; reps = Double(t.r)
         } else if let s = done.last {
             weight = s.w; reps = Double(s.r)
-        } else if let l = last, !l.isEmpty {
-            let s = l[min(done.count, l.count - 1)]
-            weight = s.w; reps = Double(s.r)
+        } else if let l = lastWorking {
+            weight = l.w; reps = Double(l.r)
         } else {
             weight = 0; reps = Double(step.slot.reps.lowerBound)
         }
@@ -191,6 +206,9 @@ struct ExerciseOptions: View {
             .labelStyle(.titleOnly)
             .listRowBackground(Color.clear)
             NavigationLink("Swap exercise") { SwapView(step: step) }
+            if lift.nextItem(for: step).warmup {
+                Button("Skip warm-ups") { lift.skipWarmups(step) }
+            }
             Button("Undo last set") { lift.undoLastSet() }
                 .disabled(lift.sets(for: step.id).isEmpty)
             Button("Finish workout") { lift.go(to: lift.steps.count) }
@@ -242,7 +260,7 @@ struct RestView: View {
                         Text(Fmt.clock(left.rounded(.up)))
                             .font(.system(size: 32, weight: .semibold, design: .rounded)).monospacedDigit()
                         if let s = lift.currentStep {
-                            Text(lift.nextUp ? "Next: \(s.name)" : "Set \(lift.sets(for: s.id).count + 1) next")
+                            Text(lift.nextUp ? "Next: \(s.name)" : "Set \(lift.workingCount(s.id) + 1) next")
                                 .font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1)
                                 .frame(maxWidth: 90)
                         }
@@ -273,9 +291,10 @@ struct NextUpView: View {
                     .padding(.top, 2)
                 Text(step.name).font(.system(size: 19, weight: .semibold)).lineLimit(3).minimumScaleFactor(0.7)
             }
-            Text("\(step.slot.sets) × \(step.slot.repsText)").font(.system(size: 16)).foregroundStyle(.secondary)
+            Text("\(lift.plannedCount(step)) sets").font(.system(size: 16)).foregroundStyle(.secondary)
             Spacer(minLength: 0)
-            Button("Start") { lift.nextUp = false }.buttonStyle(PrimaryButtonStyle(color: .control))
+            RateRow()
+            Button("Start") { lift.rateFor = nil; lift.nextUp = false }.buttonStyle(PrimaryButtonStyle(color: .control))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .navigationTitle("Next Up")
@@ -293,6 +312,7 @@ struct FinishView: View {
             Text("\(lift.totalSets)").font(.system(size: 40, weight: .semibold, design: .rounded))
             Text("sets logged").font(.footnote).foregroundStyle(.secondary)
             Spacer(minLength: 0)
+            RateRow()
             Button(saving ? "Saving…" : "Finish") {
                 saving = true
                 Task {
@@ -365,5 +385,22 @@ struct LiftSummaryDetail: View {
 
     private func row(_ k: String, _ v: String) -> some View {
         HStack { Text(k).foregroundStyle(.secondary); Spacer(); Text(v).monospacedDigit() }
+    }
+}
+
+/// Optional "How was it?" for the exercise just finished: three small buttons, easy to ignore (Start skips it).
+struct RateRow: View {
+    @EnvironmentObject var lift: LiftStore
+
+    var body: some View {
+        if let id = lift.rateFor {
+            HStack(spacing: 4) {
+                ForEach([("easy", "Easy"), ("moderate", "OK"), ("hard", "Hard")], id: \.0) { v, label in
+                    Button(label) { lift.rate(id, v) }
+                        .buttonStyle(PillButtonStyle(color: lift.draft?.diff?[id] == v ? .brand : .control))
+                }
+            }
+            .font(.system(size: 13))
+        }
     }
 }

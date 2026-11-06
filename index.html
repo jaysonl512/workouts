@@ -113,6 +113,9 @@ table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:6px 4px;b
 .dot.done{border:2px solid var(--acc);color:var(--text);background:rgba(239,68,68,.1)}
 .dot.now{border:2px solid var(--acc2);color:var(--acc2);animation:glow 1.6s ease-in-out infinite}
 .dot.pop{animation:pop .5s cubic-bezier(.3,1.7,.5,1)}
+.dot small{display:block;font-size:10px;font-weight:600;color:var(--mute);margin-top:1px;text-transform:lowercase}
+.dot.wu{min-width:48px;border-style:dotted;opacity:.85}.dot.editt{border:2px solid #fbbf24;color:#fbbf24}
+.rate{margin:14px 0 4px}.rate>span{display:block;font-size:13px;color:var(--mute);margin-bottom:6px}.rate small{opacity:.7}
 @keyframes pop{0%{transform:scale(.4);background:rgba(239,68,68,.6)}100%{transform:scale(1)}}
 @keyframes glow{50%{box-shadow:0 0 0 5px rgba(251,146,60,.14)}}
 .steppers{display:grid;grid-template-columns:1fr;gap:12px}
@@ -387,46 +390,9 @@ details[open]>summary .chev{transform:rotate(90deg)}
 <div class="toast" id="toast"></div>
 <div class="undo" id="undo" hidden><span></span><button id="undoBtn">Undo</button></div>
 
+<script src="plan.js?v=2026-11-06.1"></script>
+<script src="progression.js?v=2026-11-06.1"></script>
 <script>
-/* ---------- Plan (mirrors the training plan doc) ---------- */
-const PLAN = {
-  week: {1:'upperA',2:'run',3:'lowerA',4:'upperB',5:'lowerB',6:'run',0:'rest'},
-  sessions: {
-    upperA:{name:'Upper A · heavy',type:'lift',ex:[
-      {id:'bench',name:'Bench press',sets:4,reps:[5,8],rest:'2 min',note:'Main lift'},
-      {id:'row',name:'Chest-supported row',sets:4,reps:[6,10],rest:'90 sec'},
-      {id:'ohp-db',name:'Seated dumbbell shoulder press',sets:3,reps:[8,10],rest:'75 sec'},
-      {id:'pulldown',name:'Lat pulldown',sets:3,reps:[8,12],rest:'75 sec'},
-      {id:'pushdown',name:'Triceps pushdown',sets:2,reps:[10,12],rest:'1 min',small:1},
-      {id:'db-curl',name:'Dumbbell curl',sets:2,reps:[10,12],rest:'1 min',small:1}]},
-    lowerA:{name:'Lower A · squat',type:'lift',ex:[
-      {id:'squat',name:'Back squat',sets:4,reps:[5,8],rest:'2 min',note:'Main lift'},
-      {id:'rdl',name:'Romanian deadlift',sets:3,reps:[8,10],rest:'90 sec'},
-      {id:'lunge',name:'Bulgarian split squat (per leg)',sets:3,reps:[8,10],rest:'75 sec'},
-      {id:'leg-curl',name:'Leg curl',sets:3,reps:[10,12],rest:'1 min',small:1},
-      {id:'calf-st',name:'Standing calf raise',sets:4,reps:[10,15],rest:'1 min',small:1}]},
-    upperB:{name:'Upper B · volume',type:'lift',ex:[
-      {id:'inc-db',name:'Incline dumbbell press',sets:4,reps:[8,12],rest:'90 sec',note:'Main lift'},
-      {id:'cable-row',name:'Seated cable row',sets:4,reps:[8,12],rest:'75 sec'},
-      {id:'ohp',name:'Barbell overhead press',sets:3,reps:[6,10],rest:'90 sec'},
-      {id:'pullup',name:'Pull-ups',sets:3,reps:[6,12],rest:'90 sec',note:'As many clean reps as you can each set, stopping 1-2 short of failure'},
-      {id:'fly',name:'Single-arm cable fly',sets:3,reps:[12,15],rest:'1 min',small:1},
-      {id:'rear',name:'Single-arm rear delt fly',sets:3,reps:[15,15],rest:'1 min',small:1},
-      {id:'ss-curl',name:'EZ-bar curl',sets:3,reps:[10,12],rest:'1 min',small:1,superset:'arms'},
-      {id:'ss-tri',name:'Overhead triceps extension',sets:3,reps:[10,12],rest:'1 min',small:1,superset:'arms'}]},
-    lowerB:{name:'Lower B · hinge + core',type:'lift',ex:[
-      {id:'deadlift',name:'Deadlift',sets:3,reps:[4,6],rest:'2 min',note:'Main lift. Keep 1-2 reps in reserve'},
-      {id:'front-sq',name:'Front squat',sets:3,reps:[8,10],rest:'90 sec'},
-      {id:'hip-thrust',name:'Hip thrust',sets:3,reps:[8,12],rest:'75 sec'},
-      {id:'leg-ext',name:'Leg extension',sets:3,reps:[12,15],rest:'1 min',small:1},
-      {id:'calf-seat',name:'Seated calf raise',sets:3,reps:[12,15],rest:'1 min',small:1},
-      {id:'knee-raise',name:'Hanging knee raise',sets:3,reps:[10,15],rest:'1 min'},
-      {id:'plank',name:'Plank (seconds in the reps box)',sets:3,reps:[45,60],rest:'50 sec'}]},
-    run:{name:'Run',type:'run',note:'Weeks 1-2: 20-25 min easy. Weeks 3-4: 30 min. Weeks 5-8: build to 40-45 min, add a weekly interval session (6 x 2 min hard / 2 min easy).'},
-    yoga:{name:'Hot yoga',type:'yoga',note:'Log the class length. How it felt goes on the next screen.'},
-    rest:{name:'Rest day',type:'rest'}
-  }
-};
 const SESS_KEYS = ['upperA','run','lowerA','upperB','lowerB','run2','yoga','rest'];
 const sessBase = k => k==='run2' ? 'run' : k;
 /* Workouts outside the plan: started or logged from the + button. Yoga keeps its own type; the rest are type 'other'. */
@@ -441,44 +407,8 @@ const EFFORT = {easy:'Easy', medium:'Medium', hard:'Hard'};
 const effortSeg = (act,cur) => `<div class="segc">${Object.entries(EFFORT).map(([v,l])=>`<button class="${v===cur?'on':''}" data-act="${act}" data-v="${v}">${l}</button>`).join('')}</div>`;
 const kindOf = x => x.yoga ? 'yoga' : x.other ? 'other' : x.run ? 'run' : 'lift';
 const CHEERS = ['Nice one','Solid set','Strong','Locked in','Clean rep','Beast mode','Smooth'];
-const APP_VERSION='2026-11-05.7';
+const APP_VERSION='2026-11-06.1';
 
-/* alternatives per exercise: each alternative keeps its own history so weights stay comparable */
-const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
-const altId = (slot,name) => slot+'~'+slug(name);
-const ALTS = {
-  bench:['Dumbbell bench press','Machine chest press','Smith machine bench'],
-  row:['Barbell row','Seated cable row','T-bar row','One-arm dumbbell row'],
-  'ohp-db':['Machine shoulder press','Arnold press','Barbell overhead press'],
-  pulldown:['Pull-ups','Assisted pull-ups','Close-grip pulldown'],
-  pushdown:['Seated triceps press machine','Rope pushdown','Overhead triceps extension','Dips'],
-  'db-curl':['EZ-bar curl','Cable curl','Hammer curl'],
-  squat:['Leg press','Hack squat','Goblet squat','Smith machine squat'],
-  rdl:['Dumbbell RDL','Good morning','Back extension'],
-  lunge:['Walking lunge','Step-up','Reverse lunge'],
-  'leg-curl':['Seated leg curl','Lying leg curl','Nordic curl'],
-  'calf-st':['Leg press calf raise','Smith calf raise'],
-  'inc-db':['Incline barbell press','Incline machine press','Dumbbell bench press'],
-  'cable-row':['Chest-supported row','Machine row','Barbell row'],
-  ohp:['Machine shoulder press','Seated dumbbell press','Landmine press'],
-  pullup:['Assisted pull-ups','Lat pulldown','Chin-ups'],
-  fly:['Pec deck','Dumbbell fly','Cable crossover'],
-  rear:['Face pull','Reverse pec deck','Rear delt cable fly'],
-  'ss-curl':['Dumbbell curl','Cable curl','Preacher curl'],
-  'ss-tri':['Seated triceps press machine','Triceps pushdown','Skull crushers','Dips'],
-  deadlift:['Trap-bar deadlift','Rack pull','Sumo deadlift'],
-  'front-sq':['Hack squat','Leg press','Goblet squat'],
-  'hip-thrust':['Glute bridge','Cable pull-through','Back extension'],
-  'leg-ext':['Sissy squat','Single-leg extension'],
-  'calf-seat':['Standing calf raise','Leg press calf raise'],
-  'knee-raise':['Cable crunch','Ab wheel','Decline sit-up'],
-  plank:['Side plank','Dead bug','Hollow hold']
-};
-const EXMAP = {};
-Object.values(PLAN.sessions).forEach(S=>(S.ex||[]).forEach(e=>{
-  EXMAP[e.id]={...e,slot:e.id};
-  (ALTS[e.id]||[]).forEach(n=>{ const id=altId(e.id,n); EXMAP[id]={...e,id,name:n,slot:e.id,note:undefined,alt:true} });
-}));
 
 /* ---------- helpers ---------- */
 const $ = s => document.querySelector(s);
@@ -494,7 +424,10 @@ const num = v => (v===''||v==null||isNaN(+v)) ? null : +v;
 const isAssist = n => /\b(pull|chin)-?ups?\b/i.test(n||'');
 const isPerArm = n => /\b(single|one)-arm\b/i.test(n||'');
 const exName = en => (EXMAP[en.id]||en).name;
-const wUnit = e => isAssist(exName(e)) ? 'lb assist' : isPerArm(exName(e)) ? 'lb per arm' : 'lb';
+/* How an exercise progresses (progression.js): plan defaults from plan.js plus this user's settings. */
+const cfgOf = id => EXMAP[id] ? Progression.configFor(EXMAP[id], st.settings[id]) : null;
+const workSets = a => (a||[]).filter(x=>x && !x.wu);
+const wUnit = e => { const n=exName(e), c=cfgOf(e.id); return isAssist(n) ? 'lb assist' : c&&c.eq==='dumbbell'&&c.vf===2 ? 'lb each' : isPerArm(n) ? 'lb per arm' : 'lb' };
 /* "−60×12" for 60 lb of assistance, "BW×12" for unassisted pull-ups. */
 const fmtSet = (s,en) => en&&isAssist(exName(en)) ? (s.w ? '−'+s.w+'×' : 'BW×')+s.r : (s.w ? s.w+'×' : '') + s.r;
 /* Body weight on a date from Apple Health (lb), else the one typed in Settings. */
@@ -507,9 +440,10 @@ function bwOn(date){
 function loadOf(en,w,date){
   const n=exName(en);
   if(isAssist(n)){ const bw=bwOn(date); return bw ? Math.max(0,bw-(w||0)) : 0 }
-  return (w||0)*(isPerArm(n)?2:1);
+  const c=cfgOf(en.id);
+  return (w||0)*(c ? c.vf : isPerArm(n)?2:1);   // both dumbbells / both arms, applied the same way to all history
 }
-const setVol = (en,x,date) => Math.round(loadOf(en,x.w,date)*(x.r||0));
+const setVol = (en,x,date) => x.wu ? 0 : Math.round(loadOf(en,x.w,date)*(x.r||0));
 /* Is weight a better than b? Less assistance on assisted moves, more weight otherwise. */
 const heavier = (en,a,b) => isAssist(exName(en)) ? a<b : a>b;
 const buzz = ms => { try{navigator.vibrate&&navigator.vibrate(ms)}catch(e){} };
@@ -545,7 +479,8 @@ const st = {
   tab:'today', date:todayStr(), sess:null, auto:true, add:null,
   sb:[], local:LS('wt.local.v1',[]), draft:LS('wt.draft.v1',{}),
   progEx:null, wk:null, health:LS('wt.health.v1',[]), hm:null,
-  live:{} // workouts in progress (from the Watch or this app), by id
+  live:{}, // workouts in progress (from the Watch or this app), by id
+  settings:LS('wt.exset.v1',{}) // per-exercise structure / equipment / step (public.exercise_settings)
 };
 const verOf = x => Date.parse(x.updatedAt||x.savedAt||'')||0;
 /* Deleted workouts: id -> time of deletion. A copy is hidden (and never re-uploaded) unless it was saved after the deletion. */
@@ -566,6 +501,7 @@ async function loadData(){
   if(sbAuth()){
     try{ st.sb=await sbLoad(); await syncLocal() }catch(e){}
     try{ await loadLive() }catch(e){}
+    try{ await loadSettings() }catch(e){}
     try{ await loadHealth() }catch(e){}
     purgeDeleted();
   }
@@ -583,7 +519,7 @@ function lastFor(exId){
 /* Best weight ever logged for an exercise (least assistance on assisted moves), or null if never logged. */
 function bestEver(exId){
   let b=null; const en={id:exId};
-  allSessions().forEach(s=>{ if(s.id===sid()) return; (s.entries||[]).forEach(e=>{ if(e.id===exId) e.sets.forEach(x=>{ if(b==null||heavier(en,x.w||0,b)) b=x.w||0 }) }) });
+  allSessions().forEach(s=>{ if(s.id===sid()) return; (s.entries||[]).forEach(e=>{ if(e.id===exId) workSets(e.sets).forEach(x=>{ if(b==null||heavier(en,x.w||0,b)) b=x.w||0 }) }) });
   return b;
 }
 
@@ -603,7 +539,15 @@ function fromSession(s){
   const d={ex:{},energy:s.energy??'',notes:s.notes||'',run:{dist:s.run?.distanceKm??s.other?.distanceKm??'',min:s.run?.minutes??s.yoga?.minutes??s.other?.minutes??''},swaps:{},deload:!!s.deload,dur:s.durationMin,savedAt:s.savedAt};
   if(s.session==='other') d.label=s.name;
   if(s.effort) d.effort=s.effort;
-  (s.entries||[]).forEach(e=>{d.ex[e.id]=e.sets.map(x=>({w:x.w??0,r:x.r})); if(e.slot) d.swaps[e.slot]=e.id});
+  d.plans={}; d.diff={};
+  (s.entries||[]).forEach(e=>{
+    d.ex[e.id]=e.sets.map(x=>({...x, w:x.w??0}));
+    if(e.slot) d.swaps[e.slot]=e.id;
+    if(e.diff) d.diff[e.id]=e.diff;
+    // Editing a saved workout shows the targets it was planned with.
+    if(e.prog && Array.isArray(e.prog.planned)) d.plans[e.id]={sets:e.prog.planned.map(x=>({...x})), warmups:[], state:e.prog, why:''};
+  });
+  if(s.plans) Object.assign(d.plans, s.plans);   // a workout in progress on the other device shares its plans
   return d;
 }
 const saveDraft = () => { const d0=st.draft[sid()]; if(d0){ d0.touched=true; d0.touchedAt=Date.now() } SS('wt.draft.v1', st.draft); if(st.wk) queueLive() };
@@ -612,60 +556,26 @@ const hasDraftData = d => d.run.dist!==''||d.run.min!==''||Object.values(d.ex).s
 /* ---------- smart targets, deload, weekly stats ---------- */
 const roundTo = (v,q) => Math.round(v/q)*q;
 const monOf = ds => addDays(ds, -((new Date(ds+'T12:00:00').getDay()+6)%7));
-/* Per-set targets: double progression with a rep ceiling.
-   Each set starts from the same set last time. Top of the rep range: add weight (5 lb, 2.5 on small lifts; on assisted
-   moves, less assistance) and aim 2 reps lower. Inside the range: same weight, one more rep. Below it: same weight,
-   get back to the bottom of the range; below it on that set two sessions running: about 10% lighter.
-   Reps never climb past the top of the range, so heavier weights do the progressing. */
-const stepQ = e => e.small?2.5:5;
-const upW = (e,w) => isAssist(e.name) ? Math.max(0,w-stepQ(e)) : w+stepQ(e);
-const downW = (e,w) => isAssist(e.name) ? w+stepQ(e) : Math.max(0,w-stepQ(e));
-const resetR = e => Math.max(e.reps[0], e.reps[1]-2);
-const isBodyweight = (e,w) => !(w>0) && !isAssist(e.name);
-function progress(e,x){
-  const lo=e.reps[0], hi=e.reps[1], w=x.w||0, r=x.r||0, q=stepQ(e), as=isAssist(e.name), same=as?'Same assistance':'Same weight';
-  if(isBodyweight(e,w)){ const inc=e.id==='plank'?5:1, u=e.id==='plank'?'sec':'rep';
-    return r>=hi ? {w:0,r:hi,why:'Top of the range: hold it there'} : {w:0,r:Math.min(hi,r+inc),why:`+${inc} ${u}`} }
-  if(r>=hi) return {w:upW(e,w), r:resetR(e), up:true, why: as ? `You hit ${hi} last time: ${q} lb less assistance` : `You hit ${hi} last time: +${q} lb`};
-  if(r<lo) return {w, r:lo, why:`${same}, get back to ${lo}`};
-  return {w, r:r+1, why:`${same}, one more rep`};
-}
-function setTargets(e){
-  const hist=[];
-  for(const s of allSessions()){
-    if(s.id===sid()||s.date>st.date) continue;
-    const en=(s.entries||[]).find(x=>x.id===e.id);
-    if(en&&en.sets.length) hist.push(en.sets);
-    if(hist.length>=2) break;
+/* Plans come from progression.js, the same rules the Watch gets from the Edge Function. An exercise's plan is made
+   once, when the workout first needs it, and kept in the draft: planned targets never shift during a workout. */
+function planOf(e){
+  const d=getDraft(); d.plans ||= {};
+  if(!d.plans[e.id]){
+    const c=cfgOf(e.id); if(!c) return null;
+    d.plans[e.id]=Progression.planFor(c, Progression.historyFor(allSessions(), e.id, {excludeId:sid(), today:st.date}), st.date, {deload:!!d.deload});
+    SS('wt.draft.v1', st.draft);
   }
-  if(!hist.length) return null;
-  const dl=getDraft().deload, q=stepQ(e), lo=e.reps[0], hi=e.reps[1], as=isAssist(e.name), prev=hist[0];
-  const out = Array.from({length:Math.max(e.sets,prev.length)},(_,i)=>{
-    const x=prev[Math.min(i,prev.length-1)], w=x.w||0, y=hist[1]?.[i];
-    if(dl) return as ? {w, r:lo, why:'Deload week: same assistance, easy reps'} : {w:w?roundTo(w*0.6,q):0, r:Math.round((lo+hi)/2), why:'Deload week: about 60% of your usual weight'};
-    if(y && !isBodyweight(e,w) && (x.r||0)<lo && (y.r||0)<lo && (y.w||0)===w)
-      return as ? {w:w+q, r:lo, why:'Under the range twice: more assistance, rebuild'} : {w:roundTo(w*0.9,q), r:lo, why:'Under the range twice: about 10% lighter, rebuild'};
-    return progress(e,x);
-  });
-  // Sets build up: a later set as heavy or heavier than the one before never aims for more reps than it.
-  // (A lighter back-off set may.) So a ramp reads like 40×10, 45×10, 50×9, never 45×10 then 50×11.
-  for(let i=1;i<out.length;i++){ const a=out[i-1], b=out[i];
-    if(!heavier(e,a.w,b.w) && b.r>a.r) out[i]={...b, r:a.r, why:b.w===a.w?'Same weight as the set before: same reps':'Heavier than the set before: no more reps'} }
-  return out;
+  return d.plans[e.id];
 }
-/* Target for set i of this workout: the same set last time, progressed, then adjusted by the set just logged.
-   Hit the top of the range on a set and the next one moves up; fall short of the bottom and it moves down. */
-function targetFor(e,i,done){
-  const t=setTargets(e), base=t ? t[Math.min(i,t.length-1)] : null, p=done[i-1];
-  if(!p) return base;
-  const lo=e.reps[0], hi=e.reps[1], w=p.w||0, r=p.r||0;
-  if(isBodyweight(e,w)) return base || {w:0, r, why:'Same as your last set'};
-  if(r>=hi){ const c={w:upW(e,w), r:resetR(e), up:true, why:`You hit ${hi}: moving up`}; return base && heavier(e,base.w,c.w) ? base : c }
-  if(r<lo){ const c={w:downW(e,w), r:lo, why:`Under ${lo}: a little lighter`}; return base && heavier(e,c.w,base.w) ? base : c }
-  if(!base || heavier(e,w,base.w)) return {w, r, why:'Same as your last set'};
-  // As heavy or heavier than the set just done: aim for its reps at most (you are more tired now).
-  if(base.r>r) return {w:base.w, r, why:base.w===w?'Same weight: match your last set':'Heavier: same reps as your last set'};
-  return base;
+const planN = e => { const p=planOf(e); return p && p.sets.length ? p.sets.length : e.sets };
+const targetAt = (p,k) => p && p.sets[k] ? {...p.sets[k], ...((p.edits||{})[k]||{})} : null;
+const fmtT = (t,e) => t.w==null ? `? × ${t.r}` : fmtSet({w:t.w, r:t.r}, e);
+/* What comes next: a warm-up (until the first working set, unless skipped), else working set k of the plan. */
+function nextItem(e){
+  const d=getDraft(), a=d.ex[e.id]||[], p=planOf(e), ws=workSets(a), wu=a.filter(x=>x.wu).length;
+  const wl=(p&&p.warmups)||[];
+  if(!ws.length && !(d.skipWu||{})[e.id] && wu<wl.length) return {wu:true, i:wu, n:wl.length, t:wl[wu], orig:wl[wu]};
+  return {wu:false, i:ws.length, n:planN(e), t:targetAt(p,ws.length), orig:p&&p.sets[ws.length]};
 }
 function deloadInfo(){
   const weeks=new Map();
@@ -808,22 +718,25 @@ function startWorkout(resume){
   const d=getDraft(); if(!d.startedAt){d.startedAt=Date.now();saveDraft()}
   const steps=stepsFor();
   let first=0;
-  if(resume){ const i=steps.findIndex(e=>!e.run && (d.ex[e.id]||[]).length<e.sets); first = i<0? steps.length : i }
-  st.wk={step:first,dir:1,anim:true,editing:null,just:null,rest:null,cur:null,prs:{}};
+  if(resume){ const i=steps.findIndex(e=>!e.run && !e.yoga && !e.other && workSets(d.ex[e.id]).length<planN(e)); first = i<0? steps.length : i }
+  st.wk={step:first,dir:1,anim:true,editing:null,editT:null,just:null,rest:null,cur:null,prs:{}};
   initCur(); document.body.classList.add('wk'); render(); toTop();
   pullLive();
 }
 function exitWorkout(){ clearRest(); st.wk=null; document.body.classList.remove('wk'); render(); toTop() }
 function goStep(i,dir){
   const steps=stepsFor(); const n=steps.length;
-  st.wk.step=Math.max(0,Math.min(n,i)); st.wk.dir=dir; st.wk.anim=true; st.wk.editing=null; st.wk.just=null;
+  st.wk.step=Math.max(0,Math.min(n,i)); st.wk.dir=dir; st.wk.anim=true; st.wk.editing=null; st.wk.editT=null; st.wk.just=null;
   clearRest(); initCur(); render(); toTop();
 }
 function initCur(){
   const e=stepsFor()[st.wk.step]; if(!e||e.run||e.yoga||e.other){ if(e&&e.yoga){const d0=getDraft(); if(d0.run.min===''){d0.run.min=60;saveDraft()}} st.wk.cur=null;return}
-  const a=getDraft().ex[e.id]||[], last=lastFor(e.id), sug=targetFor(e,a.length,a);
-  const src = st.wk.editing!=null ? a[st.wk.editing] : ((sug?{w:sug.w,r:sug.r}:null) || a[a.length-1] || last?.sets[Math.min(a.length,last.sets.length-1)]);
-  st.wk.cur={w:src?.w??0, r:src?.r ?? e.reps[0]};
+  const wk=st.wk, a=getDraft().ex[e.id]||[];
+  if(wk.editing!=null){ const x=a[wk.editing]; wk.cur={w:x.w??0, r:x.r}; return }
+  if(wk.editT!=null){ const t=targetAt(planOf(e), wk.editT); wk.cur={w:t&&t.w!=null?t.w:'', r:t?t.r:e.reps[0]}; return }
+  const it=nextItem(e), lw=workSets(a).slice(-1)[0], last=lastFor(e.id), lastW=last&&workSets(last.sets).slice(-1)[0];
+  if(it.t) wk.cur={w: it.t.w!=null ? it.t.w : (lw?lw.w:''), r:it.t.r};
+  else { const src=lw || lastW; wk.cur={w:src?.w??0, r:src?.r??e.reps[0]} }
 }
 let restTimer=null;
 function clearRest(){ clearInterval(restTimer); restTimer=null; if(st.wk) st.wk.rest=null }
@@ -853,44 +766,70 @@ function ssPartner(i){
   if(ssTag(steps[i-1])===t) return i-1;
   return null;
 }
-function moveStep(i){ const wk=st.wk; wk.dir=i>wk.step?1:-1; wk.step=i; wk.anim=true; wk.editing=null; wk.just=null; initCur(); render(); toTop() }
+function moveStep(i){ const wk=st.wk; wk.dir=i>wk.step?1:-1; wk.step=i; wk.anim=true; wk.editing=null; wk.editT=null; wk.just=null; initCur(); render(); toTop() }
 function logSet(){
   const wk=st.wk, e=stepsFor()[wk.step], d=getDraft(), a=(d.ex[e.id] ||= []);
   const w=num(wk.cur.w)||0, r=num(wk.cur.r);
   const btn=$('#logBtn');
   if(!r||r<=0){ btn.classList.remove('shake'); void btn.offsetWidth; btn.classList.add('shake'); return }
-  const idx = wk.editing!=null ? wk.editing : a.length;
-  const be=bestEver(e.id), others=a.filter((_,i)=>i!==idx).map(x=>x.w||0);
-  // A PR beats every earlier set: heavier, or with less assistance on pull-ups (only once there is history).
-  const isPR = isAssist(e.name) ? be!=null && w<Math.min(be,...others)
-    : (()=>{ const prior=Math.max(be||0,...others,0); return w>0 && prior>0 && w>prior })();
-  if(!isManual()){ const nowT=Date.now(); if(!d.firstAt) d.firstAt=nowT; d.lastAt=nowT }
-  a[idx]={w,r}; saveDraft();
-  const wasEdit = wk.editing!=null;
+  if(wk.editT!=null){   // editing a future set's target: the original target stays in the plan too
+    const p=planOf(e); p.edits ||= {}; p.edits[wk.editT]={w, r};
+    wk.editT=null; saveDraft(); initCur(); render(); toast('Target updated'); return;
+  }
+  const wasEdit = wk.editing!=null, idx = wasEdit ? wk.editing : a.length;
+  let set;
+  if(wasEdit) set={...a[idx], w, r};                     // keeps its targets and warm-up flag
+  else { const it=nextItem(e); set={w, r};
+    if(it.wu) set.wu=true;
+    if(it.orig){ if(it.orig.w!=null) set.pw=it.orig.w; set.pr=it.orig.r }
+    if(it.t){ if(it.t.w!=null) set.tw=it.t.w; set.tr=it.t.r } }
+  const be=bestEver(e.id), others=workSets(a.filter((_,i)=>i!==idx)).map(x=>x.w||0);
+  // A PR beats every earlier working set: heavier, or with less assistance on pull-ups (only once there is history).
+  const isPR = !set.wu && (isAssist(e.name) ? be!=null && w<Math.min(be,...others)
+    : (()=>{ const prior=Math.max(be||0,...others,0); return w>0 && prior>0 && w>prior })());
+  if(!isManual() && !set.wu){ const nowT=Date.now(); if(!d.firstAt) d.firstAt=nowT; d.lastAt=nowT }
+  a[idx]=set; saveDraft();
   wk.editing=null; wk.just=idx;
-  const topped = !wasEdit && !isBodyweight(e,w) && r>=e.reps[1];
   if(isPR){ wk.prs[e.id]=true; burstAt(btn,44); buzz([30,40,30]); toast('New PR 🏆') }
-  else if(topped && a.length<e.sets){ burstAt(btn,24); buzz([20,30,20]); toast(`Hit ${e.reps[1]} 💪 Moving you up`) }
-  else { burstAt(btn,10); buzz(15); toast(CHEERS[Math.floor(Math.random()*CHEERS.length)]) }
-  const p = wasEdit ? null : ssPartner(wk.step);
+  else { burstAt(btn,set.wu?6:10); buzz(15); toast(set.wu?'Warm-up done':CHEERS[Math.floor(Math.random()*CHEERS.length)]) }
+  const p = wasEdit || set.wu ? null : ssPartner(wk.step), done=workSets(a).length;
   if(p!=null){
-    const pe=stepsFor()[p], pn=(d.ex[pe.id]||[]).length, isA=wk.step<p;
-    if(pn<pe.sets && (isA ? pn<a.length : pn<=a.length)){
+    const pe=stepsFor()[p], pn=workSets(d.ex[pe.id]).length, isA=wk.step<p;
+    if(pn<planN(pe) && (isA ? pn<done : pn<=done)){
       // A → B straight away; B → rest, then back to A.
       if(!isA && restOn() && !isManual()) startRest(restSecs(e.rest)); else clearRest();
-      wk.cur={w,r}; render();
+      render();
       setTimeout(()=>{ if(st.wk===wk && wk.step!==p) moveStep(p) }, 450);
       return;
     }
   }
-  if(!wasEdit && a.length<e.sets && restOn() && !isManual()) startRest(restSecs(e.rest)); else clearRest();
-  // The next set starts at its target: last time's set, moved up or down by how this one went.
-  const nt = wasEdit ? null : targetFor(e,a.length,a);
-  wk.cur = nt ? {w:nt.w, r:nt.r} : {w,r};
-  render();
+  if(!wasEdit && !set.wu && done<planN(e) && restOn() && !isManual()) startRest(restSecs(e.rest)); else clearRest();
+  initCur(); render();
   const nb=$('#logBtn'); if(nb){nb.classList.add('ok')}
 }
 
+
+/* ---------- exercise settings (public.exercise_settings; kept on this phone too) ---------- */
+async function loadSettings(){
+  const r=await sbFetch('/rest/v1/exercise_settings?select=exercise_id,structure,equipment,step');
+  if(!r.ok) return;
+  const o={}; (await r.json()).forEach(x=>{ o[x.exercise_id]={structure:x.structure||undefined, equipment:x.equipment||undefined, step:x.step!=null?+x.step:undefined} });
+  st.settings=o; SS('wt.exset.v1',st.settings);
+}
+async function saveSetting(id, patch){
+  const cur={...(st.settings[id]||{}), ...patch};
+  Object.keys(cur).forEach(k=>{ if(cur[k]==null) delete cur[k] });
+  st.settings[id]=cur; SS('wt.exset.v1',st.settings);
+  const d=getDraft(); if(d.plans && !workSets(d.ex[id]).length){ delete d.plans[id]; SS('wt.draft.v1',st.draft) }
+  if(st.wk) initCur(); render(); toast('Saved. Applies from the next plan');
+  if(!sbAuth()) return;
+  try{
+    const t=await sbToken(), uid=t&&jwtSub(t); if(!uid) return;
+    const r=await sbFetch('/rest/v1/exercise_settings?on_conflict=user_id,exercise_id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},
+      body:JSON.stringify([{user_id:uid, exercise_id:id, structure:cur.structure||null, equipment:cur.equipment||null, step:cur.step||null, updated_at:new Date().toISOString()}])});
+    if(!r.ok) toast('Saved on this phone only for now');
+  }catch(e){}
+}
 
 /* ---------- live handoff: start a lift on the Watch and continue here, or the other way round ----------
    While a lift is in progress, each device uploads it as status in_progress and checks for a newer copy.
@@ -918,6 +857,7 @@ async function pushLive(){
   const rec={id:sid(), date:st.date, session:st.sess, name:sessLabel(), type:'lift', source:'web', entries:entriesOf(S,d),
     startedAt:new Date(d.startedAt||Date.now()).toISOString(), updatedAt:new Date(d.touchedAt||Date.now()).toISOString()};
   if(d.deload) rec.deload=true;
+  if(d.plans) rec.plans=d.plans;
   const row={...sessToRow(rec,uid), status:'in_progress'};
   // Update the row only while it is still in progress; if there is none yet, insert it (never over a finished one).
   let r=await sbFetch('/rest/v1/sessions?id=eq.'+encodeURIComponent(rec.id)+'&status=eq.in_progress',{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify({data:row.data,source:'web',name:row.name})});
@@ -975,7 +915,7 @@ const MOODS=['😫','😕','😐','🙂','🔥'];
 function sessStats(x){
   if(x.yoga||x.other){ const o=x.yoga||x.other; return [[o.minutes??'—','minutes'],...(o.distanceKm?[[o.distanceKm,'km']]:[]),...(x.hk?.activeKcal?[[x.hk.activeKcal,'kcal']]:[]),...(x.hk?.avgHR?[[x.hk.avgHR,'avg bpm']]:[])].slice(0,3) }
   if(x.run){ const p=(x.run.distanceKm&&x.run.minutes)?x.run.minutes/x.run.distanceKm:null; return [[x.run.distanceKm??'—','km'],[runTime(x.run.minutes),'time'],[p?mmss(Math.round(p*60)):'—','/km']] }
-  let sets=0,vol=0; (x.entries||[]).forEach(e=>e.sets.forEach(t=>{sets++;vol+=setVol(e,t,x.date)}));
+  let sets=0,vol=0; (x.entries||[]).forEach(e=>e.sets.forEach(t=>{if(!t.wu) sets++;vol+=setVol(e,t,x.date)}));
   return [[sets,'sets'],[vol>=1000?(vol/1000).toFixed(1)+'k':vol,'lb lifted'],[x.durationMin??'—','minutes']];
 }
 /* This week's planned workouts and the logged session (if any) that covers each. Runs fill the run slots
@@ -1158,31 +1098,43 @@ function viewWorkout(){
   const e=steps[wk.step];
   if(e.run) return h+viewRunStep(e,cls);
   if(e.yoga||e.other) return h+viewTimedStep(e,cls);
-  const a=d.ex[e.id]||[], last=lastFor(e.id);
-  const tot=Math.max(e.sets,a.length), cur=wk.editing!=null?wk.editing:a.length;
-  const complete = a.length>=e.sets && wk.editing==null;
-  const sug = wk.editing==null && a.length<e.sets ? targetFor(e,a.length,a) : null;
+  const a=d.ex[e.id]||[], last=lastFor(e.id), p=planOf(e), c=cfgOf(e.id), it=nextItem(e), N=planN(e);
+  const ws=a.map((x,i)=>[x,i]).filter(([x])=>!x.wu), complete = ws.length>=N && wk.editing==null && wk.editT==null;
   let dots='';
-  for(let i=0;i<tot+(complete?0:0);i++){
-    const done=i<a.length;
-    dots+=`<button class="dot ${done?'done':''} ${i===cur&&!complete?'now':''} ${wk.just===i?'pop':''}" data-act="dot" data-i="${i}">${done?esc(fmtSet(a[i],e)):'Set '+(i+1)}</button>`;
+  a.forEach((x,i)=>{ if(x.wu) dots+=`<button class="dot wu done ${wk.editing===i?'now':''}" data-act="dot" data-i="${i}">${esc(fmtSet(x,e))}<small>warm-up</small></button>` });
+  if(it.wu) p.warmups.forEach((t,j)=>{ if(j>=it.i) dots+=`<button class="dot wu ${j===it.i&&wk.editing==null&&wk.editT==null?'now':''}" tabindex="-1">${esc(fmtT(t,e))}<small>warm-up</small></button>` });
+  for(let k=0;k<Math.max(N,ws.length);k++){
+    if(k<ws.length){ const [x,i]=ws[k], tg = x.pr!=null ? {w:x.pw??null, r:x.pr} : x.tr!=null ? {w:x.tw??null, r:x.tr} : null, off = tg && (tg.w!==x.w || tg.r!==x.r);
+      dots+=`<button class="dot done ${wk.just===i?'pop':''} ${wk.editing===i?'now':''}" data-act="dot" data-i="${i}">${esc(fmtSet(x,e))}${off?`<small>plan ${esc(fmtT(tg,e))}</small>`:''}</button>`; }
+    else { const t=targetAt(p,k), now=!it.wu && k===it.i && wk.editing==null && wk.editT==null, ed=p&&p.edits&&p.edits[k];
+      dots+=`<button class="dot ${now?'now':''} ${wk.editT===k?'editt':''}" data-act="tdot" data-k="${k}">${t?esc(fmtT(t,e)):'Set '+(k+1)}<small>${ed?'edited':'set '+(k+1)}</small></button>`; }
   }
-  const w=wk.cur.w, r=wk.cur.r, wstep=e.small?2.5:5;
-  const label = wk.editing!=null ? `Update set ${wk.editing+1}` : complete ? 'Log extra set' : `Log set ${a.length+1}`;
+  const w=wk.cur.w, r=wk.cur.r;
+  const label = wk.editT!=null ? `Save target for set ${wk.editT+1}` : wk.editing!=null ? (a[wk.editing].wu?'Update warm-up':`Update set ${ws.findIndex(([,i])=>i===wk.editing)+1}`) : it.wu ? `Log warm-up ${it.i+1}` : complete ? 'Log extra set' : `Log set ${it.i+1}`;
   const rest=wk.rest, left=rest?Math.max(0,Math.ceil((rest.end-Date.now())/1000)):0;
   const isLast = wk.step===n-1;
-  const sp=ssPartner(wk.step);
+  const sp=ssPartner(wk.step), u=wUnit(e), reps=e.id==='plank'?' sec':' reps';
+  const scheme = c&&c.structure==='pyramid' ? `Pyramid ${p&&p.sets.length?p.sets.map(x=>x.r).join('·'):c.pattern.join('·')} reps`
+    : c&&c.structure==='topback' ? `Top set ${c.top[0]}–${c.top[1]} + ${c.backSets} back-off${c.backSets>1?'s':''} ${c.back[0]}–${c.back[1]}`
+    : `${e.sets} × ${e.reps[0]===e.reps[1]?e.reps[0]:e.reps[0]+'–'+e.reps[1]}`;
+  const tShow = t => t.w==null ? `pick a weight × ${t.r}${reps}` : (t.w===0&&!isAssist(e.name) ? `${t.r}${reps}` : `${t.w} ${u} × ${t.r}${t.w&&!isAssist(e.name)?'':reps}`);
+  let box='';
+  if(wk.editT!=null){ const o=p&&p.sets[wk.editT]; box=`<div class="sug">✏️ Editing the target for set ${wk.editT+1}<small>Planned ${o?esc(fmtT(o,e)):'—'}. Your edit is saved next to the plan; progress is judged on the plan. <button class="link" data-act="tdot" data-k="${wk.editT}">Cancel</button></small></div>` }
+  else if(wk.editing!=null){ const x=a[wk.editing]; box=`<div class="sug">✏️ Editing a logged set<small>${x.tr!=null?`Target was ${esc(fmtT({w:x.tw??null,r:x.tr},e))}. `:''}<button class="link" data-act="togglewu">${x.wu?'Count as a working set':'Mark as warm-up'}</button></small></div>` }
+  else if(it.wu) box=`<div class="sug">Warm-up ${it.i+1} of ${it.n}: <b>${esc(tShow(it.t))}</b><small>Light sets before the working sets. They don't count toward progress. <button class="link" data-act="skipwu">Skip warm-ups</button></small></div>`;
+  else if(it.t){ const ed=p&&p.edits&&p.edits[it.i]; box=`<div class="sug">🎯 Set ${it.i+1} of ${N}: <b>${esc(tShow(it.t))}</b><small>${ed?`Edited (plan ${esc(fmtT(p.sets[it.i],e))}). `:''}${esc((p&&p.why)||'')}</small></div>` }
+  const rated=(d.diff||{})[e.id];
   h+=`<div class="${cls}"><div class="kicker">Exercise ${wk.step+1} of ${n}${sp!=null?` · <span class="sstag">Superset</span>`:''}</div>
     <div class="hdr"><h2>${esc(e.name)}</h2><button class="btn ghost sm" data-act="swapopen">⇄ Swap</button></div>
-    <div class="tgt">${e.sets} × ${e.reps[0]===e.reps[1]?e.reps[0]:e.reps[0]+'–'+e.reps[1]} · rest ${e.rest}${sp!=null?' after each pair':''}${e.note?' · '+esc(e.note):''}</div>
+    <div class="tgt">${scheme} · rest ${e.rest}${sp!=null?' after each pair':''}${e.note?' · '+esc(e.note):''}</div>
     ${sp!=null?`<div class="ssnote">Alternate with <b>${esc(steps[sp].name)}</b>: one set each, then rest.</div>`:''}
     ${wk.prs[e.id]?`<span class="badge">🏆 New PR</span>`:''}
-    ${isAssist(e.name)?`<div class="last">Log the machine's assistance as the weight. Less assistance is harder.</div>`:isPerArm(e.name)?`<div class="last">Log the weight for one arm.</div>`:''}
-    ${last?`<div class="last">Last time (${fmtDate(last.date)}): ${last.sets.map(x=>fmtSet(x,e)).join(', ')}</div>`:''}
-    ${sug?`<div class="sug">🎯 Set ${a.length+1}: <b>${sug.w?sug.w+' '+wUnit(e)+' × ':isAssist(e.name)?'Bodyweight × ':''}${sug.r}${sug.w&&!isAssist(e.name)?'':(e.id==='plank'?' sec':' reps')}</b><small>${esc(sug.why)}</small></div>`:''}
+    ${isAssist(e.name)?`<div class="last">Log the machine's assistance as the weight. Less assistance is harder.</div>`:isPerArm(e.name)?`<div class="last">Log the weight for one arm.</div>`:c&&c.eq==='dumbbell'?`<div class="last">Log the weight of one dumbbell.</div>`:''}
+    ${last?`<div class="last">Last time (${fmtDate(last.date)}): ${workSets(last.sets).map(x=>fmtSet(x,e)).join(', ')}</div>`:''}
+    ${box}
     <div class="dots">${dots}</div>
     <div class="steppers">
-      ${stepper('w',isAssist(e.name)?'Assistance':'Weight',w,wUnit(e))}
+      ${stepper('w',isAssist(e.name)?'Assistance':'Weight',w,u)}
       ${stepper('r',e.id==='plank'?'Seconds':'Reps',r,'')}
     </div>
     ${rest?`<div class="rest"><svg class="ring" width="44" height="44" viewBox="0 0 36 36"><circle class="bg" cx="18" cy="18" r="16"/><circle class="fg" id="restFg" cx="18" cy="18" r="16" stroke-dasharray="100.5" stroke-dashoffset="${(100.5*(1-left/rest.total)).toFixed(1)}"/></svg>
@@ -1192,7 +1144,8 @@ function viewWorkout(){
       <button class="btn ghost sm" data-act="back" ${wk.step===0?'disabled style="opacity:.3"':''}>‹ Back</button>
       <button class="btn sm ${complete?'pulse':'ghost'}" data-act="next">${isLast?'Finish':'Next ›'}</button>
     </div>
-    ${a.length&&wk.editing==null?`<div style="text-align:center"><button class="link" data-act="undo">Undo last set</button></div>`:''}
+    ${ws.length>=N&&wk.editing==null&&wk.editT==null?`<div class="rate"><span>How did ${esc(e.name)} feel? <small>Optional</small></span><div class="segc">${[['easy','Easy'],['moderate','Moderate'],['hard','Hard']].map(([v,l])=>`<button class="${rated===v?'on':''}" data-act="diff" data-v="${v}">${l}</button>`).join('')}</div></div>`:''}
+    ${a.length&&wk.editing==null&&wk.editT==null?`<div style="text-align:center"><button class="link" data-act="undo">Undo last set</button></div>`:''}
   </div>`;
   if(wk.sheet) h+=sheetHtml(e);
   return h;
@@ -1203,7 +1156,20 @@ function sheetHtml(e){
   return `<div class="sheetbg" data-act="sheetclose"><div class="sheet" data-stop="1"><h3>Swap exercise</h3>
     <div class="note">Instead of ${esc(orig.name)}. Each option keeps its own weight history.</div>
     ${opts.map(o=>`<button class="opt ${o.id===e.id?'cur':''}" data-act="swap" data-id="${o.id}"><span>${esc(o.name)}${o.id===slot?' <small>(planned)</small>':''}</span><span>${o.id===e.id?'✓':''}</span></button>`).join('')}
-    <button class="btn ghost" style="margin-top:6px" data-act="sheetclose">Cancel</button></div></div>`;
+    ${progSettings(e)}
+    <button class="btn ghost" style="margin-top:6px" data-act="sheetclose">Done</button></div></div>`;
+}
+/* Per-exercise settings: set structure, equipment and weight step. Changes apply from the next plan (an exercise
+   already started keeps its plan). */
+function progSettings(e){
+  const c=cfgOf(e.id); if(!c) return '';
+  const fixed=c.eq==='assisted'||c.eq==='bodyweight', cur=st.settings[e.id]||{};
+  const EQ=[['barbell','Barbell'],['dumbbell','Dumbbells'],['machine','Machine'],['cable','Cable'],['assisted','Assisted'],['bodyweight','Bodyweight']];
+  return `<h3 style="margin-top:18px">${esc(e.name)} settings</h3>
+    <label class="f">Sets</label>${fixed?`<div class="note" style="margin-bottom:10px">Straight sets (the only option for ${c.eq} moves)</div>`:seg('setstruct',c.structure,[['straight','Straight'],['pyramid','Pyramid'],['topback','Top + back-off']])}
+    <div class="row" style="margin-top:10px"><div><label class="f">Equipment</label><select id="seteq">${EQ.map(([v,l])=>`<option value="${v}" ${c.eq===v?'selected':''}>${l}</option>`).join('')}</select></div>
+    <div><label class="f">Weight step</label><select id="setstep"><option value="">${c.eq==='dumbbell'?'Rack (2.5 to 25, then 5)':'Default ('+(c.step||5)+' lb)'}</option>${[1.25,2.5,5,10].map(v=>`<option value="${v}" ${+cur.step===v?'selected':''}>${v} lb</option>`).join('')}</select></div></div>
+    <div class="note" style="margin-top:6px">Changing equipment starts this exercise's history fresh.</div>`;
 }
 function stepper(f,lbl,val,unit){
   return `<div class="stp"><div class="lbl">${lbl}</div><div class="ctl">
@@ -1231,7 +1197,7 @@ function viewRunStep(e,cls){
 function viewSummary(cls){
   const d=getDraft(), steps=stepsFor();
   let sets=0,vol=0,prs=Object.keys(st.wk.prs).length;
-  steps.forEach(e=>{ (d.ex[e.id]||[]).forEach(s=>{sets++;vol+=setVol(e,s,st.date)}) });
+  steps.forEach(e=>{ (d.ex[e.id]||[]).forEach(s=>{if(!s.wu) sets++;vol+=setVol(e,s,st.date)}) });
   const mins=(d.firstAt&&d.lastAt)?Math.max(1,Math.round((d.lastAt-d.firstAt)/60000)):(d.dur||null);
   const isRun=steps[0]&&steps[0].run, isYoga=steps[0]&&(steps[0].yoga||steps[0].other);
   const stats = isYoga ? [[d.run.min||'—','minutes'],...(num(d.run.dist)?[[d.run.dist,'km']]:[])] : isRun
@@ -1418,7 +1384,8 @@ function barChart(bars, fmt){
 function liftPoints(exId){
   const pts=[];
   [...allSessions()].reverse().forEach(s=>{
-    const e=(s.entries||[]).find(x=>x.id===exId); if(!e||!e.sets.length) return;
+    const e0=(s.entries||[]).find(x=>x.id===exId); if(!e0||!workSets(e0.sets).length) return;
+    const e={...e0, sets:workSets(e0.sets)};
     const top=e.sets.reduce((m,x)=>(heavier(e,x.w||0,m.w||0)||((x.w||0)===(m.w||0)&&x.r>m.r))?x:m, e.sets[0]);
     // 1RM uses the weight actually moved: body weight minus assistance (per arm stays per arm).
     const ld=x=>isAssist(exName(e))?loadOf(e,x.w,s.date):(x.w||0);
@@ -1433,7 +1400,7 @@ function runPoints(){
 }
 function prList(){
   const best=new Map();
-  allSessions().forEach(s=>(s.entries||[]).forEach(e=>e.sets.forEach(x=>{
+  allSessions().forEach(s=>(s.entries||[]).forEach(e=>workSets(e.sets).forEach(x=>{
     const as=isAssist(exName(e)), w=x.w||0;
     if(!as && !(w>0)) return;
     const b=best.get(e.id);
@@ -1663,9 +1630,9 @@ function periodReview(kind,key){
   const cur=agg(list), was=agg(all.filter(s=>s.date>=pStart&&s.date<=pEnd));
   // A PR is a heavier set than anything logged for that exercise before this period (first-timers don't count).
   const before=new Map();
-  all.filter(s=>s.date<start).forEach(s=>(s.entries||[]).forEach(e=>e.sets.forEach(x=>{ const b=before.get(e.id); if(b==null||heavier(e,x.w||0,b)) before.set(e.id,x.w||0) })));
+  all.filter(s=>s.date<start).forEach(s=>(s.entries||[]).forEach(e=>workSets(e.sets).forEach(x=>{ const b=before.get(e.id); if(b==null||heavier(e,x.w||0,b)) before.set(e.id,x.w||0) })));
   const prs=new Map();
-  list.forEach(s=>(s.entries||[]).forEach(e=>e.sets.forEach(x=>{ const b=before.get(e.id), w=x.w||0, as=isAssist(exName(e));
+  list.forEach(s=>(s.entries||[]).forEach(e=>workSets(e.sets).forEach(x=>{ const b=before.get(e.id), w=x.w||0, as=isAssist(exName(e));
     if(b!=null&&(as||w>0)&&heavier(e,w,b)){ const p=prs.get(e.id); if(!p||heavier(e,w,p.w)||(w===p.w&&x.r>p.r)) prs.set(e.id,{name:exName(e).split(/ [\/(]/)[0],w,r:x.r,as}) } })));
   let gain=null;
   new Set(list.flatMap(s=>(s.entries||[]).map(e=>e.id))).forEach(id=>{
@@ -1821,7 +1788,7 @@ function viewPlan(){
     h += `<details class="card pl"><summary><div class="ttl"><b>${esc(S.name)}</b><span>${S.ex.length} exercises · about ${S.ex.length*7} min</span></div><span class="chev">›</span></summary><div class="body">${S.ex.map(e=>`<div class="exr"><div class="exn">${esc(e.name)}${/Main lift/.test(e.note||'')?'<i>MAIN</i>':''}</div><div class="exs">${e.sets} × ${e.reps[0]===e.reps[1]?e.reps[0]:e.reps[0]+'–'+e.reps[1]}<small>rest ${e.rest}</small></div></div>`).join('')}</div></details>`;
   });
   h += `<details class="card pl"><summary><div class="ttl"><b>Running build-up</b><span>Tuesday, plus Saturday if you feel like it</span></div><span class="chev">›</span></summary><div class="body"><ul class="bul" style="margin-bottom:6px"><li><b>Weeks 1–2:</b> 20–25 min easy</li><li><b>Weeks 3–4:</b> 30 min easy</li><li><b>Weeks 5–8:</b> build to 40–45 min, add one interval session (6 × 2 min hard / 2 min easy)</li></ul></div></details>`;
-  h += `<div class="sect">How to progress</div><div class="card" style="padding:6px 16px"><ul class="bul"><li>Every set has its own target, from the same set last time. Hit the top of the rep range and that set moves up 5 lb (2.5 on small lifts) and aims 2 reps lower. Otherwise, same weight and one more rep.</li><li>During a workout, hitting the top of the range moves the next set up right away. Falling short of the bottom makes it a little lighter.</li><li>Reps never go past the top of the range, so the weight does the climbing. Pull-ups work the same way with less assistance.</li><li>Leave 1–2 reps in reserve on most sets.</li><li>Take a deload week about every 6th week, at roughly 60% of your usual weights.</li><li>Tap ⇄ Swap on any exercise to use an alternative. Each one keeps its own history.</li></ul></div>`;
+  h += `<div class="sect">How to progress</div><div class="card" style="padding:6px 16px"><ul class="bul"><li><b>Straight sets</b> (most exercises): same weight every set. Add a rep when you hit every target; once every set reaches the top of the range, the weight goes up a step and reps go back to the bottom.</li><li><b>Pyramids</b> (bench, incline press, squat, overhead press): each set a little heavier with fewer reps. The top set gains a rep each time you hit every target; at the top of its range the whole pyramid moves up a step.</li><li><b>Top set + back-offs</b> (deadlift): one heavy set, then lighter sets at a fixed percentage of it. Each part progresses on its own.</li><li>Close to target: same plan next time. Missed twice in a row: one step lighter. Targets never change during a workout unless you edit them.</li><li>Warm-ups and an optional Easy / Moderate / Hard rating per exercise. Hard keeps the weight where it is for one more session.</li><li>Change any exercise's structure, equipment or weight step from its ⇄ Swap sheet. Each alternative keeps its own history.</ul></div>`;
   return h+`<div class="sect">Settings</div><details class="card set"${st.setOpen?' open':''}><summary><b>Settings</b><span>Cloud ${sbAuth()?'on':'off'}</span></summary><div style="margin-top:12px"><div class="row2"><div><b>Rest timer</b><div class="note">Counts down after each set</div></div><button class="sw ${restOn()?'on':''}" role="switch" aria-checked="${restOn()}" aria-label="Rest timer" data-act="resttoggle"><i></i></button></div><div class="sep"></div><div class="row2"><div><b>Body weight</b><div class="note">${st.health.some(h=>h.wt!=null)?'From Apple Health. This is only a fallback.':'For pull-up volume, until Apple Health has your weight'}</div></div><span class="bwin"><input id="bw" type="number" inputmode="decimal" min="50" max="600" placeholder="—" value="${esc(LS('wt.bw','')??'')}" aria-label="Body weight in pounds"><small>lb</small></span></div><div class="sep"></div>${cloudCard()}<div class="sep"></div>${exportCard()}<div class="sep"></div><div class="row2"><div><b>App version</b><div class="note">${APP_VERSION}</div></div><button class="btn ghost sm" data-act="refresh">Refresh app</button></div></div></details>`;
 }
 
@@ -1834,6 +1801,8 @@ app.addEventListener('change',e=>{
   if(t.id==='date'){st.date=t.value||todayStr();st.auto=true;render()}
   else if(t.id==='sess'){st.sess=t.value;render()}
   else if(t.id==='progEx'){st.progEx=t.value;render()}
+  else if(t.id==='seteq'&&st.wk) saveSetting(stepsFor()[st.wk.step].id, {equipment:t.value});
+  else if(t.id==='setstep'&&st.wk) saveSetting(stepsFor()[st.wk.step].id, {step:t.value?+t.value:undefined});
   else if(t.id==='bw'){ const v=num(t.value); if(v&&v>=50&&v<=600) SS('wt.bw',v); else { try{localStorage.removeItem('wt.bw')}catch(e){} t.value='' } toast(v?'Body weight saved':'Body weight cleared') }
 });
 function fldObj(f){ return (f==='dist'||f==='min') ? getDraft().run : st.wk.cur }
@@ -1886,8 +1855,8 @@ app.addEventListener('click',e=>{
   }
   else if(act==='step'){
     const f=b.dataset.f, dir=+b.dataset.dir, e=stepsFor()[wk.step], o=fldObj(f);
-    const stepSize = f==='w'?(e.small?2.5:5) : f==='dist'?0.5 : (f==='min'&&(e.yoga||e.other)?5:1);
-    const cur=num(o[f])||0, nv=Math.max(0, Math.round((cur+dir*stepSize)*100)/100);
+    const stepSize = f==='dist'?0.5 : (f==='min'&&(e.yoga||e.other)?5:1), c=f==='w'&&cfgOf(e.id);
+    const cur=num(o[f])||0, nv = c ? (dir>0 ? Progression.up(c,cur) : Progression.down(c,cur)) : Math.max(0, Math.round((cur+dir*stepSize)*100)/100);
     o[f]=nv; const inp=document.querySelector(`[data-fld="${f}"]`);
     inp.value=nv; inp.classList.remove('bump'); void inp.offsetWidth; inp.classList.add('bump');
     buzz(5); if(f==='dist'||f==='min'){saveDraft();paceUpdate()}
@@ -1895,8 +1864,17 @@ app.addEventListener('click',e=>{
   else if(act==='log') logSet();
   else if(act==='dot'){
     const i=+b.dataset.i, a=getDraft().ex[stepsFor()[wk.step].id]||[];
-    wk.editing = i<a.length ? i : null; initCur(); render();
+    wk.editT=null; wk.editing = i<a.length && wk.editing!==i ? i : null; initCur(); render();
   }
+  else if(act==='tdot'){ const k=+b.dataset.k; wk.editing=null; wk.editT = wk.editT===k ? null : k; initCur(); render() }
+  else if(act==='togglewu'){
+    const a=getDraft().ex[stepsFor()[wk.step].id]||[], x=a[wk.editing];
+    if(x){ if(x.wu) delete x.wu; else x.wu=true; saveDraft(); toast(x.wu?'Marked as warm-up':'Counted as a working set') }
+    wk.editing=null; initCur(); render();
+  }
+  else if(act==='skipwu'){ const d2=getDraft(); (d2.skipWu ||= {})[stepsFor()[wk.step].id]=true; saveDraft(); initCur(); render() }
+  else if(act==='diff'){ const d2=getDraft(), id=stepsFor()[wk.step].id; d2.diff ||= {}; if(d2.diff[id]===b.dataset.v) delete d2.diff[id]; else d2.diff[id]=b.dataset.v; saveDraft(); buzz(10); render() }
+  else if(act==='setstruct') saveSetting(stepsFor()[wk.step].id, {structure:b.dataset.v});
   else if(act==='undo'){
     const e=stepsFor()[wk.step], a=getDraft().ex[e.id]||[];
     a.pop(); saveDraft(); clearRest(); wk.editing=null; initCur(); render();
@@ -1910,7 +1888,7 @@ app.addEventListener('click',e=>{
     if(id===slot) delete d2.swaps[slot]; else d2.swaps[slot]=id;
     saveDraft(); wk.sheet=false; wk.editing=null; clearRest(); initCur(); render(); toast('Swapped to '+EXMAP[id].name);
   }
-  else if(act==='deload'){ const d2=getDraft(); d2.deload=!d2.deload; saveDraft(); render() }
+  else if(act==='deload'){ const d2=getDraft(); d2.deload=!d2.deload; if(d2.plans) Object.keys(d2.plans).forEach(id=>{ if(!workSets(d2.ex[id]).length) delete d2.plans[id] }); saveDraft(); render() }
   else if(act==='sync') syncLocal(true);
   else if(act==='export') exportData();
   else if(act==='sbin'){
@@ -1938,8 +1916,8 @@ function entriesOf(S,d){
   const out=[];
   S.ex.forEach(slotEx=>{
     [slotEx.id,...(ALTS[slotEx.id]||[]).map(n=>altId(slotEx.id,n))].forEach(id=>{
-      const sets=(d.ex[id]||[]).map(s=>({w:num(s.w)||0,r:num(s.r)})).filter(s=>s.r!=null);
-      if(sets.length) out.push({id,name:EXMAP[id].name,...(id!==slotEx.id?{slot:slotEx.id}:{}),sets});
+      const sets=(d.ex[id]||[]).map(Progression.cleanSet).filter(s=>s.r>0), pl=d.plans&&d.plans[id], df=d.diff&&d.diff[id];
+      if(sets.length) out.push({id,name:EXMAP[id].name,...(id!==slotEx.id?{slot:slotEx.id}:{}),sets,...(pl&&pl.state?{prog:pl.state}:{}),...(df?{diff:df}:{})});
     });
   });
   return out;

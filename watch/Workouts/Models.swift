@@ -1,17 +1,35 @@
 import Foundation
 
-/// One set, exactly like the web app: weight in lb, reps (seconds for plank).
+/// One set, exactly like the web app: what was done (w in lb, r reps; seconds for plank), the original planned
+/// target (pw, pr), the target shown when it was logged (tw, tr), and wu for warm-ups. Only w and r are required,
+/// so older workouts decode unchanged, and nothing is dropped when the Watch re-uploads a set.
 struct LoggedSet: Codable, Hashable {
     var w: Double
     var r: Int
+    var pw: Double?
+    var pr: Int?
+    var tw: Double?
+    var tr: Int?
+    var wu: Bool?
 
-    init(w: Double, r: Int) { self.w = w; self.r = r }
+    init(w: Double, r: Int, target: PlanSet? = nil, warmup: Bool = false) {
+        self.w = w; self.r = r
+        if let t = target { pw = t.w; pr = t.r; tw = t.w; tr = t.r }
+        if warmup { wu = true }
+    }
+
+    var isWarmup: Bool { wu ?? false }
 
     // The web app stores plain JS numbers, so accept 8 or 8.0 for reps and a missing weight.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         w = (try? c.decode(Double.self, forKey: .w)) ?? 0
         r = Int((try? c.decode(Double.self, forKey: .r)) ?? 0)
+        if let v = try? c.decodeIfPresent(Double.self, forKey: .pw) { pw = v }
+        if let v = try? c.decodeIfPresent(Double.self, forKey: .pr) { pr = Int(v) }
+        if let v = try? c.decodeIfPresent(Double.self, forKey: .tw) { tw = v }
+        if let v = try? c.decodeIfPresent(Double.self, forKey: .tr) { tr = Int(v) }
+        if let v = try? c.decodeIfPresent(Bool.self, forKey: .wu), v { wu = true }
     }
 
     var text: String { (w > 0 ? "\(Fmt.weight(w))×" : "") + "\(r)" }
@@ -24,6 +42,64 @@ struct Entry: Codable, Hashable {
     var name: String
     var slot: String?
     var sets: [LoggedSet]
+    /// Optional Easy / Moderate / Hard for this exercise ("easy" | "moderate" | "hard").
+    var diff: String?
+    /// The plan state this exercise was done against (from progression.js; kept as-is, never read here).
+    var prog: JSONValue?
+}
+
+/// Any JSON value, kept exactly as received (plan state from the server).
+enum JSONValue: Codable, Hashable {
+    case null, bool(Bool), number(Double), string(String), array([JSONValue]), object([String: JSONValue])
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.singleValueContainer()
+        if c.decodeNil() { self = .null }
+        else if let b = try? c.decode(Bool.self) { self = .bool(b) }
+        else if let n = try? c.decode(Double.self) { self = .number(n) }
+        else if let s = try? c.decode(String.self) { self = .string(s) }
+        else if let a = try? c.decode([JSONValue].self) { self = .array(a) }
+        else { self = .object(try c.decode([String: JSONValue].self)) }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.singleValueContainer()
+        switch self {
+        case .null: try c.encodeNil()
+        case .bool(let b): try c.encode(b)
+        case .number(let n): try c.encode(n)
+        case .string(let s): try c.encode(s)
+        case .array(let a): try c.encode(a)
+        case .object(let o): try c.encode(o)
+        }
+    }
+}
+
+/// One planned set from the "plans" Edge Function (w is nil when there is no history yet).
+struct PlanSet: Codable, Hashable {
+    var w: Double?
+    var r: Int
+    var k: String?
+}
+
+/// The plan for one exercise: warm-ups, working-set targets and the state to save with the workout.
+struct ExercisePlan: Codable, Hashable {
+    var structure: String
+    var unit: String?
+    var vf: Double?
+    var warmups: [PlanSet]
+    var sets: [PlanSet]
+    var state: JSONValue?
+    var basedOn: String?
+    var why: String?
+}
+
+/// The cached response: plans for every lift (and every alternative), so lifts can start offline.
+struct PlansResponse: Codable {
+    var v: Int
+    var today: String
+    var generatedAt: String?
+    var sessions: [String: [String: ExercisePlan]]
 }
 
 struct RunData: Codable {
@@ -65,6 +141,8 @@ struct SessionData: Codable {
     var deload: Bool?
     /// When a lift in progress started, so a workout continued on the other device keeps its full length.
     var startedAt: String?
+    /// The plans frozen when the lift started, shared with the phone while it is in progress.
+    var plans: [String: ExercisePlan]?
     var updatedAt: String
 }
 
@@ -94,39 +172,6 @@ struct HistoryRow: Codable {
     var id: String
     var date: String
     var data: Payload
-}
-
-/// Suggested target for the first set of an exercise, with a short reason.
-struct Suggestion {
-    let w: Double
-    let r: Int
-    let why: String
-    var up = false
-}
-
-/// Double progression with a rep ceiling, the same rules as the web app: top of the rep range → more weight
-/// (or less assistance) and 2 reps lower; inside it → one more rep; below it → back to the bottom of the range.
-enum Progression {
-    static func isBodyweight(_ s: Step, _ w: Double) -> Bool { w <= 0 && !s.isAssisted }
-    static func up(_ s: Step, _ w: Double) -> Double { s.isAssisted ? max(0, w - s.slot.weightStep) : w + s.slot.weightStep }
-    static func down(_ s: Step, _ w: Double) -> Double { s.isAssisted ? w + s.slot.weightStep : max(0, w - s.slot.weightStep) }
-    static func resetReps(_ s: Step) -> Int { max(s.slot.reps.lowerBound, s.slot.reps.upperBound - 2) }
-    /// Is weight a better than b? Less assistance on assisted moves, more weight otherwise.
-    static func heavier(_ s: Step, _ a: Double, than b: Double) -> Bool { s.isAssisted ? a < b : a > b }
-
-    static func next(_ s: Step, from x: LoggedSet) -> Suggestion {
-        let lo = s.slot.reps.lowerBound, hi = s.slot.reps.upperBound, q = Fmt.weight(s.slot.weightStep)
-        if isBodyweight(s, x.w) {
-            let inc = s.slot.repStep
-            return x.r >= hi ? Suggestion(w: 0, r: hi, why: "Top of range · hold")
-                : Suggestion(w: 0, r: min(hi, x.r + inc), why: "+\(inc) \(s.slot.id == "plank" ? "sec" : "rep")")
-        }
-        if x.r >= hi {
-            return Suggestion(w: up(s, x.w), r: resetReps(s), why: s.isAssisted ? "−\(q) lb assist · hit \(hi)" : "+\(q) lb · hit \(hi)", up: true)
-        }
-        if x.r < lo { return Suggestion(w: x.w, r: lo, why: "Same · get to \(lo)") }
-        return Suggestion(w: x.w, r: x.r + 1, why: "Same · +1 rep")
-    }
 }
 
 enum Fmt {

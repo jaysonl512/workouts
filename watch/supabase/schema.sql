@@ -96,3 +96,21 @@ create policy "health_update_own" on public.health_daily
 drop policy if exists "health_delete_own" on public.health_daily;
 create policy "health_delete_own" on public.health_daily
   for delete to authenticated using ((select auth.uid()) = user_id);
+
+-- ---------------------------------------------------------------------------
+-- Per-exercise progression settings (2026-11-06). Set from the web app's Swap sheet; read by the web app and
+-- by the "plans" Edge Function that serves the Watch. Every column is optional: empty means the plan default.
+create table if not exists public.exercise_settings (
+  user_id     uuid not null default auth.uid() references auth.users on delete cascade,
+  exercise_id text not null,
+  structure   text check (structure in ('straight','pyramid','topback')),
+  equipment   text check (equipment in ('barbell','dumbbell','machine','cable','assisted','bodyweight')),
+  step        numeric check (step > 0),
+  updated_at  timestamptz not null default now(),
+  primary key (user_id, exercise_id)
+);
+alter table public.exercise_settings enable row level security;
+create policy "exercise_settings_select_own" on public.exercise_settings for select using (auth.uid() = user_id);
+create policy "exercise_settings_insert_own" on public.exercise_settings for insert with check (auth.uid() = user_id);
+create policy "exercise_settings_update_own" on public.exercise_settings for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "exercise_settings_delete_own" on public.exercise_settings for delete using (auth.uid() = user_id);

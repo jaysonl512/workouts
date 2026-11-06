@@ -21,6 +21,7 @@ struct WorkoutsApp: App {
                 AppModel.shared.sync.flush()
                 AppModel.shared.sync.refreshHistory()
                 Task { await AppModel.shared.health.syncIfDue() }
+                Task { await AppModel.shared.plans.refresh() }
             }
         }
     }
@@ -31,7 +32,8 @@ final class AppModel {
     static let shared = AppModel()
     let sync = SyncStore()
     let workout = WorkoutManager()
-    lazy var lift = LiftStore(sync: sync)
+    let plans = PlanCache()
+    lazy var lift = LiftStore(sync: sync, plans: plans)
     lazy var run = RunStore(sync: sync)
     lazy var timed = TimedStore(sync: sync)
     let gym = GymStore()
@@ -45,6 +47,7 @@ extension AppModel {
         await sync.flushNow()
         await sync.refreshWeek()
         await health.syncIfDue()
+        await plans.refresh()
     }
 
     /// Asks watchOS to wake the app in about an hour. With the complication on the watch face the app

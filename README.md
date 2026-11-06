@@ -31,3 +31,10 @@ Runs use `"type": "run"` and `"run": { "distanceKm": 5, "minutes": 30 }` instead
 Hot yoga uses `"type": "yoga"` and `"yoga": { "minutes": 60 }`; it is tracked separately and does not count toward the 5 planned weekly sessions.
 Weights are in lb. The `id` is `date-session`, and a later entry with the same `id` replaces the earlier one.
 Session keys: `upperA`, `lowerA`, `upperB`, `lowerB`, `run`, `run2`, `yoga`.
+
+## Progression rules
+
+Workout targets come from `progression.js` (rules) and `plan.js` (exercises), shared by the web app and the
+`plans` Edge Function that serves the Watch. Run the tests with `node --test tests/progression.test.js`.
+After changing either file, redeploy the function (supabase/functions/plans/README.md) and check it with
+`node tools/check-plans-function.mjs`.

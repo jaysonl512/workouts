@@ -19,6 +19,20 @@ final class LiftStore: ObservableObject {
         var changedAt: Date?
         var notes: String?
         var deload: Bool?
+        /// Plans frozen when the lift started (from the cache, or from the phone during a handoff): exercise id -> plan.
+        var plans: [String: ExercisePlan]?
+        /// Optional Easy / Moderate / Hard per exercise.
+        var diff: [String: String]?
+        /// Exercises whose warm-ups were skipped.
+        var skipWu: [String]?
+    }
+
+    /// What the next set is: a warm-up or working set, its number, and its planned target.
+    struct NextItem {
+        let warmup: Bool
+        let index: Int
+        let total: Int
+        let target: PlanSet?
     }
 
     struct Summary {
@@ -40,14 +54,18 @@ final class LiftStore: ObservableObject {
     @Published private(set) var finishedElsewhere: SessionRow?
     /// Short note after sets arrive from the phone ("Updated from phone").
     @Published var handoffNote: String?
+    /// An exercise just finished: the Next Up / Finish screen offers an optional rating for it.
+    @Published var rateFor: String?
     private var pulling = false
+    private let plans: PlanCache
 
     private var restTask: Task<Void, Never>?
     private let sync: SyncStore
     private let url = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("lift-draft.json")
 
-    init(sync: SyncStore) {
+    init(sync: SyncStore, plans: PlanCache) {
         self.sync = sync
+        self.plans = plans
         if let d = try? Data(contentsOf: url), let draft = try? JSONDecoder().decode(Draft.self, from: d) { self.draft = draft }
     }
 
@@ -69,13 +87,49 @@ final class LiftStore: ObservableObject {
 
     func sets(for id: String) -> [LoggedSet] { draft?.sets[id] ?? [] }
 
-    var totalSets: Int { draft?.sets.values.reduce(0) { $0 + $1.count } ?? 0 }
+    var totalSets: Int { draft?.sets.values.reduce(0) { $0 + $1.filter { !$0.isWarmup }.count } ?? 0 }
+
+    func workingCount(_ id: String) -> Int { sets(for: id).filter { !$0.isWarmup }.count }
+    func planFor(_ id: String) -> ExercisePlan? { draft?.plans?[id] }
+    /// Working sets planned for this exercise: the plan's count, else the plan file's.
+    func plannedCount(_ step: Step) -> Int { planFor(step.id).map { $0.sets.count } ?? step.slot.sets }
+
+    func nextItem(for step: Step) -> NextItem {
+        let all = sets(for: step.id), done = all.filter { !$0.isWarmup }.count, wuDone = all.count - done
+        let p = planFor(step.id), skipped = draft?.skipWu?.contains(step.id) ?? false
+        if let wl = p?.warmups, done == 0, !skipped, wuDone < wl.count {
+            return NextItem(warmup: true, index: wuDone, total: wl.count, target: wl[wuDone])
+        }
+        let target = p.flatMap { done < $0.sets.count ? $0.sets[done] : nil }
+        return NextItem(warmup: false, index: done, total: plannedCount(step), target: target)
+    }
+
+    func skipWarmups(_ step: Step) {
+        guard draft != nil else { return }
+        draft!.skipWu = (draft!.skipWu ?? []) + [step.id]
+        persist()
+    }
+
+    /// Optional rating for an exercise ("easy" | "moderate" | "hard"); tapping the same one again clears it.
+    func rate(_ id: String, _ value: String) {
+        guard draft != nil else { return }
+        var d = draft!.diff ?? [:]
+        d[id] = d[id] == value ? nil : value
+        draft!.diff = d
+        draft!.changedAt = Date()
+        rateFor = nil
+        persist()
+        upload(status: "in_progress")
+    }
 
     // MARK: Lifecycle
 
     func begin(_ key: String) {
         let today = Day.string()
         draft = Draft(id: "\(today)-\(key)", date: today, sessionKey: key, startedAt: Date())
+        // Plans come from the cache, so a lift starts with full targets even offline.
+        let cached = plans.session(key)
+        if !cached.isEmpty { draft!.plans = cached }
         persist()
     }
 
@@ -97,17 +151,22 @@ final class LiftStore: ObservableObject {
 
     func logSet(w: Double, r: Int) {
         guard let step = currentStep else { return }
+        let item = nextItem(for: step)
         draft!.changedAt = Date()
-        draft!.sets[step.id, default: []].append(LoggedSet(w: w, r: r))
-        // Top of the rep range: the next set moves up, so say so with a haptic.
-        if r >= step.slot.reps.upperBound, !Progression.isBodyweight(step, w) { WKInterfaceDevice.current().play(.directionUp) }
-        let done = draft!.sets[step.id]!.count
+        // The set keeps its planned target next to what was done. Plans never change during the workout.
+        draft!.sets[step.id, default: []].append(LoggedSet(w: w, r: r, target: item.target, warmup: item.warmup))
+        if item.warmup {
+            persist()
+            upload(status: "in_progress")
+            return
+        }
+        let done = workingCount(step.id)
         // Superset: A → B straight away, B → rest and back to A, until both are done.
         if let p = supersetPartner(of: draft!.index) {
             let partner = steps[p]
-            let pn = sets(for: partner.id).count
+            let pn = workingCount(partner.id)
             let isA = draft!.index < p
-            if pn < partner.slot.sets, isA ? pn < done : pn <= done {
+            if pn < plannedCount(partner), isA ? pn < done : pn <= done {
                 draft!.index = p
                 nextUp = false
                 persist()
@@ -116,7 +175,9 @@ final class LiftStore: ObservableObject {
                 return
             }
         }
-        if done >= step.slot.sets {
+        if done >= plannedCount(step) {
+            rateFor = step.id
+            if let p = supersetPartner(of: draft!.index), p > draft!.index { draft!.index = p }   // both halves done
             draft!.index += 1
             nextUp = draft!.index < steps.count
         }
@@ -171,10 +232,14 @@ final class LiftStore: ObservableObject {
     private func adopt(_ row: SessionRow, at remoteAt: Date) {
         var sets: [String: [LoggedSet]] = [:]
         var swaps: [String: String] = [:]
+        var diff = draft!.diff ?? [:]
         for e in row.data.entries ?? [] {
             sets[e.id] = e.sets
             if let slot = e.slot { swaps[slot] = e.id }
+            if let r = e.diff { diff[e.id] = r }
         }
+        if let p = row.data.plans { draft!.plans = (draft!.plans ?? [:]).merging(p) { _, new in new } }
+        draft!.diff = diff
         draft!.sets = sets
         draft!.swaps = swaps
         draft!.changedAt = remoteAt
@@ -182,7 +247,7 @@ final class LiftStore: ObservableObject {
         if let n = row.data.notes { draft!.notes = n }
         if let dl = row.data.deload { draft!.deload = dl }
         let s = steps
-        draft!.index = s.firstIndex { self.sets(for: $0.id).count < $0.slot.sets } ?? s.count
+        draft!.index = s.firstIndex { self.workingCount($0.id) < self.plannedCount($0) } ?? s.count
         nextUp = false
         stopRest()
         sync.dropInProgress(draft!.id)
@@ -202,18 +267,24 @@ final class LiftStore: ObservableObject {
         }
         let entries = row.data.entries ?? []
         let minutes = row.data.durationMin ?? max(1, Int((result.end.timeIntervalSince(d.startedAt) / 60).rounded()))
-        summary = Summary(name: row.name, sets: entries.reduce(0) { $0 + $1.sets.count },
-                          volume: Self.volume(entries, bodyWeight: bodyWeight), minutes: minutes,
+        summary = Summary(name: row.name, sets: entries.reduce(0) { $0 + $1.sets.filter { !$0.isWarmup }.count },
+                          volume: volume(entries, bodyWeight: bodyWeight), minutes: minutes,
                           avgHR: result.avgHR.map { Int($0.rounded()) }, kcal: result.kcal.map { Int($0.rounded()) })
         finishedElsewhere = nil
         clear()
         sync.refreshHistory()
     }
 
-    static func volume(_ entries: [Entry], bodyWeight: Double?) -> Double {
+    /// Volume like the web app: working sets only; both dumbbells / both arms (the plan's vf); body weight minus
+    /// assistance on assisted moves.
+    func volume(_ entries: [Entry], bodyWeight: Double?) -> Double {
         entries.reduce(0) { sum, e in
             let name = Plan.exerciseName(e.id) ?? e.name
-            return sum + e.sets.reduce(0) { $0 + Load.perRep(name: name, w: $1.w, bodyWeight: bodyWeight) * Double($1.r) }
+            let vf = planFor(e.id)?.vf ?? (Load.isPerArm(name) ? 2 : 1)
+            return sum + e.sets.filter { !$0.isWarmup }.reduce(0) { acc, x in
+                let load = Load.isAssisted(name) ? Load.perRep(name: name, w: x.w, bodyWeight: bodyWeight) : x.w * vf
+                return acc + load * Double(x.r)
+            }
         }
     }
 
@@ -223,8 +294,8 @@ final class LiftStore: ObservableObject {
         let minutes = max(1, Int((result.end.timeIntervalSince(d.startedAt) / 60).rounded()))
         let row = makeRow(status: "complete", durationMin: minutes, hk: result.hk)
         sync.enqueue(row)
-        let all = d.sets.values.flatMap { $0 }
-        summary = Summary(name: Plan.name(d.sessionKey), sets: all.count, volume: Self.volume(entries(), bodyWeight: bodyWeight),
+        let all = d.sets.values.flatMap { $0 }.filter { !$0.isWarmup }
+        summary = Summary(name: Plan.name(d.sessionKey), sets: all.count, volume: volume(entries(), bodyWeight: bodyWeight),
                           minutes: minutes, avgHR: result.avgHR.map { Int($0.rounded()) },
                           kcal: result.kcal.map { Int($0.rounded()) })
         clear()
@@ -244,6 +315,7 @@ final class LiftStore: ObservableObject {
         nextUp = false
         finishedElsewhere = nil
         handoffNote = nil
+        rateFor = nil
         draft = nil
         try? FileManager.default.removeItem(at: url)
     }
@@ -303,7 +375,8 @@ final class LiftStore: ObservableObject {
             let ids = [(e.id, e.name)] + e.alts.map { ($0.id, $0.name) }
             for (id, name) in ids {
                 if let sets = d.sets[id], !sets.isEmpty {
-                    out.append(Entry(id: id, name: name, slot: id == e.id ? nil : e.id, sets: sets))
+                    out.append(Entry(id: id, name: name, slot: id == e.id ? nil : e.id, sets: sets,
+                                     diff: d.diff?[id], prog: d.plans?[id]?.state))
                 }
             }
         }
@@ -318,6 +391,7 @@ final class LiftStore: ObservableObject {
         return SessionRow(id: d.id, date: d.date, session: d.sessionKey, name: Plan.name(d.sessionKey), type: .lift,
                           status: status, savedAt: status == "complete" ? now : nil,
                           data: SessionData(entries: entries(), durationMin: durationMin, hk: hk, notes: d.notes, deload: d.deload,
-                                            startedAt: ISO.string(d.startedAt), updatedAt: stamp))
+                                            startedAt: ISO.string(d.startedAt), plans: status == "in_progress" ? d.plans : nil,
+                                            updatedAt: stamp))
     }
 }

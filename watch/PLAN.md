@@ -183,3 +183,22 @@ Done when: a lift and a run logged entirely on the Watch show up in the web app 
 - Build-up rule (build 10): a later set as heavy or heavier than the one before never aims for more reps than it
   (a lighter back-off set may), both in next week's targets and during a workout. If every target is hit, the whole
   ramp gains a rep a week until the sets reach the top of the range, then each moves up 5 lb.
+
+## Progression system (2026-11-06, build 11)
+Replaces the per-set rules above. One implementation, `progression.js` (repo root), used by the web app and by the
+Supabase Edge Function `plans` (same file, see supabase/functions/plans/README.md). The Watch has no formulas: it
+caches the function's plans (`PlanCache`, plans.json) and freezes the session's plans into the lift draft when it
+starts, so lifts start with full targets offline. Plans refresh opportunistically (launch, app active, after an
+upload, background refresh when granted); nothing depends on those happening on schedule.
+- Structures per exercise (plan.js `prog`, overridable in public.exercise_settings from the web Swap sheet):
+  straight sets (default), ascending pyramid (bench, incline DB, squat, barbell OHP), top set + back-offs (deadlift).
+- Results per group of sets: Incomplete (fewer working sets than planned: hold, streak untouched), Met, Borderline
+  (no set >1 short, ≤2 short total: hold), Missed (hold; 2nd in a row: one step easier). Top set and back-offs are
+  judged separately. Ratings never change a result; Hard blocks a weight increase.
+- Assisted moves: less assistance is harder in every comparison. Lighter (or more assisted) than planned counts as a
+  shortfall. Every set harder by the same amount with full reps: the plan adopts that weight.
+- Sets store actual w/r, original target pw/pr, shown target tw/tr (edits), and wu for warm-ups; entries store
+  diff (optional rating) and prog (the plan state). Warm-ups never count for progression, volume or PRs.
+- Volume counts both dumbbells / both arms (vf) for all history, computed at display time (no data changed).
+- Tests: `node --test tests/progression.test.js` (rules), `watch/tools/decode-test.sh` (Watch JSON round trip),
+  `node tools/check-plans-function.mjs` (deployed function matches the repo).
