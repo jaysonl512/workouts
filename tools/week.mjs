@@ -16,14 +16,16 @@ console.log(`Program this week: ${T.name}, ${s.config.lifts} lifts, level ${G.LE
 for (const x of s.occs) {
   const n = x.type === 'lift' ? G.exList(s.workouts[x.key], x.ex).length + ' exercises' : (G.RUN_KINDS[x.runKind] || 'Run');
   const ch = ((inp.changes || []).find(c => c.id === x.occ) || {}).change || {};
-  const why = x.status === 'recovery' ? ` (recovery day: ${ch.reason || 'needed more recovery'}${(ch.groups || ch.trained || []).length ? '; ' + (ch.groups || ch.trained).join(', ') : ''})` : x.status === 'skipped' ? ' (skipped for a non-recovery reason)' : '';
+  const why = x.status === 'recovery' ? ` (recovery day: ${ch.reason || 'needed more recovery'}${(ch.groups || ch.trained || []).length ? '; ' + (ch.groups || ch.trained).join(', ') : ''})` : x.status === 'skipped' ? ' (skipped: a scheduling decision, not a recovery issue)' : '';
   console.log(`${G.DOW_NAME[G.dow(x.date)]} ${x.date}  ${x.name}${x.optional ? ' (optional)' : ''}  ${n}  ${x.status}${why}${x.reduced ? ', reduced' : ''}${x.done ? ' (' + x.done.id + ')' : ''}`);
 }
 for (const e of s.extras) console.log(`extra: ${e.date} ${e.name || e.session}`);
 for (const w of s.warnings) console.log(`warning: ${w.text}`);
-for (const a of G.recoveryAdvice(inp.changes || [], today)) console.log(`suggestion: ${a.text}`);
-const off = s.occs.filter(x => x.status === 'recovery' || x.status === 'skipped').length;
+for (const a of G.recoveryAdvice(inp.changes || [], today)) console.log(`suggestion (recovery): ${a.text}`);
+const sa = G.scheduleAdvice(inp.prog || null, { sessions: inp.sessions || [], changes: inp.changes || [] }, today);
+if (sa) console.log(`suggestion (schedule): ${sa.text}`);
+const rec = s.occs.filter(x => x.status === 'recovery').length, skp = s.occs.filter(x => x.status === 'skipped').length;
 const st = G.programStatus(inp.prog || null, today);
 if (st.upcoming) console.log(`Upcoming: ${G.TEMPLATES[st.upcoming.template].name} starts ${st.startsOn}.`);
 if (st.adapted) console.log(`This week was adapted from ${G.TEMPLATES[st.from.template].name}.`);
-console.log(`Goal: ${G.goalOf(s).length} workouts; done ${G.goalOf(s).filter(x => x.status === 'done').length}${off ? `; ${off} recovery day or skip (a deliberate choice, not counted against the week)` : ''}.`);
+console.log(`Goal: ${G.goalOf(s).length} workouts; done ${G.goalOf(s).filter(x => x.status === 'done').length}.${rec ? ` Recovery days: ${rec} (a physical recovery need).` : ''}${skp ? ` Skipped: ${skp} (scheduling, not recovery).` : ''}${rec || skp ? ' Neither counts against the week.' : ''}`);

@@ -542,3 +542,42 @@ test('K5 the Watch gets recovery and skipped workouts with their status', () => 
   assert.equal(out.occs.find(x => x.occ === occOf(ws, 'upperB')).status, 'skipped');
   assert.equal(out.occs.find(x => x.occ === occOf(ws, 'lowerB')).status, 'recovery');
 });
+
+/* ---------- repeated skips: a scheduling suggestion ---------- */
+test('Q1 finishing far fewer workouts than planned for 3 of 4 weeks suggests fewer days; nothing changes', () => {
+  const prog = { config: P.configFor('upperLower', 4) };
+  // Upper/Lower: Mon UA, Tue LA, Wed run, Thu UB, Fri LB (5 planned). "short" weeks: only UA + LA done (2 of 5).
+  const week = (ws, all) => all ? [lift('upperA', ws), lift('lowerA', P.addDays(ws, 1)), run(P.addDays(ws, 2)), lift('upperB', P.addDays(ws, 3)), lift('lowerB', P.addDays(ws, 4))]
+    : [lift('upperA', ws), lift('lowerA', P.addDays(ws, 1))];
+  const skips = ws => [`${ws}:upperB:1`, `${ws}:lowerB:1`].map(id => ({ id, change: { week: ws, skipped: true, on: ws, source: 'manual' } }));
+  const ws = ['2026-10-12', '2026-10-19', '2026-10-26', '2026-11-02'];
+  const three = P.scheduleAdvice(prog, { sessions: [...week(ws[0], true), ...week(ws[1]), ...week(ws[2]), ...week(ws[3])], changes: [ws[1], ws[2], ws[3]].flatMap(skips) }, NEXT);
+  assert.ok(three); assert.equal(three.short, 3);
+  assert.match(three.text, /fewer|Balanced Fitness|lifting days/);
+  assert.match(three.text, /Balanced Fitness/, 'Upper/Lower only has 4 days, so it points to a 3-day program');
+  assert.equal(prog.config.lifts, 4, 'the program is never changed');
+  const two = P.scheduleAdvice(prog, { sessions: [...week(ws[0], true), ...week(ws[1], true), ...week(ws[2]), ...week(ws[3])], changes: [ws[2], ws[3]].flatMap(skips) }, NEXT);
+  assert.equal(two, null, 'two short weeks are not a pattern');
+});
+
+test('Q2 recovery days are not scheduling problems: they never count toward the suggestion', () => {
+  const prog = { config: P.configFor('upperLower', 4) };
+  const ws = ['2026-10-12', '2026-10-19', '2026-10-26', '2026-11-02'];
+  const sessions = ws.flatMap(w => [lift('upperA', w), lift('lowerA', P.addDays(w, 1)), run(P.addDays(w, 2))]);
+  const rec = ws.flatMap(w => [`${w}:upperB:1`, `${w}:lowerB:1`].map(id => ({ id, change: { week: w, recovery: true, on: w, source: 'readiness' } })));
+  assert.equal(P.scheduleAdvice(prog, { sessions, changes: rec }, NEXT), null, '3 of 3 planned (recovery days left out) every week');
+});
+
+test('Q3 a program with more days on offer suggests a lower day count of the same program', () => {
+  const prog = { config: P.configFor('ppl', 5) };
+  const ws = ['2026-10-12', '2026-10-19', '2026-10-26', '2026-11-02'];
+  const sessions = ws.flatMap(w => [lift('upperA', w), lift('upperB', P.addDays(w, 2)), lift('lowerA', P.addDays(w, 4))].map((s, i) => ({ ...s, session: ['pushA', 'pullA', 'legsA'][i] })));
+  const a = P.scheduleAdvice(prog, { sessions, changes: [] }, NEXT);
+  assert.ok(a); assert.equal(a.suggest, 3); assert.match(a.text, /3 lifting days instead of 5/);
+});
+
+test('Q4 weeks before the first logged workout never count as missed', () => {
+  const prog = { config: P.configFor('upperLower', 4) };
+  assert.equal(P.scheduleAdvice(prog, { sessions: [lift('upperA', MON), lift('lowerA', TUE)], changes: [] }, NEXT), null);
+  assert.equal(P.scheduleAdvice(prog, { sessions: [], changes: [] }, NEXT), null);
+});

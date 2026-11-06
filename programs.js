@@ -438,6 +438,31 @@ function recoveryAdvice(changes, today){
     text:`${ds.size} recovery days for your ${GROUP_WORDS[g]||g} muscles in the last 4 weeks. Consider fewer ${GROUP_WORDS[g]||g} sets (the Returning level does this) or more days between those workouts.`}));
 }
 
+/* A suggestion (never an automatic change) when the plan keeps asking for more than gets done: in at least 3 of the
+   last 4 full weeks, under 75% of the planned workouts were done. Planned = the week's goal plus skips (skips and
+   missed workouts are scheduling, so they count as planned-but-not-done); recovery days are left out, since those are
+   about recovery, not the schedule. Suggests a lifting-day count near what you have actually been doing. */
+function scheduleAdvice(prog, o, today){
+  const cur=configOn(prog, today), ws=weekStartOf(today, cur.weekStart), weeks=[];
+  // Only full weeks after the first logged workout count (weeks before using the app are not "missed").
+  const first=sessList(o.sessions).map(x=>x.date).sort()[0]; if(!first) return null;
+  const from = weekStartOf(first, cur.weekStart)===first ? first : addDays(weekStartOf(first, cur.weekStart),7);
+  for(let i=1;i<=4;i++){
+    const w=addDays(ws,-7*i); if(w<from) break;
+    const s=weekSchedule({...o, prog, today, weekStart:w});
+    const planned=s.occs.filter(x=>!x.optional && x.status!=='recovery'), done=planned.filter(x=>x.status==='done');
+    if(!planned.length) continue;
+    weeks.push({w, planned:planned.length, done:done.length, lifts:done.filter(x=>x.type==='lift').length, short: done.length < 0.75*planned.length});
+  }
+  if(weeks.filter(x=>x.short).length<3) return null;
+  const avg=k=>weeks.reduce((a,x)=>a+x[k],0)/weeks.length, t=TEMPLATES[cur.template], freqs=Object.keys(t.freq).map(Number);
+  const target=Math.max(2, Math.round(avg('lifts')));
+  const fit=freqs.filter(n=>n<cur.lifts && n>=target).sort((a,b)=>a-b)[0];
+  const idea = fit ? `${fit} lifting days instead of ${cur.lifts}` : target<=2 ? 'Strength + Running with 2 lifting days' : target<=3 && cur.lifts>3 ? 'Balanced Fitness (3 lifting days)' : 'fewer scheduled days';
+  return {weeks:weeks.length, short:weeks.filter(x=>x.short).length, avgDone:Math.round(avg('done')*10)/10, avgPlanned:Math.round(avg('planned')*10)/10, suggest:fit||null,
+    text:`Over the last ${weeks.length} weeks you finished about ${Math.round(avg('done'))} of ${Math.round(avg('planned'))} planned workouts a week. A lighter schedule might fit better, for example ${idea}. You can change it in Program settings.`};
+}
+
 /* ---------- readiness check ---------- */
 /* What to suggest when a scheduled lift comes with soreness. Ready: nothing. A little sore: start as planned, with
    Reduce offered. Very sore: Move to the first later day this week with no lift that creates no new warning and is
@@ -690,7 +715,7 @@ const P = {MUSCLE_LIST, MAJOR, GROUPS, SPACE, DEMANDING, LEG_CAP, LEVELS, RUN_KI
   defaultConfig, normalize, configFor, configOn, addDays, dow, daysBetween, weekStartOf, baseKey, sessList,
   volumeOf, plannedVolume, groupLoads, exList, volumeFor, weekQualifies, workoutsFor, classicWorkouts, baseWeek,
   reduceWorkout, weekSchedule, warningsFor, itemsOf, blockedOn, readiness, moveTarget, planSwitch, plansFor, serve,
-  bestRotation, restSecs, musclesOf, slotOf, rekey, watchPayload, programStatus, goalOf, recoveryPatch, skipPatch, recoveryAdvice, AREA_GROUPS};
+  bestRotation, restSecs, musclesOf, slotOf, rekey, watchPayload, programStatus, goalOf, recoveryPatch, skipPatch, recoveryAdvice, scheduleAdvice, AREA_GROUPS};
 if(typeof module!=='undefined' && module.exports) module.exports=P;
 globalThis.Programs=P;
 })();

@@ -65,7 +65,9 @@ serves the Watch its workouts and two weeks of schedule (cached for offline use)
   recovery day saves why and which muscle groups (from that day's check-in) and holds the Returning stage that week;
   two or more in 4 weeks for the same groups show a suggestion (`recoveryAdvice`), never an automatic cut. A skip is a
   non-recovery reason: it leaves the schedule, stays in History, and only matters for the ramp through the lifts it
-  leaves undone (2/3 of the scheduled lifts are still needed).
+  leaves undone (2/3 of the scheduled lifts are still needed). If 3 of the last 4 full weeks finished under 75% of
+  the planned workouts (skips and missed count as planned, recovery days do not), the Plan tab suggests fewer
+  scheduled days (`scheduleAdvice`); nothing changes automatically.
 
 ## Progression rules
 

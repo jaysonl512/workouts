@@ -464,7 +464,7 @@ details[open]>summary .chev{transform:rotate(90deg)}
 
 <script src="plan.js?v=2026-11-06.6"></script>
 <script src="progression.js?v=2026-11-06.1"></script>
-<script src="programs.js?v=2026-11-06.9"></script>
+<script src="programs.js?v=2026-11-06.10"></script>
 <script>
 const SESS_KEYS = ['upperA','run','lowerA','upperB','lowerB','run2','yoga','rest'];
 const sessBase = k => Programs.baseKey(k);
@@ -491,7 +491,7 @@ const EFFORT = {easy:'Easy', medium:'Medium', hard:'Hard'};
 const effortSeg = (act,cur) => `<div class="segc">${Object.entries(EFFORT).map(([v,l])=>`<button class="${v===cur?'on':''}" data-act="${act}" data-v="${v}">${l}</button>`).join('')}</div>`;
 const kindOf = x => x.yoga ? 'yoga' : x.other ? 'other' : x.run ? 'run' : 'lift';
 const CHEERS = ['Nice one','Solid set','Strong','Locked in','Clean rep','Beast mode','Smooth'];
-const APP_VERSION='2026-11-06.9';
+const APP_VERSION='2026-11-06.10';
 
 
 /* ---------- helpers ---------- */
@@ -2075,7 +2075,8 @@ function viewPlan(){
     return `<button class="dayrow ${d===t?'now':''}" data-act="dayopen" data-d="${d}"><span class="dn">${day(d)}</span><span class="dt">${label}</span>${st2}</button>`;
   }).join('');
   const warns=sc.warnings.map(w=>`<div class="warn ${w.soft?'soft':''}">${w.soft?'ⓘ':'⚠'} ${esc(w.text)}</div>`).join('')
-    + Programs.recoveryAdvice(st.changes, t).map(a=>`<div class="warn soft">💡 ${esc(a.text)}</div>`).join('');
+    + Programs.recoveryAdvice(st.changes, t).map(a=>`<div class="warn soft">💡 ${esc(a.text)}</div>`).join('')
+    + (sa=>sa?`<div class="warn soft">💡 ${esc(sa.text)}</div>`:'')(Programs.scheduleAdvice(st.prog, {sessions:allSessions(), changes:st.changes, settings:st.settings}, t));
   h+=`<div class="schhd"><b>This week</b><span>${esc(shortDate(sc.weekStart))} – ${esc(shortDate(addDays(sc.weekStart,6)))}</span></div>
     <div class="card" style="padding:6px">${rows}</div>${warns}<div class="note" style="margin:0 4px">Tap a day to move, swap, reduce or skip it. Warnings never block a change.</div>`;
   // workouts (the program's newest settings)
