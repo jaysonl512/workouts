@@ -430,9 +430,6 @@ details[open]>summary .chev{transform:rotate(90deg)}
 .bwin{display:flex;align-items:center;gap:6px}.bwin input{width:84px;text-align:right}.bwin small{color:var(--mute);font-size:13px}
 .hmrow em{font-style:normal;font-weight:700;font-size:18px;white-space:nowrap;display:flex;align-items:baseline;gap:3px}.hmrow em small{font-size:11px;color:var(--mute);font-weight:600}
 .hmrow>i{color:var(--mute);font-style:normal;font-size:20px}
-.insrow{display:flex;gap:12px;align-items:flex-start;border-top:1px solid var(--line);padding:12px 0}
-.insrow:first-of-type{border-top:0}
-.insrow div{display:flex;flex-direction:column}.insrow b{font-size:15px}.insrow span{color:var(--mute);font-size:13px}
 .kicker2{color:var(--mute);font-size:13px;font-weight:600;letter-spacing:.4px;text-transform:uppercase}
 .wbig{font-size:15px;color:var(--mute)}
 .wbig b{font-size:36px;color:var(--text);letter-spacing:-1px}
@@ -489,7 +486,7 @@ const EFFORT = {easy:'Easy', medium:'Medium', hard:'Hard'};
 const effortSeg = (act,cur) => `<div class="segc">${Object.entries(EFFORT).map(([v,l])=>`<button class="${v===cur?'on':''}" data-act="${act}" data-v="${v}">${l}</button>`).join('')}</div>`;
 const kindOf = x => x.yoga ? 'yoga' : x.other ? 'other' : x.run ? 'run' : 'lift';
 const CHEERS = ['Nice one','Solid set','Strong','Locked in','Clean rep','Beast mode','Smooth'];
-const APP_VERSION='2026-11-06.7';
+const APP_VERSION='2026-11-06.8';
 
 
 /* ---------- helpers ---------- */
@@ -1697,17 +1694,22 @@ function prList(){
 }
 const prText = p => p.as ? (p.w ? `${p.w} lb assist × ${p.r}` : `Bodyweight × ${p.r}`) : `${p.w} lb × ${p.r}`;
 
+/* This week against the schedule in force (programs.js): the goal leaves out optional runs, recovery days and skips;
+   repeats and extras are listed but never fill the goal. Volume and running distance count everything logged. */
 function weekCard(){
-  const w=weekStats(monOf(todayStr())), wp=weekPlan(todayStr()), goal=Math.max(1,wp.goal), pct=Math.min(100,Math.round(w.sessions/goal*100));
-  const lifts=wp.sched.occs.filter(x=>x.type==='lift').length;
-  const pips=Array.from({length:goal},(_,i)=>`<i class="${i<w.sessions?'on':''}"></i>`).join('');
+  const t=todayStr(), w=weekStats(monOf(t)), wp=weekPlan(t), goalOcc=Programs.goalOf(wp.sched);
+  const goal=goalOcc.length, done=goalOcc.filter(x=>x.status==='done').length, pct=goal?Math.min(100,Math.round(done/goal*100)):100;
+  const gl=goalOcc.filter(x=>x.type==='lift'), dl=gl.filter(x=>x.status==='done').length;
+  const extras=[...wp.sched.extras.filter(s=>s.type==='lift'||s.type==='run').map(s=>s.name||sessName(s.session)), ...w.extra];
+  const pips=Array.from({length:goal},(_,i)=>`<i class="${i<done?'on':''}"></i>`).join('');
   return `<div class="card pcard"><div class="phead">${ico('cal','acc')}<b>This Week</b><span class="ppill">${pct}% Complete</span></div>
-    <div class="wbig"><b>${w.sessions}</b> of ${goal} workouts</div><div class="pips">${pips}</div>
+    <div class="wbig"><b>${done}</b> of ${goal} workouts</div><div class="pips">${pips}</div>
     <div class="tiles3">
-      <div>${ico('dumb')}<b>${w.lifts} / ${lifts}</b><span>Lifts</span></div>
+      <div>${ico('dumb')}<b>${dl} / ${gl.length}</b><span>Lifts</span></div>
       <div>${ico('run')}<b>${w.km?w.km.toFixed(1).replace(/\.0$/,'')+' km':'0 km'}</b><span>Running</span></div>
       <div>${ico('layers')}<b>${kfmt(w.volume)} lb</b><span>Volume</span></div></div>
-    ${w.extra.length?`<div class="note" style="margin-top:10px">Extras: ${esc(w.extra.join(', '))} · ${w.extraMin} min</div>`:''}</div>`;
+    ${wp.rest?`<div class="note" style="margin-top:10px">${wp.rest} recovery day${wp.rest>1?'s':''} this week, not counted against you.</div>`:''}
+    ${extras.length?`<div class="note" style="margin-top:${wp.rest?4:10}px">Extras: ${esc(extras.join(', '))}${w.extraMin?` · ${w.extraMin} min`:''}</div>`:''}</div>`;
 }
 
 function strengthCard(){
@@ -1784,31 +1786,6 @@ function volumeCard(){
 }
 
 /* Plain rules over your own data: biggest strength gain, weekly pace vs plan, run trend, volume, deload. */
-function insightsCard(){
-  const out=[];
-  let best=null;
-  new Set(allSessions().flatMap(s=>(s.entries||[]).map(e=>e.id))).forEach(id=>{
-    const p=liftPoints(id); if(p.length<2) return;
-    const d=p[p.length-1].e1-p[0].e1, pct=d/(p[0].e1||1);
-    if(d>0&&(!best||pct>best.pct)) best={id,d,pct,a:p[0].e1,b:p[p.length-1].e1};
-  });
-  if(best) out.push(['trend','up',`${esc(EXMAP[best.id]?.name||best.id)} +${best.d} lb (+${Math.round(best.pct*100)}%)`,`Estimated 1RM up from ${best.a} lb to ${best.b} lb.`]);
-  const hg=HM.filter(m=>m.better).map(m=>[m,hTrend(m)]).find(([m,t])=>t&&t.tone==='good');
-  if(hg){ const [m,tr]=hg; out.push([m.ico,'up',`${m.short} ${tr.diff>0?'up':'down'} ${hFmt(m,Math.abs(tr.diff))} ${m.unit}`,`Since ${shortDate(tr.since)}. ${m.better<0?'Lower':'Higher'} is better.`]) }
-  const t=todayStr(), mon=monOf(t), w=weekStats(mon);
-  const wpl=weekPlan(t), planned=wpl.sched.occs.filter(x=>!x.optional && x.date<=t && x.status!=='skipped' && x.status!=='recovery').length;
-  out.push(['cal','', w.sessions>=planned?'On track':'Catch up', `${w.sessions} of ${wpl.goal} workouts done this week${w.sessions<planned?`, ${planned} planned by today`:''}.`]);
-  const runs=runPoints().filter(r=>r.pace&&r.km>=0.5);
-  if(runs.length>=2){ const last=runs[runs.length-1].pace, avg=Math.round(runs.slice(0,-1).reduce((a,r)=>a+r.pace,0)/(runs.length-1));
-    out.push([last<=avg?'trend':'down', last<=avg?'up':'', last<=avg?'Pace improving':'Pace slower last run', `Last run ${mmss(last)}/km vs ${mmss(avg)}/km average before it.`]); }
-  const lastW=weekStats(addDays(mon,-7));
-  if(lastW.volume>0&&w.volume>0){ const p=Math.round((w.volume-lastW.volume)/lastW.volume*100);
-    out.push(['layers','',`Volume ${p>=0?'up':'down'} ${Math.abs(p)}%`,`${kfmt(w.volume)} lb this week vs ${kfmt(lastW.volume)} lb last week.`]); }
-  if(deloadInfo().recommended) out.push(['bolt','',`Deload week suggested`,`You've trained several weeks in a row. Drop to about 60% this week.`]);
-  return `<div class="card pcard"><div class="phead">${ico('bolt','acc')}<b>Insights</b></div>
-    ${out.slice(0,4).map(([i,c,h,n])=>`<div class="insrow">${ico(i,c)}<div><b>${h}</b><span>${n}</span></div></div>`).join('')}</div>`;
-}
-
 /* ---------- health trends (daily values the Watch uploads from Apple Health) ---------- */
 const HM=[
   {k:'rhr', col:'rhr',         name:'Resting heart rate',     short:'Resting HR',lc:'resting heart rate',      unit:'bpm',     ico:'heart', better:-1, min:1,   dec:0, smooth:true,
@@ -2041,7 +2018,7 @@ function recapBanners(){
 
 function viewProgress(){
   chartN=0;
-  return weekCard()+healthCard()+strengthCard()+runCard()+prCard()+volumeCard()+insightsCard();
+  return weekCard()+healthCard()+strengthCard()+runCard()+prCard()+volumeCard();
 }
 function cloudCard(){
   const a=sbAuth();
