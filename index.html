@@ -407,7 +407,7 @@ const EFFORT = {easy:'Easy', medium:'Medium', hard:'Hard'};
 const effortSeg = (act,cur) => `<div class="segc">${Object.entries(EFFORT).map(([v,l])=>`<button class="${v===cur?'on':''}" data-act="${act}" data-v="${v}">${l}</button>`).join('')}</div>`;
 const kindOf = x => x.yoga ? 'yoga' : x.other ? 'other' : x.run ? 'run' : 'lift';
 const CHEERS = ['Nice one','Solid set','Strong','Locked in','Clean rep','Beast mode','Smooth'];
-const APP_VERSION='2026-11-06.1';
+const APP_VERSION='2026-11-06.2';
 
 
 /* ---------- helpers ---------- */
@@ -839,13 +839,14 @@ async function loadLive(){
   const r=await sbFetch('/rest/v1/sessions?select=*&status=eq.in_progress&updated_at=gte.'+encodeURIComponent(since));
   if(!r.ok) return;
   st.live={}; (await r.json()).forEach(row=>{ const x=rowToSess(row); if(x.type==='lift') st.live[x.id]=x });
+  try{ await dropDiscarded() }catch(e){}
 }
 function adoptLive(id,lv){
   const prev=st.draft[id], d=fromSession(lv), started=Date.parse(lv.startedAt||'')||prev?.startedAt||Date.now();
   d.touched=true; d.touchedAt=verOf(lv); d.startedAt=started; delete d.savedAt;
   d.firstAt=Math.min(prev?.firstAt||started, started); d.lastAt=Math.max(prev?.lastAt||0, verOf(lv));
   if(prev){ d.energy=prev.energy; d.effort=prev.effort||d.effort; d.notes=prev.notes||d.notes; d.deload=prev.deload||d.deload }
-  d.liveFrom=lv.source||'';
+  d.liveFrom=lv.source||''; d.liveSeen=true;
   st.draft[id]=d; SS('wt.draft.v1',st.draft);
 }
 let liveT=null;
@@ -861,8 +862,23 @@ async function pushLive(){
   const row={...sessToRow(rec,uid), status:'in_progress'};
   // Update the row only while it is still in progress; if there is none yet, insert it (never over a finished one).
   let r=await sbFetch('/rest/v1/sessions?id=eq.'+encodeURIComponent(rec.id)+'&status=eq.in_progress',{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify({data:row.data,source:'web',name:row.name})});
-  if(r.ok && (await r.json()).length) return;
-  await sbFetch('/rest/v1/sessions?on_conflict=user_id,id',{method:'POST',headers:{Prefer:'resolution=ignore-duplicates,return=minimal'},body:JSON.stringify([row])});
+  const synced = () => { const dd=st.draft[rec.id]; if(dd && !dd.liveSeen){ dd.liveSeen=true; SS('wt.draft.v1',st.draft) } };
+  if(r.ok && (await r.json()).length) return synced();
+  r=await sbFetch('/rest/v1/sessions?on_conflict=user_id,id',{method:'POST',headers:{Prefer:'resolution=ignore-duplicates,return=minimal'},body:JSON.stringify([row])});
+  if(r.ok) synced();
+}
+/* A draft that was synced with the cloud whose cloud copy is gone was discarded on another device (the Watch deletes
+   its in-progress copy on Discard): drop it here too, so Today stops offering to resume it. */
+async function dropDiscarded(){
+  const ids=Object.keys(st.draft).filter(id=>{ const d=st.draft[id]; return d && (d.liveSeen||d.liveFrom) && !st.live[id] && !allSessions().some(s=>s.id===id) });
+  if(!ids.length) return;
+  const r=await sbFetch('/rest/v1/sessions?select=id&id=in.('+ids.map(id=>'"'+encodeURIComponent(id)+'"').join(',')+')');
+  if(!r.ok) return;
+  const have=new Set((await r.json()).map(x=>x.id));
+  let gone=false;
+  ids.forEach(id=>{ if(have.has(id)) return; delete st.draft[id]; gone=true;
+    if(st.wk && sid()===id){ clearRest(); st.wk=null; st.auto=true; toast('This workout was discarded on your Watch') } });
+  if(gone){ SS('wt.draft.v1',st.draft); render() }
 }
 /* During a lift: pick up sets logged on the Watch, and notice when the Watch finishes the workout. */
 let pulling=false;
@@ -872,7 +888,9 @@ async function pullLive(){
   try{
     const id=sid(), r=await sbFetch('/rest/v1/sessions?select=*&id=eq.'+encodeURIComponent(id));
     if(!r.ok) return;
-    const row=(await r.json())[0]; if(!row||!st.wk||sid()!==id) return;
+    const row=(await r.json())[0];
+    if(!row){ const d0=st.draft[id]; if(st.wk && sid()===id && d0 && (d0.liveSeen||d0.liveFrom)){ delete st.draft[id]; SS('wt.draft.v1',st.draft); delete st.live[id]; clearRest(); st.wk=null; st.auto=true; render(); toTop(); toast('This workout was discarded on your Watch') } return }
+    if(!st.wk||sid()!==id) return;
     const x=rowToSess(row), d=st.draft[id];
     if(verOf(x)<=(d?.touchedAt||0)) return;
     if(row.status==='complete'){

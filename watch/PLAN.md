@@ -202,3 +202,6 @@ upload, background refresh when granted); nothing depends on those happening on 
 - Volume counts both dumbbells / both arms (vf) for all history, computed at display time (no data changed).
 - Tests: `node --test tests/progression.test.js` (rules), `watch/tools/decode-test.sh` (Watch JSON round trip),
   `node tools/check-plans-function.mjs` (deployed function matches the repo).
+- Discard across devices (web 2026-11-06.2): drafts remember when they were synced with the cloud (liveSeen). If the
+  cloud copy is later gone (the Watch deletes its in-progress row on Discard), the web app drops the draft, and leaves
+  the workout screen if it is open. Drafts never synced (offline) are kept.
