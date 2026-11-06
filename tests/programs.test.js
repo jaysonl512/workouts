@@ -477,3 +477,68 @@ test('X8 the Watch gets the schedule that is actually in force, before and after
   const later = P.serve({ prog: r.prog, ...w, settings: {}, today: NEXT });
   assert.equal(later.program.name, 'Strength + Running'); assert.equal(later.program.upcoming, null);
 });
+
+/* ---------- recovery day vs skip ---------- */
+const UL = () => ({ config: { ...P.configFor('upperLower', 4), level: 'returning', levelSince: '2026-10-05' } });
+// A full returning week (Mon/Tue/Thu/Fri lifts at 2 sets each).
+const retWeek = (ws, skip) => ['upperA', 'lowerA', 'upperB', 'lowerB'].filter(k => k !== skip)
+  .map((k, i) => ({ ...lift(k, P.addDays(ws, [0, 1, 3, 4][i])), entries: lift(k, ws).entries.map(e => ({ ...e, sets: e.sets.slice(0, 2) })) }));
+const occOf = (ws, k) => `${ws}:${k}:1`;
+
+test('K1 recovery day and skip are built the same way from the readiness check and the Plan tab', () => {
+  const ws = '2026-11-09', chk = { id: 'chk:2026-11-10', change: { week: ws, readiness: 'very', area: 'legs', source: 'readiness' } };
+  const s = P.weekSchedule({ prog: UL(), changes: [chk], sessions: [], today: '2026-11-10', weekStart: ws });
+  const r = P.recoveryPatch(s, occOf(ws, 'lowerA'), [chk]);
+  assert.deepEqual(r, { recovery: true, skipped: false, on: '2026-11-10', reason: 'very sore', groups: ['legs'], trained: ['legs'] });
+  const r2 = P.recoveryPatch(s, occOf(ws, 'upperB'), []);   // chosen from the Plan tab with no check-in that day
+  assert.equal(r2.reason, 'needed more recovery'); assert.equal(r2.groups, null); assert.deepEqual(r2.trained, ['push', 'pull']);
+  assert.deepEqual(P.skipPatch(s, occOf(ws, 'lowerA')), { skipped: true, recovery: false, on: '2026-11-10', reason: null, groups: null, trained: null });
+  // the same patch from either place gives the same schedule (only the source differs)
+  const a = P.weekSchedule({ prog: UL(), changes: [chk, { id: occOf(ws, 'lowerA'), change: { ...r, week: ws, source: 'readiness' } }], sessions: [], today: '2026-11-10', weekStart: ws });
+  const b = P.weekSchedule({ prog: UL(), changes: [chk, { id: occOf(ws, 'lowerA'), change: { ...r, week: ws, source: 'manual' } }], sessions: [], today: '2026-11-10', weekStart: ws });
+  assert.deepEqual(a.occs.map(x => [x.occ, x.status]), b.occs.map(x => [x.occ, x.status]));
+});
+
+test('K2 both leave history, progression and the week goal alone; a skip leaves the schedule', () => {
+  const ws = '2026-11-09', sessions = retWeek(ws).slice(0, 2);
+  for (const patch of [{ recovery: true }, { skipped: true }]) {
+    const s = P.weekSchedule({ prog: UL(), changes: [{ id: occOf(ws, 'upperB'), change: { ...patch, week: ws, source: 'manual' } }], sessions, today: '2026-11-13', weekStart: ws });
+    const x = s.occs.find(y => y.key === 'upperB');
+    assert.equal(x.status, patch.recovery ? 'recovery' : 'skipped');
+    assert.equal(P.goalOf(s).length, 4, '4 lifts + 1 run, minus this one'); assert.ok(!P.goalOf(s).includes(x));
+    assert.equal(s.extras.length, 0); assert.equal(sessions.length, 2);
+  }
+});
+
+test('K3 Returning ramp: a recovery day holds the stage; a skip does not if enough was done and recovery was good', () => {
+  const prog = UL(), ws1 = '2026-10-05', ws2 = '2026-10-12';
+  const two = (changes, s2) => P.volumeFor(prog, { sessions: [...retWeek(ws1), ...(s2 || retWeek(ws2))], changes }, '2026-10-19').stage;
+  assert.equal(two([]), 'r2', 'two good weeks: next stage');
+  // skip one of four lifts for scheduling reasons, three done (at least 2/3): still a good week, from either place
+  for (const source of ['manual', 'readiness'])
+    assert.equal(two([{ id: occOf(ws2, 'lowerB'), change: { week: ws2, skipped: true, source } }], retWeek(ws2, 'lowerB')), 'r2', 'skip via ' + source);
+  // a recovery day holds the stage, from either place
+  for (const source of ['manual', 'readiness'])
+    assert.equal(two([{ id: occOf(ws2, 'lowerB'), change: { week: ws2, recovery: true, groups: ['legs'], source } }], retWeek(ws2, 'lowerB')), 'r1', 'recovery via ' + source);
+  // skipping two of four: too little done, no advance (skips never lower the bar)
+  const twoSkipped = retWeek(ws2).slice(0, 2);
+  assert.equal(two([{ id: occOf(ws2, 'upperB'), change: { week: ws2, skipped: true, source: 'manual' } }, { id: occOf(ws2, 'lowerB'), change: { week: ws2, skipped: true, source: 'manual' } }], twoSkipped), 'r1');
+});
+
+test('K4 repeated recovery days for the same muscles suggest a change; one does not; skips never do', () => {
+  const rec = (id, on, groups, trained) => ({ id, change: { week: on, recovery: true, on, groups, trained, source: 'readiness' } });
+  assert.deepEqual(P.recoveryAdvice([rec('a', '2026-11-04', ['legs'], ['legs'])], '2026-11-10'), []);
+  const two = P.recoveryAdvice([rec('a', '2026-10-21', ['legs'], ['legs']), rec('b', '2026-11-06', ['legs'], ['legs'])], '2026-11-10');
+  assert.equal(two.length, 1); assert.equal(two[0].group, 'legs'); assert.equal(two[0].count, 2); assert.match(two[0].text, /fewer leg sets/);
+  assert.deepEqual(P.recoveryAdvice([rec('a', '2026-09-01', ['legs'], ['legs']), rec('b', '2026-11-06', ['legs'], ['legs'])], '2026-11-10'), [], 'only the last 4 weeks');
+  assert.deepEqual(P.recoveryAdvice([rec('a', '2026-11-02', null, ['push', 'pull']), rec('b', '2026-11-05', ['legs'], ['legs'])], '2026-11-10'), [], 'different muscles');
+  const skips = [{ id: 'a', change: { week: '2026-11-02', skipped: true, on: '2026-11-03' } }, { id: 'b', change: { week: '2026-11-02', skipped: true, on: '2026-11-05' } }];
+  assert.deepEqual(P.recoveryAdvice(skips, '2026-11-10'), []);
+});
+
+test('K5 the Watch gets recovery and skipped workouts with their status', () => {
+  const ws = MON, ch = [{ id: occOf(ws, 'upperB'), change: { week: ws, skipped: true, source: 'manual' } }, { id: occOf(ws, 'lowerB'), change: { week: ws, recovery: true, source: 'readiness' } }];
+  const out = P.serve({ prog: def(), changes: ch, sessions: [], today: WED });
+  assert.equal(out.occs.find(x => x.occ === occOf(ws, 'upperB')).status, 'skipped');
+  assert.equal(out.occs.find(x => x.occ === occOf(ws, 'lowerB')).status, 'recovery');
+});

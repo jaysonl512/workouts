@@ -86,7 +86,8 @@ struct TodayView: View {
                     if let sch {
                         hero(sch)
                         header("This week", "\(sch.doneCount) of \(sch.goal)")
-                        ForEach(sch.items) { it in
+                        // A skipped workout leaves the schedule (the web keeps it in History and the Plan tab).
+                        ForEach(sch.items.filter { $0.status != "skipped" }) { it in
                             if let r = it.done {
                                 doneRow(r)
                             } else {

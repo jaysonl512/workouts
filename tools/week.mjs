@@ -15,10 +15,13 @@ const T = G.TEMPLATES[s.config.template];
 console.log(`Program this week: ${T.name}, ${s.config.lifts} lifts, level ${G.LEVELS[s.config.level]} (volume stage ${s.volume.stage}). Week of ${s.weekStart}.`);
 for (const x of s.occs) {
   const n = x.type === 'lift' ? G.exList(s.workouts[x.key], x.ex).length + ' exercises' : (G.RUN_KINDS[x.runKind] || 'Run');
-  console.log(`${G.DOW_NAME[G.dow(x.date)]} ${x.date}  ${x.name}${x.optional ? ' (optional)' : ''}  ${n}  ${x.status}${x.reduced ? ', reduced' : ''}${x.done ? ' (' + x.done.id + ')' : ''}`);
+  const ch = ((inp.changes || []).find(c => c.id === x.occ) || {}).change || {};
+  const why = x.status === 'recovery' ? ` (recovery day: ${ch.reason || 'needed more recovery'}${(ch.groups || ch.trained || []).length ? '; ' + (ch.groups || ch.trained).join(', ') : ''})` : x.status === 'skipped' ? ' (skipped for a non-recovery reason)' : '';
+  console.log(`${G.DOW_NAME[G.dow(x.date)]} ${x.date}  ${x.name}${x.optional ? ' (optional)' : ''}  ${n}  ${x.status}${why}${x.reduced ? ', reduced' : ''}${x.done ? ' (' + x.done.id + ')' : ''}`);
 }
 for (const e of s.extras) console.log(`extra: ${e.date} ${e.name || e.session}`);
 for (const w of s.warnings) console.log(`warning: ${w.text}`);
+for (const a of G.recoveryAdvice(inp.changes || [], today)) console.log(`suggestion: ${a.text}`);
 const off = s.occs.filter(x => x.status === 'recovery' || x.status === 'skipped').length;
 const st = G.programStatus(inp.prog || null, today);
 if (st.upcoming) console.log(`Upcoming: ${G.TEMPLATES[st.upcoming.template].name} starts ${st.startsOn}.`);

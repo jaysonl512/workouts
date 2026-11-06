@@ -61,6 +61,11 @@ serves the Watch its workouts and two weeks of schedule (cached for offline use)
 - Readiness checks cover runs too: hard runs (long, intervals) and easy runs get different suggestions; nothing
   changes unless you pick an option. Recovery days and skips stay decisions: no session, no effect on progression,
   not counted in the week's goal, kept through program switches, shown under the week in History.
+- Recovery day vs skip (same result from the readiness check or the Plan tab, `recoveryPatch` / `skipPatch`): a
+  recovery day saves why and which muscle groups (from that day's check-in) and holds the Returning stage that week;
+  two or more in 4 weeks for the same groups show a suggestion (`recoveryAdvice`), never an automatic cut. A skip is a
+  non-recovery reason: it leaves the schedule, stays in History, and only matters for the ramp through the lifts it
+  leaves undone (2/3 of the scheduled lifts are still needed).
 
 ## Progression rules
 

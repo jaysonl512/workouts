@@ -162,9 +162,11 @@ function exList(workout, only){
 /* ---------- training level ---------- */
 function weekLiftCount(prog, ws){ const c=configOn(prog, ws); return TEMPLATES[c.template].freq[c.lifts].w.length }
 const checkinsOf = changes => (changes||[]).filter(c=>c && String(c.id).startsWith('chk:')).map(c=>({date:c.id.slice(4), ...(c.change||{})}));
-/* A week counts toward building volume back up only if recovery was good: at least 2/3 of the scheduled lifts done,
-   no "Very sore", no workout reduced, moved to a recovery day or skipped because of soreness, at most one
-   "A little sore", and weekly leg credits within the cap. A week without lifting changes nothing. */
+/* A week counts toward building volume back up only if recovery was good and enough was done: at least 2/3 of the
+   scheduled lifts done (skips do not lower that bar), no "Very sore", no recovery day, no reduced workout, at most
+   one "A little sore", and weekly leg credits within the cap. A skip is not a recovery problem: it only matters
+   through the lifts it leaves undone. The same rules apply wherever a choice was made. A week without lifting
+   changes nothing. */
 function weekQualifies(prog, o, w, level){
   const we=addDays(w,6), ss=sessList(o.sessions).filter(s=>s.date>=w && s.date<=we);
   const lifts=ss.filter(s=>s.type==='lift' && (s.entries||[]).length);
@@ -172,7 +174,7 @@ function weekQualifies(prog, o, w, level){
   const chk=checkinsOf(o.changes).filter(c=>c.date>=w && c.date<=we);
   if(chk.some(c=>c.readiness==='very')) return false;
   if(chk.filter(c=>c.readiness==='sore').length>1) return false;
-  if((o.changes||[]).some(c=>c && c.change && c.change.week===w && c.change.source==='readiness' && (c.change.reduced||c.change.recovery||c.change.skipped))) return false;
+  if((o.changes||[]).some(c=>c && c.change && c.change.week===w && !String(c.id).startsWith('chk:') && (c.change.recovery||c.change.reduced))) return false;
   if(lifts.some(s=>s.reduced)) return false;
   if(lifts.length < Math.ceil(weekLiftCount(prog,w)*2/3)) return false;
   return groupLoads(volumeOf(lifts).credits).legs <= LEG_CAP[level||'regular'];
@@ -396,6 +398,44 @@ function blockedOn(date, items, level, checkins, legsPlanned){
   const legs7=r1(items.filter(i=>i.loads && daysBetween(i.date,date)>0 && daysBetween(i.date,date)<7).reduce((s,i)=>s+i.loads.legs,0));
   if(legsPlanned!=null && legs7+legsPlanned>(LEG_CAP[level]||40)) out.legs=out.legs||`${legs7} leg sets in the last 7 days`;
   return out;
+}
+
+/* ---------- recovery days and skips ---------- */
+/* Two different decisions, built the same way wherever they are made (readiness check or Plan tab):
+   - Recovery day: you need more physical recovery. Saves why and which muscle groups (from that day's readiness
+     check when there is one) plus the groups the workout would have trained. It holds the Returning stage that week,
+     and repeated recovery days for the same groups lead to a suggestion (recoveryAdvice), never an automatic cut.
+   - Skip: not doing it for another reason (time, travel). It leaves the schedule, keeps its skipped status, and is
+     never read as a recovery problem.
+   Neither creates a session, so history and progression are untouched; neither counts toward the week's goal. */
+const AREA_GROUPS = {legs:['legs'], upper:['push','pull'], all:['legs','push','pull']};
+function trainedGroups(sched, x){
+  if(!x) return [];
+  if(x.type==='run') return ['legs'];
+  const w=sched.workouts[x.key]; if(!w) return [];
+  return Object.entries(groupLoads(plannedVolume(w, x.ex).credits)).filter(([,v])=>v>=4).map(([g])=>g);
+}
+function recoveryPatch(sched, occId, changes){
+  const x=sched.occs.find(y=>y.occ===occId); if(!x) return null;
+  const c=checkinsOf(changes).find(k=>k.date===x.date && (k.readiness==='sore'||k.readiness==='very'));
+  return {recovery:true, skipped:false, on:x.date, reason: c ? (c.readiness==='very'?'very sore':'a little sore') : 'needed more recovery',
+    groups: c ? AREA_GROUPS[c.area||'legs'] : null, trained: trainedGroups(sched, x)};
+}
+function skipPatch(sched, occId){
+  const x=sched.occs.find(y=>y.occ===occId); if(!x) return null;
+  return {skipped:true, recovery:false, on:x.date, reason:null, groups:null, trained:null};
+}
+const GROUP_WORDS = {legs:'leg', push:'chest, shoulder and triceps', pull:'back and biceps'};
+/* Suggestions (never automatic changes) when recovery days keep landing on the same muscle groups: 2 or more in the
+   last 4 weeks. Uses the sore groups from the readiness check, else the groups the workout trains. */
+function recoveryAdvice(changes, today){
+  const since=addDays(today,-27), per={};
+  (changes||[]).forEach(c=>{ const ch=c&&c.change; if(!ch || !ch.recovery || String(c.id).startsWith('chk:')) return;
+    const d=ch.on||ch.date; if(!d || d<since || d>today) return;
+    const gs=(ch.groups&&ch.groups.length) ? ch.groups : (ch.trained||[]);
+    gs.forEach(g=>{ (per[g] ||= new Set()).add(d) }); });
+  return Object.entries(per).filter(([,ds])=>ds.size>=2).map(([g,ds])=>({group:g, count:ds.size,
+    text:`${ds.size} recovery days for your ${GROUP_WORDS[g]||g} muscles in the last 4 weeks. Consider fewer ${GROUP_WORDS[g]||g} sets (the Returning level does this) or more days between those workouts.`}));
 }
 
 /* ---------- readiness check ---------- */
@@ -650,7 +690,7 @@ const P = {MUSCLE_LIST, MAJOR, GROUPS, SPACE, DEMANDING, LEG_CAP, LEVELS, RUN_KI
   defaultConfig, normalize, configFor, configOn, addDays, dow, daysBetween, weekStartOf, baseKey, sessList,
   volumeOf, plannedVolume, groupLoads, exList, volumeFor, weekQualifies, workoutsFor, classicWorkouts, baseWeek,
   reduceWorkout, weekSchedule, warningsFor, itemsOf, blockedOn, readiness, moveTarget, planSwitch, plansFor, serve,
-  bestRotation, restSecs, musclesOf, slotOf, rekey, watchPayload, programStatus, goalOf};
+  bestRotation, restSecs, musclesOf, slotOf, rekey, watchPayload, programStatus, goalOf, recoveryPatch, skipPatch, recoveryAdvice, AREA_GROUPS};
 if(typeof module!=='undefined' && module.exports) module.exports=P;
 globalThis.Programs=P;
 })();

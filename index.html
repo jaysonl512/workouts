@@ -259,6 +259,11 @@ button.dayrow{width:100%;background:none;border-left:0;border-right:0;border-bot
 .rdy.col{flex-direction:column;align-items:stretch}
 .rdy>span{font-size:13px;color:var(--mute);font-weight:600}.rdy small{opacity:.7}
 .rbtns{display:flex;flex-wrap:wrap;gap:6px}
+.ropts{display:flex;flex-direction:column;gap:6px}
+.ropt{display:block;width:100%;text-align:left;background:var(--card);border:1px solid var(--line);color:var(--text);border-radius:12px;padding:10px 12px;font:inherit}
+.ropt b{display:block;font-size:15px}.ropt small{display:block;color:var(--mute);font-size:12px;margin-top:2px}
+.ropt.rec{border-color:var(--acc);background:rgba(239,68,68,.08)}
+.swapd{margin-top:10px}.swapd summary{color:var(--mute);font-size:13px;cursor:pointer;margin-bottom:6px}
 .pv{margin-top:12px}
 .pvd{display:flex;gap:10px;padding:10px 0;border-top:1px solid var(--line);font-size:14px}
 .pvd .dn{width:36px;flex:none;font-weight:800;color:var(--mute);font-size:12px;text-transform:uppercase;padding-top:2px}
@@ -459,7 +464,7 @@ details[open]>summary .chev{transform:rotate(90deg)}
 
 <script src="plan.js?v=2026-11-06.6"></script>
 <script src="progression.js?v=2026-11-06.1"></script>
-<script src="programs.js?v=2026-11-06.7"></script>
+<script src="programs.js?v=2026-11-06.9"></script>
 <script>
 const SESS_KEYS = ['upperA','run','lowerA','upperB','lowerB','run2','yoga','rest'];
 const sessBase = k => Programs.baseKey(k);
@@ -486,7 +491,7 @@ const EFFORT = {easy:'Easy', medium:'Medium', hard:'Hard'};
 const effortSeg = (act,cur) => `<div class="segc">${Object.entries(EFFORT).map(([v,l])=>`<button class="${v===cur?'on':''}" data-act="${act}" data-v="${v}">${l}</button>`).join('')}</div>`;
 const kindOf = x => x.yoga ? 'yoga' : x.other ? 'other' : x.run ? 'run' : 'lift';
 const CHEERS = ['Nice one','Solid set','Strong','Locked in','Clean rep','Beast mode','Smooth'];
-const APP_VERSION='2026-11-06.8';
+const APP_VERSION='2026-11-06.9';
 
 
 /* ---------- helpers ---------- */
@@ -1194,7 +1199,7 @@ function weekList(wp){
   const next = wp.left.find(x=>x.status!=='missed') || wp.left[0];
   const day = d => Programs.DOW_NAME[Programs.dow(d)];
   const doneRow = (s,on) => `<button class="wrow done ${on?'sel':''}" data-act="opensess" data-d="${s.date}" data-s="${esc(s.session)}"><i class="wck">✓</i><span><b>${esc(s.name)}</b><small>Done ${day(s.date)}</small></span></button>`;
-  const rows = sc.occs.map(x=>{
+  const rows = sc.occs.filter(x=>x.status!=='skipped').map(x=>{
     if(x.done) return doneRow(x.done, logged&&logged.id===x.done.id);
     const n = x.type==='run' ? 0 : Programs.exList(sc.workouts[x.key], x.ex).length;
     const sub = x.type==='run' ? (x.optional?'If you feel like it':'Distance and time') : `${n} exercises · about ${n*7} min`;
@@ -1216,23 +1221,26 @@ function readyCard(x){
   if(!ans) return `<div class="rdy col"><span>How are you feeling? <small>Optional</small></span>${seg('rdy','',[['ready','Ready'],['sore','A little sore'],['very','Very sore']])}</div>`;
   if(ans==='ready') return '';
   const sc=sched(st.date), r=Programs.readiness(sc, x.occ, ans, todayStr(), chk.area), dname=d=>Programs.DOW_NAME[Programs.dow(d)];
-  const b=(a,l,rec)=>`<button class="btn sm ${rec?'':'ghost'}" data-act="rdyact" data-a="${a}" data-o="${esc(x.occ)}">${l}</button>`;
-  const label={start:'Continue as planned', easier:'Shorter, easy run', move:r.moveTo?'Move to '+dname(r.moveTo):'', reduce:'Reduce volume', recovery:'Recovery day', skip:'Skip'};
-  const btn=a=> a==='start' ? `<button class="btn sm ${r.recommend==='start'?'':'ghost'}" data-act="start" data-resume="0">${label.start}</button>` : a==='move'&&!r.moveTo ? '' : b(a,label[a],r.recommend===a);
+  const label={start:'Continue as planned', easier:'Shorter, easy run', move:r.moveTo?'Move to '+dname(r.moveTo):'', reduce:'Reduce volume', recovery:'Recovery day', skip:'Skip workout'};
+  const desc={...ACT_DESC, move:r.moveTo?`Do it on ${dname(r.moveTo)}, clear of your sore muscles.`:''};
+  const btn=a=> a==='move'&&!r.moveTo ? '' : optRow(a==='start'?'data-act="start" data-resume="0"':`data-act="rdyact" data-a="${a}" data-o="${esc(x.occ)}"`, label[a], desc[a], r.recommend===a);
   const order=[r.recommend, ...r.actions.filter(a=>a!==r.recommend)].filter(a=>a && r.actions.includes(a));
-  if(r.run){
-    const msg = (chk.area||'legs')==='upper' ? 'Sore upper body is no reason to skip a run.'
-      : r.hard ? `A ${x.runKind==='long'?'long run':'hard interval session'} on sore legs adds more fatigue. A shorter, easy run keeps you moving.`
-      : ans==='very' ? 'An easy run is fine if it feels good once you start. A recovery day is fine too.' : 'Keep it easy and conversational.';
-    return `<div class="rdy col"><div><b>${ans==='very'?'Not recovered':'A little sore'}</b><div class="note">${msg} Nothing changes unless you pick something.</div></div><div class="rbtns">${order.map(btn).join('')}</div><button class="link" data-act="rdyclear">Change answer</button></div>`;
-  }
+  const head = ans==='very' ? 'Not recovered' : 'A little sore';
+  let msg;
+  if(r.run) msg = (chk.area||'legs')==='upper' ? 'Sore upper body is no reason to skip a run.'
+    : r.hard ? `A ${x.runKind==='long'?'long run':'hard interval session'} on sore legs adds more fatigue. A shorter, easy run keeps you moving.`
+    : ans==='very' ? 'An easy run is fine if it feels good once you start. A recovery day is fine too.' : 'Keep it easy and conversational.';
+  else msg = ans==='sore' ? 'Starting as planned is fine: the warm-ups help.' : r.moveTo ? `${dname(r.moveTo)} is clear of your sore muscles.` : 'No later day this week is clear of your sore muscles.';
   // A long run or intervals tomorrow, after very sore legs today: offer to make it easy (only if you choose).
-  const tmr=ans==='very' && (chk.area||'legs')!=='upper' ? sched(addDays(st.date,1)).occs.find(y=>y.type==='run' && y.date===addDays(st.date,1) && !y.done && y.runKind!=='easy' && y.status!=='skipped' && y.status!=='recovery') : null;
-  const tmrBtn = tmr ? `<button class="btn sm ghost" data-act="rdyact" data-a="easier" data-o="${esc(tmr.occ)}">Make tomorrow's ${esc(tmr.name.toLowerCase())} easy</button>` : '';
-  if(ans==='sore') return `<div class="rdy col"><div><b>A little sore</b><div class="note">Start as planned: the warm-ups help. Or do fewer sets today.</div></div><div class="rbtns">${b('reduce','Reduce volume')}</div><button class="link" data-act="rdyclear">Change answer</button></div>`;
-  return `<div class="rdy col"><div><b>Not recovered</b><div class="note">${r.moveTo?`${dname(r.moveTo)} is clear of your sore muscles.`:'No later day this week is clear of your sore muscles.'} None of these change your weights.</div></div>
-    <div class="rbtns">${order.filter(a=>a!=='start').map(btn).join('')}${tmrBtn}</div><button class="link" data-act="rdyclear">Change answer</button></div>`;
+  const tmr=!r.run && ans==='very' && (chk.area||'legs')!=='upper' ? sched(addDays(st.date,1)).occs.find(y=>y.type==='run' && y.date===addDays(st.date,1) && !y.done && y.runKind!=='easy' && y.status!=='skipped' && y.status!=='recovery') : null;
+  const tmrBtn = tmr ? `<button class="btn sm ghost" style="margin-top:6px" data-act="rdyact" data-a="easier" data-o="${esc(tmr.occ)}">Make tomorrow's ${esc(tmr.name.toLowerCase())} easy</button>` : '';
+  return `<div class="rdy col"><div><b>${head}</b><div class="note">${msg} Nothing changes unless you pick something, and nothing here changes your weights.</div></div>
+    <div class="ropts">${order.map(btn).join('')}</div>${tmrBtn}<button class="link" data-act="rdyclear">Change answer</button></div>`;
 }
+/* The three choices for a scheduled workout, described the same way in the readiness check and the Plan tab. */
+const ACT_DESC = {start:'Start it as it is.', easier:'Swap it for a short, conversational run.', reduce:'Fewer sets today, same targets.',
+  recovery:'Your body needs more rest. Holds any volume increase this week.', skip:'Not doing it this week for another reason. Your training volume is not affected.'};
+const optRow = (attrs, title, desc, rec) => `<button class="ropt ${rec?'rec':''}" ${attrs}><b>${title}</b>${desc?`<small>${desc}</small>`:''}</button>`;
 /* The scheduled occurrence for the workout shown, attached to a draft that has nothing logged yet (so a workout's
    exercise list is fixed once it starts). Workouts started outside the schedule (repeats, extras) have none. */
 function attachOcc(d){
@@ -1583,7 +1591,7 @@ function viewHistory(){
     // Recovery days and skips are decisions, not workouts: listed under the week, never counted as missed.
     const off = mon>=addDays(thisMon,-84) ? sched(mon).occs.filter(x=>x.status==='recovery'||x.status==='skipped') : [];
     h += `<div class="wkhead"><b>${label}</b><span>${mon===thisMon||mon===lastMon?rng(mon)+' · ':''}${list.length} workout${list.length>1?'s':''}${mon<thisMon?` · <button class="rlink" data-act="recap" data-k="week" data-v="${mon}">Recap</button>`:''}</span></div>`;
-    off.forEach(x=>{ h += `<div class="hrest">🌿 ${Programs.DOW_NAME[Programs.dow(x.date)]} · ${esc(x.name)}: ${x.status==='recovery'?'recovery day':'skipped'}</div>` });
+    off.forEach(x=>{ const ch=changeOf(x.occ)||{}; h += `<div class="hrest">${x.status==='recovery'?'🌿':'⏭'} ${Programs.DOW_NAME[Programs.dow(x.date)]} · ${esc(x.name)}: ${x.status==='recovery'?'recovery day'+(ch.reason?` (${esc(ch.reason)}${ch.groups&&ch.groups.length?', '+esc(ch.groups.join(', ')):''})`:''):'skipped'}</div>` });
     list.forEach(x=>{
       const kind = kindOf(x), loc = st.local.some(l=>l.id===x.id);
       const dt = new Date(x.date+'T12:00:00');
@@ -2059,14 +2067,15 @@ function viewPlan(){
   // the week
   const rows=[...Array(7)].map((_,i)=>{
     const d=addDays(sc.weekStart,i), items=sc.occs.filter(x=>x.date===d);
-    const label = items.length ? items.map(x=>esc(x.name)+(x.optional?' <small>optional</small>':'')).join(' · ') : '<span class="mute">Rest</span>';
+    const label = items.length ? items.map(x=>(x.status==='skipped'?`<s class="mute">${esc(x.name)}</s>`:esc(x.name))+(x.optional?' <small>optional</small>':'')).join(' · ') : '<span class="mute">Rest</span>';
     const lift=items.find(x=>x.type==='lift'), main=lift||items[0];
     const st2 = !main ? '' : items.every(x=>x.status==='done'||x.optional&&x.status!=='done'&&items.some(y=>y.status==='done')) && items.some(x=>x.status==='done') ? '<span class="tag ok">✓ Done</span>'
       : main.status==='recovery' ? '<span class="tag">Recovery</span>' : main.status==='skipped' ? '<span class="tag">Skipped</span>' : main.status==='missed' ? '<span class="tag">Missed</span>'
       : main.reduced ? '<span class="tag lift">Reduced</span>' : main.type==='lift' ? '<span class="tag lift">Lift</span>' : '<span class="tag run">Run</span>';
     return `<button class="dayrow ${d===t?'now':''}" data-act="dayopen" data-d="${d}"><span class="dn">${day(d)}</span><span class="dt">${label}</span>${st2}</button>`;
   }).join('');
-  const warns=sc.warnings.map(w=>`<div class="warn ${w.soft?'soft':''}">${w.soft?'ⓘ':'⚠'} ${esc(w.text)}</div>`).join('');
+  const warns=sc.warnings.map(w=>`<div class="warn ${w.soft?'soft':''}">${w.soft?'ⓘ':'⚠'} ${esc(w.text)}</div>`).join('')
+    + Programs.recoveryAdvice(st.changes, t).map(a=>`<div class="warn soft">💡 ${esc(a.text)}</div>`).join('');
   h+=`<div class="schhd"><b>This week</b><span>${esc(shortDate(sc.weekStart))} – ${esc(shortDate(addDays(sc.weekStart,6)))}</span></div>
     <div class="card" style="padding:6px">${rows}</div>${warns}<div class="note" style="margin:0 4px">Tap a day to move, swap, reduce or skip it. Warnings never block a change.</div>`;
   // workouts (the program's newest settings)
@@ -2182,10 +2191,16 @@ function daySheet(){
     if(x.status==='done') return `<div class="card"><b>${esc(x.name)}</b><div class="note">Done ${day(x.done.date)} ✓</div></div>`;
     const changed=!!changeOf(x.occ), others=sc.occs.filter(y=>y!==x && y.status!=='done' && y.date>=t && y.date!==d);
     const n=x.type==='lift'?Programs.exList(sc.workouts[x.key],x.ex).length:0;
-    return `<div class="card"><b>${esc(x.name)}</b><div class="note">${x.type==='lift'?`${n} exercises`:esc(Programs.RUN_KINDS[x.runKind]||'Run')}${x.movedFrom?` · moved from ${day(x.movedFrom)}`:''}${x.reduced?' · reduced':''}${x.status==='skipped'?' · skipped':x.status==='recovery'?' · recovery day':x.status==='missed'?' · missed':''}</div>
-      ${dates.length?`<label class="f" style="margin-top:10px">Move to</label><div class="dchips">${dates.map(z=>`<button class="dchip" data-act="dmove" data-o="${esc(x.occ)}" data-d="${z}">${day(z)[0]}<small>${day(z)}</small></button>`).join('')}</div>`:''}
-      ${others.length?`<label class="f" style="margin-top:10px">Swap with</label>${others.map(y=>`<button class="opt sm" data-act="dswap" data-o="${esc(x.occ)}" data-p="${esc(y.occ)}"><span>${esc(y.name)}</span><small>${day(y.date)}</small></button>`).join('')}`:''}
-      <div class="rbtns" style="margin-top:10px">${x.type==='run'&&x.runKind!=='easy'?`<button class="btn sm ghost" data-act="deasy" data-o="${esc(x.occ)}">Make it an easy run</button>`:''}${x.type==='lift'&&!x.reduced?`<button class="btn sm ghost" data-act="dset" data-o="${esc(x.occ)}" data-k="reduced">Reduce volume</button>`:''}${x.status!=='skipped'?`<button class="btn sm ghost" data-act="dset" data-o="${esc(x.occ)}" data-k="skipped">Skip</button>`:''}${changed&&(changeOf(x.occ)||{}).add&&(x.reduced||x.status==='skipped'||x.status==='recovery'||(changeOf(x.occ)||{}).easier)?`<button class="btn sm ghost" data-act="rdyundo" data-o="${esc(x.occ)}">Undo</button>`:''}${changed?`<button class="btn sm ghost" data-act="drestore" data-o="${esc(x.occ)}">${(changeOf(x.occ)||{}).add?'Remove':'Undo changes'}</button>`:''}</div></div>`;
+    const ch=changeOf(x.occ)||{}, off=x.status==='skipped'||x.status==='recovery';
+    const status = x.status==='skipped' ? 'Skipped' : x.status==='recovery' ? `Recovery day${ch.reason?` · ${esc(ch.reason)}`:''}` : x.status==='missed' ? 'Missed' : '';
+    const undo = off||x.reduced||ch.easier ? `<button class="btn sm ghost" data-act="rdyundo" data-o="${esc(x.occ)}">Undo ${off?(x.status==='skipped'?'skip':'recovery day'):x.reduced?'reduce':'easy run'}</button>` : '';
+    return `<div class="card"><b>${esc(x.name)}</b><div class="note">${x.type==='lift'?`${n} exercises`:esc(Programs.RUN_KINDS[x.runKind]||'Run')}${x.movedFrom?` · moved from ${day(x.movedFrom)}`:''}${x.reduced?' · reduced':''}${status?' · '+status:''}</div>
+      ${off ? `<div class="rbtns" style="margin-top:10px">${undo}</div>` : `<div class="ropts" style="margin-top:10px">
+        ${dates.length?`<div class="ropt"><b>Move workout</b><small>Do it on another day this week.</small><div class="dchips" style="margin-top:8px">${dates.map(z=>`<button class="dchip" data-act="dmove" data-o="${esc(x.occ)}" data-d="${z}">${day(z)[0]}<small>${day(z)}</small></button>`).join('')}</div></div>`:''}
+        ${optRow(`data-act="drec" data-o="${esc(x.occ)}"`, 'Recovery day', ACT_DESC.recovery)}
+        ${optRow(`data-act="dskip" data-o="${esc(x.occ)}"`, 'Skip workout', ACT_DESC.skip)}</div>
+      <div class="rbtns" style="margin-top:10px">${x.type==='run'&&x.runKind!=='easy'?`<button class="btn sm ghost" data-act="deasy" data-o="${esc(x.occ)}">Make it an easy run</button>`:''}${x.type==='lift'&&!x.reduced?`<button class="btn sm ghost" data-act="dset" data-o="${esc(x.occ)}" data-k="reduced">Reduce volume</button>`:''}${undo}${ch.add?`<button class="btn sm ghost" data-act="drestore" data-o="${esc(x.occ)}">Remove</button>`:changed&&!undo?`<button class="btn sm ghost" data-act="drestore" data-o="${esc(x.occ)}">Undo changes</button>`:''}</div>
+      ${others.length?`<details class="swapd"><summary>Swap with another day</summary>${others.map(y=>`<button class="opt sm" data-act="dswap" data-o="${esc(x.occ)}" data-p="${esc(y.occ)}"><span>${esc(y.name)}</span><small>${day(y.date)}</small></button>`).join('')}</details>`:''}`}</div>`;
   }).join('');
   const wk=Programs.TEMPLATES[sc.config.template].freq[sc.config.lifts].w;
   const add = d>=t && !items.some(x=>x.type==='lift'&&x.status!=='done') ? `<label class="f" style="margin-top:12px">Add a workout on this day</label>${wk.map(k=>`<button class="opt sm" data-act="dadd" data-k="${k}"><span>${esc(sc.workouts[k].name)}</span><span>+</span></button>`).join('')}` : '';
@@ -2211,8 +2226,9 @@ function setOcc(occ, patch, source, date){
    own row, with its run type put back. */
 function undoOcc(occ){
   const prev=changeOf(occ); if(!prev) return;
-  if(prev.add){ const c={...prev}; ['reduced','recovery','skipped','easier','runWas'].forEach(k=>delete c[k]); if(prev.runWas) c.runKind=prev.runWas; putChanges([{id:occ, change:c}]) }
-  else clearOcc(occ,['reduced','recovery','skipped','runKind','easier','runWas']);
+  const keys=['reduced','recovery','skipped','easier','runWas','on','reason','groups','trained'];
+  if(prev.add){ const c={...prev}; keys.forEach(k=>delete c[k]); if(prev.runWas) c.runKind=prev.runWas; putChanges([{id:occ, change:c}]) }
+  else clearOcc(occ,[...keys,'runKind']);
 }
 const easierPatch = occ => { const x=sched(occ.slice(0,10)).occs.find(y=>y.occ===occ); return {runKind:'easy', easier:true, runWas:(x&&x.runKind)||'long'} };
 function clearOcc(occ, keys){
@@ -2355,8 +2371,8 @@ app.addEventListener('click',e=>{
       setOcc(o,{date:r.moveTo},'readiness'); toast('Moved to '+fmtDate(r.moveTo)) }
     else if(a==='reduce'){ setOcc(o,{reduced:true},'readiness'); toast('Fewer sets today, same targets') }
     else if(a==='easier'){ setOcc(o,easierPatch(o),'readiness',o.slice(0,10)); toast('Shorter, easy run instead') }
-    else if(a==='recovery'){ setOcc(o,{recovery:true},'readiness'); toast('Recovery day. You can still do it later this week') }
-    else if(a==='skip'){ setOcc(o,{skipped:true},'readiness'); toast("Skipped. It won't count against your progress") }
+    else if(a==='recovery'){ setOcc(o,Programs.recoveryPatch(sched(o.slice(0,10)),o,st.changes),'readiness',o.slice(0,10)); toast('Recovery day saved 🌿') }
+    else if(a==='skip'){ setOcc(o,Programs.skipPatch(sched(o.slice(0,10)),o),'readiness',o.slice(0,10)); toast("Skipped. Your training volume isn't affected") }
     st.auto=true; render(); toTop();
   }
   else if(act==='rdyundo'){ undoOcc(b.dataset.o); st.auto=true; render() }
@@ -2408,6 +2424,8 @@ app.addEventListener('click',e=>{
     const sc=sched(st.daysh.date), x=sc.occs.find(y=>y.occ===b.dataset.o), y=sc.occs.find(z=>z.occ===b.dataset.p); if(!x||!y) return;
     setOcc(x.occ,{date:y.date},'manual',x.date); setOcc(y.occ,{date:x.date},'manual',x.date); st.daysh=null; st.auto=true; render(); toast('Swapped');
   }
+  else if(act==='drec'){ const o=b.dataset.o; setOcc(o,Programs.recoveryPatch(sched(st.daysh.date),o,st.changes),'manual',st.daysh.date); st.auto=true; render(); toast('Recovery day saved 🌿') }
+  else if(act==='dskip'){ const o=b.dataset.o; setOcc(o,Programs.skipPatch(sched(st.daysh.date),o),'manual',st.daysh.date); st.auto=true; render(); toast("Skipped. Your training volume isn't affected") }
   else if(act==='dset'){ setOcc(b.dataset.o,{[b.dataset.k]:true},'manual',st.daysh.date); st.auto=true; render(); toast(b.dataset.k==='reduced'?'Reduced: fewer sets, same targets':"Skipped. It won't count against your progress") }
   else if(act==='drestore'){ dropChanges([b.dataset.o]); st.auto=true; render(); toast('Back to the plan') }
   else if(act==='dadd'){
