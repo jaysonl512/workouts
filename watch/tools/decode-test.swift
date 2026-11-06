@@ -79,6 +79,10 @@ check(two.items[0].done?.id == "2026-11-02-upperA" && two.extras.map(\.id) == ["
 check(Schedule(occs: plans.occs, rows: [], now: at("2026-11-10"))?.next?.occ.key == nil, "next week from the cache: Tuesday is a rest day")
 check(Schedule(occs: plans.occs, rows: [], now: at("2026-11-09"))?.next?.occ.key == "fbA", "next week from the cache: Monday is Full Body A")
 check(Schedule(occs: plans.occs, rows: [], now: at("2026-11-20")) == nil, "nothing cached for that week: the built-in plan is used")
+var withRec = plans.occs!
+withRec[1].status = "recovery"
+let rec = Schedule(occs: withRec, rows: [], now: at("2026-11-06"))!
+check(rec.items[1].status == "recovery" && rec.goal == 2 && !rec.open.contains { $0.occ.key == "lowerA" }, "a recovery day stays a recovery day and is not counted against the week")
 
 // A workout's uid, occurrence and reduced flag survive a handoff re-encode.
 var live = row

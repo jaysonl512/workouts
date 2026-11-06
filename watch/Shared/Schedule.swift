@@ -116,7 +116,8 @@ struct Schedule {
         extras = inWeek.filter { !used.contains($0.id) }
     }
 
-    var goal: Int { items.filter { !$0.optional }.count }
+    /// Recovery days and skips are decisions, not shortfalls: they are left out of the week's goal (programs.js goalOf).
+    var goal: Int { items.filter { !$0.optional && $0.status != "recovery" && $0.status != "skipped" }.count }
     var doneCount: Int { items.filter { !$0.optional && $0.status == "done" }.count }
     /// Workouts still to do this week (missed ones included), not counting optional runs.
     var open: [Item] { items.filter { !$0.optional && ["today", "upcoming", "missed"].contains($0.status) } }

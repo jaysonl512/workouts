@@ -53,8 +53,14 @@ serves the Watch its workouts and two weeks of schedule (cached for offline use)
 - Reduced workouts drop optional accessories, take one set off straight sets with 3+ sets and one back-off off
   top-set lifts; pyramids keep their sets. The saved plan still lists every set, so a reduced exercise is
   "Incomplete" for progression: no penalty, no increase from fewer sets.
-- Mid-week switch: completed workouts count toward the new program's targets; remaining days get trimmed workouts
-  for real gaps, respecting recovery; manual changes are kept unless you replace them; the new program starts next week.
+- Switching programs (always previewed): **Start next week** (default) leaves this week exactly as it is and the new
+  program shows as "Next" until its start date, then becomes the current program; **Adapt this week** applies it now:
+  completed workouts count toward its targets, remaining days get trimmed workouts for real gaps, respecting recovery
+  and soreness (a hard run after very sore legs becomes easy), with manual and readiness changes kept unless replaced.
+  A waiting switch is replaced by a new one, never turned into an immediate one.
+- Readiness checks cover runs too: hard runs (long, intervals) and easy runs get different suggestions; nothing
+  changes unless you pick an option. Recovery days and skips stay decisions: no session, no effect on progression,
+  not counted in the week's goal, kept through program switches, shown under the week in History.
 
 ## Progression rules
 

@@ -294,7 +294,7 @@ function weekSchedule(o){
   let occs=baseWeek(cfg, ws, workouts);
   changeList(o.changes, ws).forEach(({id, change:ch})=>{
     if(ch.add){ if(occs.some(x=>x.occ===id)) return;
-      occs.push({occ:id, key:ch.key, date:ch.date, type:ch.type||(baseKey(ch.key)==='run'?'run':'lift'), name:ch.name||(all[ch.key]?all[ch.key].name:ch.key),
+      occs.push({occ:id, key:ch.key, date:ch.date, type:ch.type||(baseKey(ch.key)==='run'?'run':'lift'), name:ch.easier ? (RUN_KINDS[ch.runKind]||'Run')+' (shorter)' : ch.name||(all[ch.key]?all[ch.key].name:ch.key),
         ex:ch.ex||null, runKind:ch.runKind, optional:!!ch.optional, auto:ch.source==='auto', manual:ch.source==='manual', added:true, source:ch.source, note:ch.note||null}); }
     const x=occs.find(y=>y.occ===id); if(!x) return;
     if(ch.removed) x.removed=true;
@@ -303,6 +303,7 @@ function weekSchedule(o){
     if(ch.recovery) x.recovery=true;
     if(ch.reduced) x.reduced=true;
     if(ch.ex && !ch.add) x.ex=ch.ex;
+    if(ch.runKind && !ch.add && x.type==='run'){ x.runKind=ch.runKind; x.name=(RUN_KINDS[ch.runKind]||'Run')+(ch.easier?' (shorter)':'') }
     if(ch.key && ch.swap) { x.key=ch.key; x.name=all[ch.key]?all[ch.key].name:x.name }
     if(ch.source==='manual'){ x.manual=true; x.auto=false } else if(ch.source==='readiness') x.readiness=true;
   });
@@ -327,6 +328,11 @@ function weekSchedule(o){
   const done=ss.filter(s=>s.type==='lift');
   const sched={weekStart:ws, config:cfg, volume:vol, workouts:all, occs, extras, actual:volumeOf(done)};
   sched.warnings=warningsFor(sched, cfg.level);
+  // A long run or intervals on the day of, or the day after, a "very sore legs" check-in.
+  checkinsOf(o.changes).filter(c=>c.readiness==='very' && (c.area||'legs')!=='upper').forEach(c=>{
+    occs.filter(x=>x.type==='run' && !x.done && x.status!=='skipped' && x.status!=='recovery' && x.runKind!=='easy' && [0,1].includes(daysBetween(c.date,x.date)))
+      .forEach(x=>sched.warnings.push({type:'sore', occs:[x.occ], text:`${x.name} ${x.date===c.date?'today':'the day after'} very sore legs. An easy run (or rest) is kinder.`}));
+  });
   return sched;
 }
 
@@ -398,8 +404,15 @@ function blockedOn(date, items, level, checkins, legsPlanned){
    clear of the sore area, else Reduce. Never changes weights. */
 function readiness(sched, occId, answer, today, area){
   const x=sched.occs.find(y=>y.occ===occId); if(!x) return null;
-  const base={answer, occ:occId, actions:['move','reduce','recovery','skip']};
-  if(answer==='ready') return {...base, recommend:null, actions:[]};
+  if(answer==='ready') return {answer, occ:occId, recommend:null, actions:[]};
+  if(x.type==='run'){
+    // Runs: an easy run is gentle, a long run or intervals is not. Very sore legs never get a hard run recommended.
+    const hard=x.runKind==='long'||x.runKind==='intervals', legs=(area||'legs')!=='upper';
+    const moveTo=moveTarget(sched, occId, today, [{date:today, readiness:answer, area:area||'legs'}]);
+    const recommend = !legs ? 'start' : answer==='sore' ? (hard?'easier':'start') : (hard?'easier':'recovery');
+    return {answer, occ:occId, run:true, hard, moveTo, recommend, actions:['start', ...(hard?['easier']:[]), 'move', 'recovery', 'skip']};
+  }
+  const base={answer, occ:occId, actions:['start','move','reduce','recovery','skip']};
   const moveTo=moveTarget(sched, occId, today, answer==='very' ? [{date:today, readiness:'very', area:area||'legs'}] : []);
   return {...base, moveTo, recommend: answer==='sore' ? 'start' : moveTo ? 'move' : 'reduce'};
 }
@@ -407,10 +420,14 @@ function moveTarget(sched, occId, today, checkins){
   const x=sched.occs.find(y=>y.occ===occId), we=addDays(sched.weekStart,6); if(!x) return null;
   const level=sched.config.level, before=new Set(sched.warnings.map(w=>w.text));
   for(let d=addDays(today,1); d<=we; d=addDays(d,1)){
-    if(sched.occs.some(y=>y!==x && y.type==='lift' && y.date===d && y.status!=='skipped' && y.status!=='recovery')) continue;
+    if(sched.occs.some(y=>y!==x && y.type===x.type && y.date===d && y.status!=='skipped' && y.status!=='recovery' && !(y.optional&&!y.done))) continue;
     const moved={...sched, occs:sched.occs.map(y=>y===x?{...y, date:d, status:'upcoming'}:y)};
     const fresh=warningsFor(moved, level).filter(w=>!before.has(w.text) && (w.occs||[]).includes(occId));
     if(fresh.length) continue;
+    if(x.type==='run'){
+      if(x.runKind!=='easy' && blockedOn(d, [], level, checkins, null).legs) continue;
+      return d;
+    }
     const pv=plannedVolume(sched.workouts[x.key], x.ex), loads=groupLoads(pv.credits);
     const bl=blockedOn(d, itemsOf(moved).filter(i=>i.occ!==occId), level, checkins, loads.legs);
     if(Object.keys(bl).some(g=>loads[g]>=4)) continue;
@@ -420,10 +437,13 @@ function moveTarget(sched, occId, today, checkins){
 }
 
 /* ---------- switching programs mid-week ---------- */
-/* Plan the rest of this week for a new program. Completed workouts stay as they are and their actual working sets
-   count toward the new program's weekly muscle targets, whatever program they came from.
-   o = {prog, next (new settings), changes, sessions, today, settings?, sore?: 'legs'|'upper'|'all', startNow?,
-        keep?: {occ: false}}   keep: workouts you moved or added yourself stay unless set to false.
+/* Switch programs. Two ways, always previewed first; completed workouts, recovery days and skips are never touched:
+   - mode 'next' (start next week): this week stays exactly as it is; the new program starts on the next week start.
+   - mode 'adapt' (adapt this week): the new program takes over now. Completed workouts count toward its weekly muscle
+     targets, whatever program they came from, and the rest of this week is planned from what is still missing.
+   ('now' / startNow: the new program's own week from today, kept for older callers.)
+   o = {prog, next (new settings), changes, sessions, today, settings?, sore?: 'legs'|'upper'|'all', mode?,
+        keep?: {occ: false}}   keep: workouts you moved, added or changed after a readiness check stay unless false.
    Rules: a major muscle (chest, back, shoulders, quads, glutes, hamstrings) has a gap below 80% of target and at
    least 3 credits short. Each remaining lifting day of the new program gets the new workout that covers the most
    gap, without exercises for groups that are still recovering (spacing, back-to-back, hard runs, soreness, weekly
@@ -433,20 +453,32 @@ function moveTarget(sched, occId, today, checkins){
 function planSwitch(o){
   const today=o.today, oldCfg=configOn(o.prog, today), ws=weekStartOf(today, oldCfg.weekStart), we=addDays(ws,6);
   const next=normalize({...o.next, levelSince: o.next.level==='returning' && (oldCfg.level!=='returning' || !o.next.levelSince) ? today : o.next.levelSince});
+  const mode = o.startNow ? 'now' : o.mode || 'next';
   const old=weekSchedule({...o, weekStart:ws});
   const keep=o.keep||{};
   const future=old.occs.filter(x=>!x.done && (x.status==='today'||x.status==='upcoming'));
-  const conflicts=future.filter(x=>x.manual).map(x=>({occ:x.occ, name:x.name, date:x.date, type:x.type, keep:keep[x.occ]!==false,
-    why: x.added ? 'You added this workout' : x.movedFrom ? `You moved this from ${DOW_NAME[dow(x.movedFrom)]}` : 'You changed this workout'}));
-  const kept=future.filter(x=>x.manual && keep[x.occ]!==false), replaced=future.filter(x=>!kept.includes(x));
+  const mine=x=>x.manual || x.readiness;
+  const conflicts=future.filter(mine).map(x=>({occ:x.occ, name:x.name, date:x.date, type:x.type, keep:keep[x.occ]!==false,
+    why: x.added ? 'You added this workout' : x.movedFrom ? `You moved this from ${DOW_NAME[dow(x.movedFrom)]}` : x.readiness ? 'Changed after a readiness check' : 'You changed this workout'}));
+  const kept=future.filter(x=>mine(x) && keep[x.occ]!==false), replaced=future.filter(x=>!kept.includes(x));
+  const held=old.occs.filter(x=>x.status==='recovery'||x.status==='skipped').map(x=>x.occ);
   const doneS=sessList(o.sessions).filter(s=>s.date>=ws && s.date<=today && s.type==='lift');
   const before=volumeOf(doneS);
-  const nextProg={config:{...next, startedOn: o.startNow ? ws : addDays(we,1)}, past:[...((o.prog&&o.prog.past)||[]), {config:oldCfg, until: o.startNow ? addDays(ws,-1) : we}]};
+  // An earlier switch still waiting for next week is replaced by this one, never stacked on it.
+  const past=((o.prog&&o.prog.past)||[]).filter(p=>p && p.until && p.until<ws);
+  const nextCfg={...next, startedOn: mode==='now' ? ws : addDays(we,1)};
+  if(mode==='adapt') nextCfg.adaptWeek=ws; else delete nextCfg.adaptWeek;
+  const nextProg={config:nextCfg, past:[...past, {config:oldCfg, until: mode==='now' ? addDays(ws,-1) : we}]};
   const nextWeek=weekSchedule({...o, prog:nextProg, weekStart:addDays(we,1)});
-  if(o.startNow){
+  if(mode==='next'){
+    // This week's earlier switch changes (from an adapted week) stay as they are; nothing new is written.
+    return {mode, startNow:false, weekStart:ws, startsOn:addDays(we,1), prog:nextProg, rows:[], conflicts:[], kept:future.map(x=>x.occ), replaced:[], held,
+      added:[], before, days:previewDays(old, old, ws, today), nextWeek:nextWeek.occs, warnings:old.warnings};
+  }
+  if(mode==='now'){
     const sched=weekSchedule({...o, prog:nextProg, changes:(o.changes||[]).filter(c=>!c.change||c.change.week!==ws), weekStart:ws});
     const rows=kept.map(x=>({id:`${ws}:m:${x.key}:1`, change:{week:ws, add:true, key:x.key, date:x.date, type:x.type, name:x.name, ex:x.ex||null, runKind:x.runKind, source:'manual'}}));
-    return {startNow:true, weekStart:ws, prog:nextProg, rows, conflicts, kept:kept.map(x=>x.occ), before, days:previewDays(old, sched, ws, today), nextWeek:nextWeek.occs, warnings:sched.warnings};
+    return {mode, startNow:true, weekStart:ws, prog:nextProg, rows, conflicts, kept:kept.map(x=>x.occ), held, before, days:previewDays(old, sched, ws, today), nextWeek:nextWeek.occs, warnings:sched.warnings};
   }
   const vol=volumeFor(nextProg, o, addDays(we,1)), workouts=workoutsFor(next, vol, o.settings);
   const order=TEMPLATES[next.template].freq[next.lifts].w;
@@ -468,8 +500,11 @@ function planSwitch(o){
     if(sessList(o.sessions).some(s=>s.date===d && s.type==='run')) return;
     let i=1; while(usedRuns.has(i===1?'run':'run'+i)) i++;
     const key=i===1?'run':'run'+i; usedRuns.add(key);
-    added.push({occ:`${ws}:t:${key}:1`, key, date:d, type:'run', name:RUN_KINDS[r.kind]||'Run', runKind:r.kind, optional:!!r.optional});
-    if(!r.optional) items.push({date:d, occ:`${ws}:t:${key}:1`, name:RUN_KINDS[r.kind]||'Run', run:r.kind||'easy'});
+    // A long run or intervals right after reported leg soreness becomes an easy run (shown in the preview).
+    let kind=r.kind||'easy', note=null;
+    if(kind!=='easy' && blockedOn(d, [], next.level, checkins, null).legs){ note=`${RUN_KINDS[kind]} made easy: ${blockedOn(d, [], next.level, checkins, null).legs}`; kind='easy' }
+    added.push({occ:`${ws}:t:${key}:1`, key, date:d, type:'run', name:RUN_KINDS[kind]||'Run', runKind:kind, optional:!!r.optional, note});
+    if(!r.optional) items.push({date:d, occ:`${ws}:t:${key}:1`, name:RUN_KINDS[kind]||'Run', run:kind});
   });
   for(let d=today; d<=we; d=addDays(d,1)) if(!newDays.includes(d) && old.occs.some(x=>x.date===d && x.type==='lift' && !x.done)) dayNotes[d]='Not a lifting day in the new program';
   let n=0;
@@ -504,12 +539,12 @@ function planSwitch(o){
     n++;
   });
   const rows=[
-    ...replaced.map(x=>({id:x.occ, change:{week:ws, removed:true, source:'auto'}})),
-    ...added.map(x=>({id:x.occ, change:{week:ws, add:true, key:x.key, date:x.date, type:x.type, name:x.name, ex:x.ex||null, runKind:x.runKind, optional:x.optional||undefined, source:'auto'}})),
+    ...replaced.filter(x=>!added.some(a=>a.occ===x.occ)).map(x=>({id:x.occ, change:{week:ws, removed:true, source:'auto'}})),
+    ...added.map(x=>({id:x.occ, change:{week:ws, add:true, key:x.key, date:x.date, type:x.type, name:x.name, ex:x.ex||null, runKind:x.runKind, optional:x.optional||undefined, note:x.note||undefined, source:'auto'}})),
   ];
   const after={sets:before.sets+added.filter(x=>x.type==='lift').reduce((s,x)=>s+x.sets,0)+kept.filter(x=>x.type==='lift').reduce((s,x)=>s+plannedVolume(old.workouts[x.key],x.ex).sets,0), credits:credit};
   const newSched=weekSchedule({...o, prog:nextProg, changes:[...(o.changes||[]).filter(c=>!rows.some(r=>r.id===c.id)), ...rows], weekStart:ws});
-  return {startNow:false, weekStart:ws, prog:nextProg, rows, conflicts, kept:kept.map(x=>x.occ), replaced:replaced.map(x=>x.occ), added,
+  return {mode, startNow:false, weekStart:ws, prog:nextProg, rows, conflicts, kept:kept.map(x=>x.occ), replaced:replaced.map(x=>x.occ), held, added,
     before, after, target, gaps:MAJOR.filter(gapOf).map(m=>({muscle:m, short:r1(target[m]-credit[m])})),
     days:previewDays(old, newSched, ws, today, dayNotes, added), nextWeek:nextWeek.occs, warnings:newSched.warnings};
 }
@@ -519,12 +554,25 @@ function previewDays(old, neu, ws, today, notes, added){
   for(let d=today; d<=addDays(ws,6); d=addDays(d,1)){
     const b=old.occs.filter(x=>x.date===d && x.status!=='done'), a=neu.occs.filter(x=>x.date===d && x.status!=='done');
     const done=old.occs.filter(x=>x.date===d && x.status==='done');
-    out.push({date:d, done:done.map(x=>x.name), before:b.map(x=>({occ:x.occ, name:x.name, type:x.type, optional:!!x.optional})),
-      after:a.map(x=>{ const ad=(added||[]).find(y=>y.occ===x.occ); return {occ:x.occ, name:x.name, type:x.type, optional:!!x.optional, ex:x.ex||null, dropped:ad?ad.dropped:[], covers:ad?ad.covers:[]} }),
+    out.push({date:d, done:done.map(x=>x.name), before:b.map(x=>({occ:x.occ, name:x.name, type:x.type, optional:!!x.optional, status:x.status})),
+      after:a.map(x=>{ const ad=(added||[]).find(y=>y.occ===x.occ); return {occ:x.occ, name:x.name, type:x.type, optional:!!x.optional, ex:x.ex||null, status:x.status, dropped:(ad&&ad.dropped)||[], covers:(ad&&ad.covers)||[], note:(ad&&ad.note)||null} }),
       note:(notes||{})[d]||null});
   }
   return out;
 }
+
+/* Which program governs this week, and which (if any) is waiting to start. An adapted week belongs to the new
+   program; a program chosen to start next week is "upcoming" until its start date, then simply current. */
+function programStatus(prog, today){
+  const cur=configOn(prog, today), ws=weekStartOf(today, cur.weekStart), latest=prog&&prog.config ? normalize(prog.config) : null;
+  if(latest && latest.startedOn && latest.startedOn>today){
+    if(latest.adaptWeek===ws) return {current:latest, adapted:true, from:cur, upcoming:null, startsOn:null};
+    return {current:cur, adapted:false, upcoming:latest, startsOn:latest.startedOn};
+  }
+  return {current:cur, adapted:false, upcoming:null, startsOn:null};
+}
+/* The week's goal: scheduled workouts that are not optional and not set aside on purpose (recovery days, skips). */
+const goalOf = sched => sched.occs.filter(x=>!x.optional && x.status!=='recovery' && x.status!=='skipped');
 
 /* ---------- what the Watch gets ---------- */
 function restSecs(txt){
@@ -558,7 +606,9 @@ function serve(o){
     alts:(ALTS[e.id]||[]).map(n=>({id:altId(e.id,n), name:n}))}))} });
   const occ=x=>({occ:x.occ, key:x.key, date:x.date, type:x.type, name:x.name, status:x.status, optional:!!x.optional, runKind:x.runKind||null,
     reduced:!!x.reduced, ex:x.ex?x.ex.map(e=>({id:e.id, sets:e.sets})):null, doneId:x.done?x.done.id:null});
-  return {program:{template:c.template, name:TEMPLATES[c.template].name, level:c.level, levelName:LEVELS[c.level], stage:a.volume.stage},
+  const ps=programStatus(o.prog, o.today), pc=ps.current;
+  return {program:{template:pc.template, name:TEMPLATES[pc.template].name, level:pc.level, levelName:LEVELS[pc.level], stage:a.volume.stage,
+      upcoming: ps.upcoming ? {template:ps.upcoming.template, name:TEMPLATES[ps.upcoming.template].name, startsOn:ps.startsOn} : null},
     weekStart:ws, workouts:wire, occs:[...a.occs, ...b.occs].map(occ), allWorkouts:workouts};
 }
 
@@ -600,7 +650,7 @@ const P = {MUSCLE_LIST, MAJOR, GROUPS, SPACE, DEMANDING, LEG_CAP, LEVELS, RUN_KI
   defaultConfig, normalize, configFor, configOn, addDays, dow, daysBetween, weekStartOf, baseKey, sessList,
   volumeOf, plannedVolume, groupLoads, exList, volumeFor, weekQualifies, workoutsFor, classicWorkouts, baseWeek,
   reduceWorkout, weekSchedule, warningsFor, itemsOf, blockedOn, readiness, moveTarget, planSwitch, plansFor, serve,
-  bestRotation, restSecs, musclesOf, slotOf, rekey, watchPayload};
+  bestRotation, restSecs, musclesOf, slotOf, rekey, watchPayload, programStatus, goalOf};
 if(typeof module!=='undefined' && module.exports) module.exports=P;
 globalThis.Programs=P;
 })();

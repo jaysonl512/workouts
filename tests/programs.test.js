@@ -84,7 +84,7 @@ test('S4 rescheduling after the week started: past days stay, only the moved wor
 
 test('S5 switching from four lifting days to three', () => {
   const prog = def(), hist = [lift('upperA', '2026-10-26'), lift('lowerA', '2026-10-28'), lift('upperB', '2026-10-29'), lift('lowerB', '2026-10-30')];
-  const r = P.planSwitch({ prog, next: P.configFor('balanced', 3, prog.config), changes: [], sessions: hist, today: MON });
+  const r = P.planSwitch({ mode: 'adapt', prog, next: P.configFor('balanced', 3, prog.config), changes: [], sessions: hist, today: MON });
   assert.equal(r.added.filter(x => x.type === 'lift').length, 3);
   assert.deepEqual(r.added.filter(x => x.type === 'lift').map(x => x.date), [MON, WED, FRI]);
   assert.deepEqual(r.nextWeek.filter(x => x.type === 'lift').map(x => x.key), ['fbA', 'fbB', 'fbC']);
@@ -178,7 +178,7 @@ test('R4 skipping a workout leaves progression exactly where it was', () => {
 });
 
 /* ---------- mid-week switching ---------- */
-const thursdaySwitch = (extra = {}) => P.planSwitch({ prog: def(), next: P.configFor('balanced', 3, P.defaultConfig()), changes: [], sessions: [lift('upperA', MON), lift('lowerA', WED)], today: THU, ...extra });
+const thursdaySwitch = (extra = {}) => P.planSwitch({ mode: 'adapt', prog: def(), next: P.configFor('balanced', 3, P.defaultConfig()), changes: [], sessions: [lift('upperA', MON), lift('lowerA', WED)], today: THU, ...extra });
 
 test('M1 the Thursday example: Upper/Lower to Full Body after Upper A and Lower A', () => {
   const r = thursdaySwitch();
@@ -209,7 +209,7 @@ test('M2 same switch on Tue/Thu/Sat days: Saturday would only have 5 useful sets
 });
 
 test('M3 a week where no more workouts are needed', () => {
-  const r = P.planSwitch({ prog: def(), next: P.configFor('balanced', 3, P.defaultConfig()), changes: [],
+  const r = P.planSwitch({ mode: 'adapt', prog: def(), next: P.configFor('balanced', 3, P.defaultConfig()), changes: [],
     sessions: [lift('upperA', MON), lift('lowerA', WED), lift('upperB', THU), lift('lowerB', FRI)], today: SAT });
   assert.equal(r.added.filter(x => x.type === 'lift').length, 0);
   assert.deepEqual(r.gaps, []);
@@ -220,20 +220,20 @@ test('M4 recovery spacing and soreness in a switch', () => {
   assert.equal(sore.added.filter(x => x.type === 'lift').length, 0, 'very sore upper body blocks Friday upper work, and legs are still recovering');
   const prior = [lift('upperA', '2026-10-26'), lift('lowerA', '2026-10-28'), lift('upperB', '2026-10-29'), lift('lowerB', '2026-10-30')];
   // a long run the day before blocks leg work: Friday long run, Saturday lift has no leg exercises
-  const r = P.planSwitch({ prog: def(), next: { ...P.configFor('balanced', 3, P.defaultConfig()), days: [1, 3, 6], runs: [{ dow: 5, kind: 'long' }] }, changes: [],
+  const r = P.planSwitch({ mode: 'adapt', prog: def(), next: { ...P.configFor('balanced', 3, P.defaultConfig()), days: [1, 3, 6], runs: [{ dow: 5, kind: 'long' }] }, changes: [],
     sessions: [...prior, lift('upperA', MON)], today: TUE });
   const legs = ['squat', 'deadlift', 'hip-thrust', 'leg-curl', 'lunge', 'leg-ext', 'calf-st'];
   const sat = r.added.find(x => x.date === SAT && x.type === 'lift');
   assert.ok(!sat || (sat.ex && !sat.ex.some(e => legs.includes(e.id))), 'no leg exercises the day after a long run');
   // with an easy run on Friday, Saturday gets the leg work
-  const r2 = P.planSwitch({ prog: def(), next: { ...P.configFor('balanced', 3, P.defaultConfig()), days: [1, 3, 6], runs: [{ dow: 5, kind: 'easy' }] }, changes: [],
+  const r2 = P.planSwitch({ mode: 'adapt', prog: def(), next: { ...P.configFor('balanced', 3, P.defaultConfig()), days: [1, 3, 6], runs: [{ dow: 5, kind: 'easy' }] }, changes: [],
     sessions: [...prior, lift('upperA', MON)], today: TUE });
   const sat2 = r2.added.find(x => x.date === SAT && x.type === 'lift');
   assert.ok(sat2 && P.exList(P.workoutsFor(r2.prog.config, { stage: 'reg', fresh: {} })[sat2.key], sat2.ex).some(e => legs.includes(e.id)));
 });
 
 test('M5 no cramming: at most ceil(lifts x days left / 7) workouts and never two demanding sessions too close', () => {
-  const r = P.planSwitch({ prog: def(), next: P.configFor('ppl', 6, P.defaultConfig()), changes: [], sessions: [], today: THU });
+  const r = P.planSwitch({ mode: 'adapt', prog: def(), next: P.configFor('ppl', 6, P.defaultConfig()), changes: [], sessions: [], today: THU });
   const lifts = r.added.filter(x => x.type === 'lift');
   assert.ok(lifts.length <= Math.ceil(6 * 4 / 7));
   assert.deepEqual(r.warnings.filter(w => w.type === 'spacing'), []);
@@ -242,10 +242,10 @@ test('M5 no cramming: at most ceil(lifts x days left / 7) workouts and never two
 test('M6 manually scheduled workouts are kept and shown as conflicts; only automatic ones are replaced', () => {
   const prog = def(), ub = `${MON}:upperB:1`;
   const changes = [{ id: ub, change: { week: MON, date: SAT, source: 'manual' } }];
-  const r = P.planSwitch({ prog, next: P.configFor('balanced', 3, prog.config), changes, sessions: [lift('upperA', MON), lift('lowerA', WED)], today: THU });
+  const r = P.planSwitch({ mode: 'adapt', prog, next: P.configFor('balanced', 3, prog.config), changes, sessions: [lift('upperA', MON), lift('lowerA', WED)], today: THU });
   assert.deepEqual(r.conflicts.map(c => [c.occ, c.keep]), [[ub, true]]);
   assert.ok(r.kept.includes(ub)); assert.ok(!r.replaced.includes(ub)); assert.ok(r.replaced.includes(`${MON}:lowerB:1`));
-  const r2 = P.planSwitch({ prog, next: P.configFor('balanced', 3, prog.config), changes, sessions: [lift('upperA', MON), lift('lowerA', WED)], today: THU, keep: { [ub]: false } });
+  const r2 = P.planSwitch({ mode: 'adapt', prog, next: P.configFor('balanced', 3, prog.config), changes, sessions: [lift('upperA', MON), lift('lowerA', WED)], today: THU, keep: { [ub]: false } });
   assert.ok(r2.replaced.includes(ub));
 });
 
@@ -361,4 +361,119 @@ test('L4 nothing saved yet: the original plan with its original set counts, even
   assert.equal(v.stage, 'reg'); assert.deepEqual(v.fresh, {});
   const s = P.weekSchedule({ prog: null, changes: [], sessions: hist, today: '2026-11-08', weekStart: NEXT });
   assert.deepEqual(s.workouts.lowerA.ex.map(e => e.sets), [4, 3, 3, 3, 4]);
+});
+
+/* ---------- program transitions (start next week / adapt this week), recovery days, run readiness ---------- */
+// Jayson's real week: Mon Upper A, Tue run, Wed Lower A, Thu Upper B done; Friday's Lower B made a recovery day
+// after "very sore legs"; switching to Strength + Running on Friday.
+const realWeek = () => ({
+  sessions: [lift('upperA', MON), run(TUE), lift('lowerA', WED), lift('upperB', THU)],
+  changes: [{ id: `${MON}:lowerB:1`, change: { week: MON, recovery: true, source: 'readiness' } },
+            { id: `chk:${FRI}`, change: { week: MON, readiness: 'very', area: 'legs', source: 'readiness' } }],
+});
+const srNext = () => P.configFor('strengthRun', 3, P.defaultConfig());
+
+test('X1 a program scheduled to start next Monday leaves this week exactly as it was', () => {
+  const w = realWeek(), before = P.weekSchedule({ prog: def(), ...w, today: FRI, weekStart: MON });
+  const r = P.planSwitch({ prog: def(), next: srNext(), ...w, today: FRI });   // default: start next week
+  assert.equal(r.mode, 'next'); assert.deepEqual(r.rows, []); assert.equal(r.startsOn, NEXT);
+  const after = P.weekSchedule({ prog: r.prog, ...w, today: FRI, weekStart: MON });
+  assert.deepEqual(after.occs.map(x => [x.occ, x.date, x.status]), before.occs.map(x => [x.occ, x.date, x.status]));
+  const st = P.programStatus(r.prog, FRI);
+  assert.equal(st.current.template, 'current'); assert.equal(st.upcoming.template, 'strengthRun'); assert.equal(st.startsOn, NEXT);
+  assert.deepEqual(r.nextWeek.filter(x => x.type === 'lift').map(x => x.key), ['srA', 'srB', 'srC']);
+});
+
+test('X2 the upcoming program becomes current on its start date, with nothing rewritten', () => {
+  const r = P.planSwitch({ prog: def(), next: srNext(), ...realWeek(), today: FRI });
+  const sat = P.programStatus(r.prog, SAT), sun = P.programStatus(r.prog, '2026-11-08'), mon = P.programStatus(r.prog, NEXT);
+  assert.equal(sat.upcoming.template, 'strengthRun'); assert.equal(sun.current.template, 'current');
+  assert.equal(mon.current.template, 'strengthRun'); assert.equal(mon.upcoming, null);
+  assert.equal(P.weekSchedule({ prog: r.prog, changes: [], sessions: [], today: NEXT }).config.template, 'strengthRun');
+});
+
+test('X3 adapt this week: the new program takes over now and the week is planned from what is missing', () => {
+  const r = thursdaySwitch();   // mode adapt
+  assert.equal(r.mode, 'adapt'); assert.equal(r.prog.config.adaptWeek, MON);
+  const st = P.programStatus(r.prog, THU);
+  assert.equal(st.current.template, 'balanced'); assert.equal(st.adapted, true); assert.equal(st.upcoming, null);
+  assert.equal(P.programStatus(r.prog, NEXT).adapted, false);
+});
+
+test('X4 switching after four workouts and a recovery day: done and recovery stay; no hard run after very sore legs', () => {
+  const w = realWeek();
+  const r = P.planSwitch({ mode: 'adapt', prog: def(), next: srNext(), ...w, today: FRI });
+  assert.ok(r.held.includes(`${MON}:lowerB:1`)); assert.ok(!r.replaced.includes(`${MON}:lowerB:1`));
+  assert.ok(!r.rows.some(x => x.id === `${MON}:lowerB:1`), 'the recovery decision is not rewritten');
+  assert.equal(r.added.filter(x => x.type === 'lift').length, 0, 'no lift crammed into the sore Friday');
+  const satRun = r.added.find(x => x.type === 'run' && x.date === SAT);
+  assert.equal(satRun.runKind, 'easy'); assert.match(satRun.note, /made easy/);
+  const s = P.weekSchedule({ prog: r.prog, changes: [...w.changes, ...r.rows], sessions: w.sessions, today: FRI, weekStart: MON });
+  assert.equal(s.occs.find(x => x.occ === `${MON}:lowerB:1`).status, 'recovery');
+  assert.equal(s.occs.filter(x => x.status === 'done').length, 4);
+  // start-next-week keeps the recovery day too, and flags the long run instead of changing it
+  const n = P.planSwitch({ prog: def(), next: srNext(), ...w, today: FRI });
+  const s2 = P.weekSchedule({ prog: n.prog, ...w, today: FRI, weekStart: MON });
+  assert.equal(s2.occs.find(x => x.occ === `${MON}:lowerB:1`).status, 'recovery');
+  assert.equal(s2.occs.find(x => x.key === 'run2').runKind, 'long');
+  assert.ok(s2.warnings.some(x => x.type === 'sore'));
+});
+
+test('X5 changing your mind before next week replaces the waiting switch; it is never turned into an immediate one', () => {
+  const w = realWeek(), r = P.planSwitch({ prog: def(), next: srNext(), ...w, today: THU });
+  const r2 = P.planSwitch({ prog: r.prog, next: P.configFor('balanced', 3, P.defaultConfig()), ...w, today: FRI });
+  assert.equal(r2.mode, 'next'); assert.deepEqual(r2.rows, []);
+  assert.equal(r2.prog.past.length, 1); assert.equal(r2.prog.past[0].config.template, 'current');
+  assert.equal(P.programStatus(r2.prog, FRI).upcoming.template, 'balanced');
+  assert.equal(r2.prog.config.adaptWeek, undefined);
+});
+
+test('X6 readiness on run days: hard runs and easy runs are treated differently, nothing changes without a choice', () => {
+  const w = realWeek(), s = P.weekSchedule({ prog: def(), ...w, today: SAT, weekStart: MON });
+  const lr = s.occs.find(x => x.key === 'run2');          // Saturday long run (optional in the original plan)
+  const v = P.readiness(s, lr.occ, 'very', SAT, 'legs');
+  assert.equal(v.recommend, 'easier'); assert.deepEqual(v.actions, ['start', 'easier', 'move', 'recovery', 'skip']);
+  assert.equal(P.readiness(s, lr.occ, 'sore', SAT, 'legs').recommend, 'easier');
+  assert.equal(P.readiness(s, lr.occ, 'very', SAT, 'upper').recommend, 'start', 'sore arms do not stop a run');
+  assert.equal(P.readiness(s, lr.occ, 'ready', SAT).recommend, null);
+  const easy = P.weekSchedule({ prog: { config: { ...P.configFor('upperLower', 4), runs: [{ dow: 6, kind: 'easy' }] } }, changes: [], sessions: [], today: SAT, weekStart: MON });
+  const er = easy.occs.find(x => x.type === 'run'), ev = P.readiness(easy, er.occ, 'very', SAT, 'legs');
+  assert.equal(ev.recommend, 'recovery'); assert.ok(!ev.actions.includes('easier'));
+  assert.equal(P.readiness(easy, er.occ, 'sore', SAT, 'legs').recommend, 'start');
+  // choosing "shorter, easier run" is a change row; the schedule and the Watch both show it
+  const ch = [...w.changes, { id: lr.occ, change: { week: MON, runKind: 'easy', easier: true, source: 'readiness' } }];
+  const s2 = P.weekSchedule({ prog: def(), changes: ch, sessions: w.sessions, today: SAT, weekStart: MON });
+  const x = s2.occs.find(y => y.occ === lr.occ);
+  assert.equal(x.runKind, 'easy'); assert.equal(x.name, 'Easy run (shorter)');
+  assert.equal(P.serve({ prog: def(), changes: ch, sessions: w.sessions, today: SAT }).occs.find(y => y.occ === lr.occ).runKind, 'easy');
+  // the same for a run that a program switch added (Jayson's Saturday long run)
+  const added = { id: `${MON}:t:run2:1`, change: { week: MON, add: true, key: 'run2', date: SAT, type: 'run', name: 'Long run', runKind: 'long', source: 'auto' } };
+  const merged = { id: added.id, change: { ...added.change, runKind: 'easy', easier: true, source: 'readiness' } };
+  const s3 = P.weekSchedule({ prog: def(), changes: [merged], sessions: [], today: SAT, weekStart: MON });
+  const y = s3.occs.find(z => z.occ === added.id);
+  assert.equal(y.runKind, 'easy'); assert.equal(y.name, 'Easy run (shorter)');
+});
+
+test('X7 a recovery day is a decision, not a failure: not in the goal, not missed, no effect on progression', () => {
+  const w = realWeek(), s = P.weekSchedule({ prog: def(), ...w, today: SAT, weekStart: MON });
+  const lb = s.occs.find(x => x.key === 'lowerB');
+  assert.equal(lb.status, 'recovery');
+  assert.equal(P.goalOf(s).length, 4, 'four workouts to do: the recovery day is not counted against the week');
+  assert.ok(!s.occs.some(x => x.status === 'missed' && x.key === 'lowerB'));
+  // no session is created, so every Lower B exercise plans from the same history as before
+  const c = Prog.configFor(W.EXMAP.deadlift, {}), h = [{ date: '2026-10-30', sets: [{ w: 225, r: 5 }, { w: 190, r: 7 }, { w: 190, r: 7 }] }];
+  assert.deepEqual(Prog.planFor(c, Prog.historyFor(w.sessions, 'deadlift', { today: NEXT }).concat(h), NEXT).sets, Prog.planFor(c, h, NEXT).sets);
+});
+
+test('X8 the Watch gets the schedule that is actually in force, before and after the start date', () => {
+  const w = realWeek(), r = P.planSwitch({ prog: def(), next: srNext(), ...w, today: FRI });
+  const out = P.serve({ prog: r.prog, ...w, settings: {}, today: FRI });
+  const thisWeek = out.occs.filter(x => x.date < NEXT), nextWeek = out.occs.filter(x => x.date >= NEXT);
+  assert.deepEqual(thisWeek.filter(x => x.type === 'lift').map(x => x.key), ['upperA', 'lowerA', 'upperB', 'lowerB']);
+  assert.equal(thisWeek.find(x => x.key === 'lowerB').status, 'recovery');
+  assert.deepEqual(nextWeek.filter(x => x.type === 'lift').map(x => x.key), ['srA', 'srB', 'srC']);
+  assert.equal(out.program.name, 'Current plan'); assert.equal(out.program.upcoming.name, 'Strength + Running');
+  assert.ok(out.workouts.srA && out.workouts.lowerB);
+  const later = P.serve({ prog: r.prog, ...w, settings: {}, today: NEXT });
+  assert.equal(later.program.name, 'Strength + Running'); assert.equal(later.program.upcoming, null);
 });

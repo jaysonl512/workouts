@@ -234,6 +234,9 @@ table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:6px 4px;b
 button.dayrow{width:100%;background:none;border-left:0;border-right:0;border-bottom:0;color:var(--text);font:inherit;text-align:left}
 .dayrow .dt small,.mute{color:var(--mute);font-weight:500}
 .pname{font-size:18px}
+.hrest{font-size:13px;color:var(--mute);padding:4px 6px 8px}
+.kick{display:block;font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--mute);margin-bottom:2px}
+.upc{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);margin-top:12px;padding-top:12px}
 .warn{background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.3);color:#fcd34d;border-radius:12px;padding:9px 12px;font-size:13px;margin:8px 0}
 .warn.soft{background:transparent;border-color:var(--line);color:var(--mute)}
 .warnc{color:#fcd34d}
@@ -459,7 +462,7 @@ details[open]>summary .chev{transform:rotate(90deg)}
 
 <script src="plan.js?v=2026-11-06.6"></script>
 <script src="progression.js?v=2026-11-06.1"></script>
-<script src="programs.js?v=2026-11-06.6"></script>
+<script src="programs.js?v=2026-11-06.7"></script>
 <script>
 const SESS_KEYS = ['upperA','run','lowerA','upperB','lowerB','run2','yoga','rest'];
 const sessBase = k => Programs.baseKey(k);
@@ -486,7 +489,7 @@ const EFFORT = {easy:'Easy', medium:'Medium', hard:'Hard'};
 const effortSeg = (act,cur) => `<div class="segc">${Object.entries(EFFORT).map(([v,l])=>`<button class="${v===cur?'on':''}" data-act="${act}" data-v="${v}">${l}</button>`).join('')}</div>`;
 const kindOf = x => x.yoga ? 'yoga' : x.other ? 'other' : x.run ? 'run' : 'lift';
 const CHEERS = ['Nice one','Solid set','Strong','Locked in','Clean rep','Beast mode','Smooth'];
-const APP_VERSION='2026-11-06.6';
+const APP_VERSION='2026-11-06.7';
 
 
 /* ---------- helpers ---------- */
@@ -1149,8 +1152,8 @@ function sessStats(x){
 /* This week's scheduled workouts (programs.js) with the session that covers each, and the week's goal
    (scheduled workouts that are not optional). Used by Today, stats and reviews. */
 function weekPlan(ds){
-  const sc=sched(ds), req=sc.occs.filter(x=>!x.optional);
-  return {mon:sc.weekStart, sched:sc, doneN:req.filter(x=>x.status==='done').length, goal:req.length,
+  const sc=sched(ds), req=sc.occs.filter(x=>!x.optional), goal=Programs.goalOf(sc);
+  return {mon:sc.weekStart, sched:sc, doneN:goal.filter(x=>x.status==='done').length, goal:goal.length, rest:req.filter(x=>x.status==='recovery'||x.status==='skipped').length,
     left:req.filter(x=>x.status==='today'||x.status==='upcoming'||x.status==='missed')};
 }
 /* Session key for a scheduled run on a date: whichever run key is still free that day. */
@@ -1203,23 +1206,35 @@ function weekList(wp){
     return `<button class="wrow ${!logged&&st.occ===x.occ?'sel':''}" data-act="pick" data-k="${esc(x.key)}" data-o="${esc(x.occ)}"><i class="wck"></i><span><b>${esc(x.name)}</b><small>${day(x.date)} · ${sub}</small></span>${tag}</button>`;
   }).join('');
   const extras = sc.extras.map(s=>doneRow(s, logged&&logged.id===s.id)).join('');
-  return `<div class="schhd"><b>${cur?'This week':'That week'}</b><span>${wp.doneN} of ${wp.goal} done</span></div>
+  return `<div class="schhd"><b>${cur?'This week':'That week'}</b><span>${wp.doneN} of ${wp.goal} done${wp.rest?` · ${wp.rest} recovery`:''}</span></div>
     <div class="card wlist">${rows||'<div class="note" style="padding:10px">Nothing scheduled this week.</div>'}${extras?`<div class="wsub">Also this week</div>${extras}`:''}</div>`;
 }
 /* Optional readiness check before a scheduled lift (programs.js readiness): never changes weights. */
 function readyCard(x){
-  if(!x || x.type!=='lift' || x.done || st.date!==todayStr()) return '';
-  if(x.reduced) return `<div class="rdy"><div><b>Reduced volume today</b><div class="note">Fewer sets, same targets. It won't count against your progress.</div></div><button class="link" data-act="rdyundo" data-o="${esc(x.occ)}">Undo</button></div>`;
+  if(!x || (x.type!=='lift' && x.type!=='run') || x.done || st.date!==todayStr()) return '';
+  if(x.type==='lift' && x.reduced) return `<div class="rdy"><div><b>Reduced volume today</b><div class="note">Fewer sets, same targets. It won't count against your progress.</div></div><button class="link" data-act="rdyundo" data-o="${esc(x.occ)}">Undo</button></div>`;
+  if(x.type==='run' && (changeOf(x.occ)||{}).easier) return `<div class="rdy"><div><b>Shorter, easy run today</b><div class="note">Keep it conversational, and stop early if your legs complain.</div></div><button class="link" data-act="rdyundo" data-o="${esc(x.occ)}">Undo</button></div>`;
   if(!progCfg().readiness) return '';
   const chk=changeOf('chk:'+todayStr()), ans=chk&&chk.readiness;
   if(!ans) return `<div class="rdy col"><span>How are you feeling? <small>Optional</small></span>${seg('rdy','',[['ready','Ready'],['sore','A little sore'],['very','Very sore']])}</div>`;
   if(ans==='ready') return '';
-  const r=Programs.readiness(sched(st.date), x.occ, ans, todayStr(), chk.area);
+  const sc=sched(st.date), r=Programs.readiness(sc, x.occ, ans, todayStr(), chk.area), dname=d=>Programs.DOW_NAME[Programs.dow(d)];
   const b=(a,l,rec)=>`<button class="btn sm ${rec?'':'ghost'}" data-act="rdyact" data-a="${a}" data-o="${esc(x.occ)}">${l}</button>`;
-  const move = r.moveTo ? b('move','Move to '+Programs.DOW_NAME[Programs.dow(r.moveTo)], r.recommend==='move') : '';
-  if(ans==='sore') return `<div class="rdy col"><div><b>A little sore</b><div class="note">Start as planned: the warm-ups help. Or do fewer sets today.</div></div><div class="rbtns">${b('reduce','Reduce volume')}<button class="link" data-act="rdyclear">Change answer</button></div></div>`;
-  return `<div class="rdy col"><div><b>Not recovered</b><div class="note">${r.moveTo?`${Programs.DOW_NAME[Programs.dow(r.moveTo)]} is clear of your sore muscles.`:'No later day this week is clear of your sore muscles.'} None of these change your weights.</div></div>
-    <div class="rbtns">${r.recommend==='move'?move:b('reduce','Reduce volume',true)}${r.recommend==='move'?b('reduce','Reduce volume'):move}${b('recovery','Recovery day')}${b('skip','Skip')}</div><button class="link" data-act="rdyclear">Change answer</button></div>`;
+  const label={start:'Continue as planned', easier:'Shorter, easy run', move:r.moveTo?'Move to '+dname(r.moveTo):'', reduce:'Reduce volume', recovery:'Recovery day', skip:'Skip'};
+  const btn=a=> a==='start' ? `<button class="btn sm ${r.recommend==='start'?'':'ghost'}" data-act="start" data-resume="0">${label.start}</button>` : a==='move'&&!r.moveTo ? '' : b(a,label[a],r.recommend===a);
+  const order=[r.recommend, ...r.actions.filter(a=>a!==r.recommend)].filter(a=>a && r.actions.includes(a));
+  if(r.run){
+    const msg = (chk.area||'legs')==='upper' ? 'Sore upper body is no reason to skip a run.'
+      : r.hard ? `A ${x.runKind==='long'?'long run':'hard interval session'} on sore legs adds more fatigue. A shorter, easy run keeps you moving.`
+      : ans==='very' ? 'An easy run is fine if it feels good once you start. A recovery day is fine too.' : 'Keep it easy and conversational.';
+    return `<div class="rdy col"><div><b>${ans==='very'?'Not recovered':'A little sore'}</b><div class="note">${msg} Nothing changes unless you pick something.</div></div><div class="rbtns">${order.map(btn).join('')}</div><button class="link" data-act="rdyclear">Change answer</button></div>`;
+  }
+  // A long run or intervals tomorrow, after very sore legs today: offer to make it easy (only if you choose).
+  const tmr=ans==='very' && (chk.area||'legs')!=='upper' ? sched(addDays(st.date,1)).occs.find(y=>y.type==='run' && y.date===addDays(st.date,1) && !y.done && y.runKind!=='easy' && y.status!=='skipped' && y.status!=='recovery') : null;
+  const tmrBtn = tmr ? `<button class="btn sm ghost" data-act="rdyact" data-a="easier" data-o="${esc(tmr.occ)}">Make tomorrow's ${esc(tmr.name.toLowerCase())} easy</button>` : '';
+  if(ans==='sore') return `<div class="rdy col"><div><b>A little sore</b><div class="note">Start as planned: the warm-ups help. Or do fewer sets today.</div></div><div class="rbtns">${b('reduce','Reduce volume')}</div><button class="link" data-act="rdyclear">Change answer</button></div>`;
+  return `<div class="rdy col"><div><b>Not recovered</b><div class="note">${r.moveTo?`${dname(r.moveTo)} is clear of your sore muscles.`:'No later day this week is clear of your sore muscles.'} None of these change your weights.</div></div>
+    <div class="rbtns">${order.filter(a=>a!=='start').map(btn).join('')}${tmrBtn}</div><button class="link" data-act="rdyclear">Change answer</button></div>`;
 }
 /* The scheduled occurrence for the workout shown, attached to a draft that has nothing logged yet (so a workout's
    exercise list is fixed once it starts). Workouts started outside the schedule (repeats, extras) have none. */
@@ -1568,7 +1583,10 @@ function viewHistory(){
   const rng = m => { const f=d=>new Date(d+'T12:00:00').toLocaleDateString(undefined,{month:'short',day:'numeric'}); return f(m)+' – '+f(addDays(m,6)) };
   groups.forEach((list,mon)=>{
     const label = mon===thisMon ? 'This week' : mon===lastMon ? 'Last week' : rng(mon);
+    // Recovery days and skips are decisions, not workouts: listed under the week, never counted as missed.
+    const off = mon>=addDays(thisMon,-84) ? sched(mon).occs.filter(x=>x.status==='recovery'||x.status==='skipped') : [];
     h += `<div class="wkhead"><b>${label}</b><span>${mon===thisMon||mon===lastMon?rng(mon)+' · ':''}${list.length} workout${list.length>1?'s':''}${mon<thisMon?` · <button class="rlink" data-act="recap" data-k="week" data-v="${mon}">Recap</button>`:''}</span></div>`;
+    off.forEach(x=>{ h += `<div class="hrest">🌿 ${Programs.DOW_NAME[Programs.dow(x.date)]} · ${esc(x.name)}: ${x.status==='recovery'?'recovery day':'skipped'}</div>` });
     list.forEach(x=>{
       const kind = kindOf(x), loc = st.local.some(l=>l.id===x.id);
       const dt = new Date(x.date+'T12:00:00');
@@ -2045,20 +2063,23 @@ function exportData(){
   else { const a=document.createElement('a'), u=URL.createObjectURL(file); a.href=u; a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(u),5000); toast('Export saved') }
 }
 function viewPlan(){
-  const t=todayStr(), c=progCfg(), T=Programs.TEMPLATES[c.template], sc=sched(t), vol=sc.volume;
-  const starts = c.startedOn && c.startedOn>t ? c.startedOn : null;
-  const runs=c.runs||[], req=runs.filter(r=>!r.optional).length, opt=runs.length-req;
-  const runTxt = !runs.length ? 'no runs' : [req?`${req} run${req>1?'s':''}`:'', opt?`${opt} optional run${opt>1?'s':''}`:''].filter(Boolean).join(' + ');
-  const stage = c.level!=='returning' ? '' : vol.stage==='reg' ? 'Built back up to regular volume' : `Building back up: stage ${vol.stage==='r1'?1:2} of 3`;
-  let h=`<div class="sect">Current program</div><div class="card"><div class="row2"><div><b class="pname">${esc(T.name)}</b>
-    <div class="note">${c.lifts} lifts · ${runTxt} · ${Programs.LEVELS[c.level]}</div>
-    ${stage?`<div class="note">${stage}${vol.held?' (on hold)':''} · <button class="link inl" data-act="ramphold">${c.rampHold?'Keep building':'Hold this stage'}</button></div>`:''}
-    ${starts?`<div class="note">Starts ${esc(fmtDate(starts))}. This week finishes as planned.</div>`:''}</div>
+  const t=todayStr(), c=progCfg(), sc=sched(t), vol=sc.volume, ps=Programs.programStatus(st.prog, t);
+  const cur=ps.current, CT=Programs.TEMPLATES[cur.template], T=Programs.TEMPLATES[c.template];
+  const starts = ps.startsOn;
+  const runsTxt = cf => { const runs=cf.runs||[], req=runs.filter(r=>!r.optional).length, opt=runs.length-req;
+    return !runs.length ? 'no runs' : [req?`${req} run${req>1?'s':''}`:'', opt?`${opt} optional run${opt>1?'s':''}`:''].filter(Boolean).join(' + ') };
+  const stage = cur.level!=='returning' ? '' : vol.stage==='reg' ? 'Built back up to regular volume' : `Building back up: stage ${vol.stage==='r1'?1:2} of 3`;
+  const day = d => Programs.DOW_NAME[Programs.dow(d)];
+  let h=`<div class="sect">Program</div><div class="card"><div class="row2"><div><small class="kick">This week</small><b class="pname">${esc(CT.name)}</b>
+    <div class="note">${cur.lifts} lifts · ${runsTxt(cur)} · ${Programs.LEVELS[cur.level]}</div>
+    ${ps.adapted?`<div class="note">Adapted this week from ${esc(Programs.TEMPLATES[ps.from.template].name)}</div>`:''}
+    ${stage?`<div class="note">${stage}${vol.held?' (on hold)':''} · <button class="link inl" data-act="ramphold">${c.rampHold?'Keep building':'Hold this stage'}</button></div>`:''}</div>
     <button class="btn sm" data-act="chgopen">Change</button></div>
+    ${ps.upcoming?`<div class="upc"><div><small class="kick">Next</small><b>${esc(T.name)}</b><div class="note">Starts ${esc(day(starts))}, ${esc(shortDate(starts))} · ${c.lifts} lifts · ${runsTxt(c)}</div></div>
+      <div class="rbtns"><button class="btn sm ghost" data-act="adaptnow">Adapt this week instead</button><button class="link inl" data-act="upccancel">Cancel</button></div></div>`:''}
     ${!st.prog?'<div class="note" style="margin-top:8px">Your original plan. Change program, or customize it below.</div>':''}
     ${st.prog && sbAuth() && st.progCloud===false?'<div class="note warnc" style="margin-top:8px">Saved on this phone. It reaches your Watch once the database update is in place.</div>':''}</div>`;
   // the week
-  const day = d => Programs.DOW_NAME[Programs.dow(d)];
   const rows=[...Array(7)].map((_,i)=>{
     const d=addDays(sc.weekStart,i), items=sc.occs.filter(x=>x.date===d);
     const label = items.length ? items.map(x=>esc(x.name)+(x.optional?' <small>optional</small>':'')).join(' · ') : '<span class="mute">Rest</span>';
@@ -2074,7 +2095,7 @@ function viewPlan(){
   // workouts (the program's newest settings)
   const pv=Programs.volumeFor(st.prog, {sessions:allSessions(), changes:st.changes}, starts||sc.weekStart);
   const wks=Programs.workoutsFor(c, pv, st.settings), order=T.freq[c.lifts].w;
-  h+=`<div class="sect">Workouts</div>`;
+  h+=`<div class="sect">Workouts${ps.upcoming?` <span class="mute">· ${esc(T.name)}, from ${esc(day(starts))}</span>`:''}</div>`;
   order.forEach(k=>{
     const S=wks[k], sets=S.ex.reduce((a,e)=>a+e.sets,0), lib=Object.keys(EXMAP).filter(id=>!EXMAP[id].alt && Programs.musclesOf(id) && !S.ex.some(e=>e.id===id));
     h+=`<details class="card pl" ${st.openW===k?'open':''} data-w="${k}"><summary><div class="ttl"><b>${esc(S.name)}</b><span>${S.ex.length} exercises · ${sets} sets · about ${S.ex.length*7} min</span></div><span class="chev">›</span></summary><div class="body">${S.ex.map(e=>{
@@ -2090,12 +2111,13 @@ function viewPlan(){
   // settings
   const pick=st.pdays||c.days, need=Object.keys(T.freq).map(Number);
   const dayBtns=[...Array(7)].map((_,i)=>{ const dw=(c.weekStart+i)%7; return `<button class="dchip ${pick.includes(dw)?'on':''}" data-act="pday" data-v="${dw}">${Programs.DOW_NAME[dw][0]}<small>${Programs.DOW_NAME[dw]}</small></button>` }).join('');
+  const runs=c.runs||[];
   const runRows=runs.map(r=>`<div class="runr"><b>${Programs.DOW_NAME[r.dow]}</b><select data-prun="${r.dow}">${Object.entries(Programs.RUN_KINDS).map(([v,l])=>`<option value="${v}" ${r.kind===v?'selected':''}>${l}</option>`).join('')}</select>
     <button class="chipb ${r.optional?'on':''}" data-act="prunopt" data-v="${r.dow}">Optional</button><button class="ibtn" data-act="prunrem" data-v="${r.dow}" aria-label="Remove run">✕</button></div>`).join('');
   const free=[0,1,2,3,4,5,6].filter(d=>!runs.some(r=>r.dow===d));
   const prefs=c.prefs, prefRows=[...Object.entries(prefs.use).map(([slot,id])=>`<div class="ln"><b>${esc(EXMAP[id]?.name||id)}</b><span>instead of ${esc(EXMAP[slot]?.name||slot)} <button class="ibtn" data-act="prefdel" data-k="use" data-id="${slot}" aria-label="Remove">✕</button></span></div>`),
     ...prefs.avoid.map(id=>`<div class="ln"><b>${esc(EXMAP[id]?.name||id)}</b><span>never <button class="ibtn" data-act="prefdel" data-k="avoid" data-id="${id}" aria-label="Remove">✕</button></span></div>`)].join('');
-  h+=`<div class="sect">Program settings</div><div class="card">
+  h+=`<div class="sect">Program settings${ps.upcoming?` <span class="mute">· ${esc(T.name)}</span>`:''}</div><div class="card">
     <label class="f">Lifting days ${need.length>1?`(${need[0]} to ${need[need.length-1]})`:`(${need[0]})`}</label><div class="dchips">${dayBtns}</div>
     ${st.pdays&&!need.includes(st.pdays.length)?`<div class="note warnc">Pick ${need.length>1?need.join(' or '):need[0]} days for ${esc(T.name)}.</div>`:''}
     <div class="sep"></div><label class="f">Runs</label>${runRows||'<div class="note">No runs scheduled.</div>'}
@@ -2143,31 +2165,37 @@ function chgSheet(){
       <button class="btn ghost" style="margin-top:8px" data-act="chgback">Back</button>`+cl;
   }
   // preview
-  const r=Programs.planSwitch({prog:st.prog, next:g.cfg, changes:st.changes, sessions:allSessions(), today:t, settings:st.settings, sore:g.sore||null, startNow:!!g.now, keep:g.keep});
+  const r=Programs.planSwitch({prog:st.prog, next:g.cfg, changes:st.changes, sessions:allSessions(), today:t, settings:st.settings, sore:g.sore||null, mode:g.mode||'next', keep:g.keep});
   g.r=r;
   const day=d=>Programs.DOW_NAME[Programs.dow(d)];
   const done=sched(t).occs.filter(x=>x.status==='done');
   const exNames = (x,key) => { const w=Programs.workoutsFor(g.cfg,{stage:'reg',fresh:{}})[key]||sched(t).workouts[key]; return x.ex&&w ? Programs.exList(w,x.ex).map(e=>`${EXMAP[e.use||e.id].name} ${e.sets}`).join(' · ') : '' };
   const dayRows=r.days.map(d=>{
-    const b=d.before.map(x=>esc(x.name)).join(', '), a=d.after.map(x=>`<b>${esc(x.name)}</b>${x.ex?`<small class="sub">${esc(exNames(x,x.occ.split(':').slice(-2)[0]))}</small>`:''}`).join('');
+    const lbl=x=>esc(x.name)+(x.status==='recovery'?' <small class="mute">(recovery day)</small>':x.status==='skipped'?' <small class="mute">(skipped)</small>':'');
+    const b=d.before.map(lbl).join(', '), a=d.after.map(x=>`<b>${lbl(x)}</b>${x.ex?`<small class="sub">${esc(exNames(x,x.occ.split(':').slice(-2)[0]))}</small>`:''}`).join('');
     const drop={}; d.after.forEach(x=>(x.dropped||[]).forEach(e=>{ (drop[e.why] ||= []).push(e.name) }));
     const why=Object.entries(drop).map(([w,n])=>`Left out ${n.join(', ')}: ${w}.`).join(' ');
-    const same=b===d.after.map(x=>esc(x.name)).join(', ');
+    const same=b===d.after.map(lbl).join(', ');
     return `<div class="pvd"><span class="dn">${day(d.date)}</span><div>${d.done.length?`<div class="mute">Done: ${esc(d.done.join(', '))}</div>`:''}${same?(b?`<div>${b} <small class="mute">(no change)</small></div>`:'<div class="mute">Rest</div>'):`${b?`<div class="was">${b}</div>`:''}${a||'<div class="mute">Rest</div>'}`}${why?`<small class="sub">${esc(why)}</small>`:''}${d.note&&!same?`<small class="sub">${esc(d.note)}</small>`:''}</div></div>`;
   }).join('');
   const conf=r.conflicts.map(c=>`<div class="row2 conf"><div><b>${esc(c.name)}</b> · ${day(c.date)}<div class="note">${esc(c.why)}</div></div>${seg('chgkeep:'+c.occ, c.keep?'keep':'replace', [['keep','Keep'],['replace','Replace']])}</div>`).join('');
   const M=Programs.MUSCLE_LIST, cap=m=>m[0].toUpperCase()+m.slice(1);
-  const vol=r.startNow?'':`<label class="f" style="margin-top:14px">This week's volume (working sets credited per muscle)</label><table class="vt"><tr><th></th><th>Done</th><th>After</th><th>Target</th></tr>${M.map(m=>`<tr class="${Programs.MAJOR.includes(m)?'':'mute'}"><td>${cap(m)}</td><td>${r.before.credits[m]}</td><td>${r.after.credits[m]}</td><td>${r.target[m]}</td></tr>`).join('')}</table>
+  const vol=r.mode!=='adapt'?'':`<label class="f" style="margin-top:14px">This week's volume (working sets credited per muscle)</label><table class="vt"><tr><th></th><th>Done</th><th>After</th><th>Target</th></tr>${M.map(m=>`<tr class="${Programs.MAJOR.includes(m)?'':'mute'}"><td>${cap(m)}</td><td>${r.before.credits[m]}</td><td>${r.after.credits[m]}</td><td>${r.target[m]}</td></tr>`).join('')}</table>
     <div class="note">Working sets: ${r.before.sets} done, ${r.after.sets} with the rest of this week. ${r.gaps.length?r.gaps.map(x=>`${cap(x.muscle)} finish ${x.short} short`).join(', ')+'. That\'s fine: no catching up crammed into the last days.':'Every main muscle is covered.'}</div>`;
   const next=r.nextWeek.filter(x=>!x.optional).map(x=>`${day(x.date)} ${esc(x.name)}`).join(' · ');
   const warn=r.warnings.filter(w=>!w.soft).map(w=>`<div class="warn">⚠ ${esc(w.text)}</div>`).join('');
-  return o+`<h3>${esc(T.name)}: rest of this week</h3><div class="note">${done.length?`Kept as done: ${esc(done.map(x=>x.name+' ('+day(x.done.date)+')').join(', '))}. Their sets count toward the new program.`:'Nothing done yet this week.'}</div>
-    ${conf?`<label class="f" style="margin-top:14px">Workouts you scheduled yourself</label>${conf}`:''}
-    <div class="pv">${dayRows}</div>${warn}${vol}
-    <label class="f" style="margin-top:14px">Anything sore right now?</label>${seg('chgsore',g.sore||'',[['','No'],['legs','Legs'],['upper','Upper body']])}
-    <div class="note" style="margin-top:10px">${g.now?'The full program starts today.':`Next week: ${esc(next)}`}</div>
-    <div class="row2" style="margin-top:10px"><div><b>Start the full program now</b><div class="note">Instead of adapting this week</div></div><button class="sw ${g.now?'on':''}" role="switch" aria-checked="${!!g.now}" aria-label="Start now" data-act="chgnow"><i></i></button></div>
-    <button class="btn" style="margin-top:16px" data-act="chgok">Switch to ${esc(T.name)}</button><button class="btn ghost" style="margin-top:8px" data-act="chgback">Back</button>`+cl;
+  const nextD=r.mode==='next' ? r.startsOn : addDays(r.weekStart,7);
+  const intro = r.mode==='next' ? `This week stays exactly as planned${r.held.length?', recovery days included':''}. ${esc(T.name)} starts ${esc(day(nextD))}, ${esc(shortDate(nextD))}.`
+    : `${done.length?`Kept as done: ${esc(done.map(x=>x.name+' ('+day(x.done.date)+')').join(', '))}. Their sets count toward the new program.`:'Nothing done yet this week.'}${r.held.length?' Recovery days and skips stay as they are.':''}`;
+  const runNotes=r.mode==='adapt' ? r.days.flatMap(d=>d.after.filter(x=>x.note).map(x=>`<small class="sub">${day(d.date)}: ${esc(x.note)}.</small>`)).join('') : '';
+  return o+`<h3>Switch to ${esc(T.name)}</h3>
+    ${seg('chgmode',r.mode,[['next','Start next week'],['adapt','Adapt this week']])}
+    <div class="note" style="margin-top:10px">${intro}</div>
+    ${r.mode==='adapt'&&conf?`<label class="f" style="margin-top:14px">Workouts you scheduled or changed yourself</label>${conf}`:''}
+    <label class="f" style="margin-top:14px">Rest of this week</label><div class="pv" style="margin-top:0">${dayRows}</div>${runNotes}${warn}${vol}
+    ${r.mode==='adapt'?`<label class="f" style="margin-top:14px">Anything sore right now?</label>${seg('chgsore',g.sore||'',[['','No'],['legs','Legs'],['upper','Upper body']])}`:''}
+    <div class="note" style="margin-top:10px">Next week: ${esc(next)}</div>
+    <button class="btn" style="margin-top:16px" data-act="chgok">${r.mode==='next'?`Start ${esc(T.name)} ${esc(day(nextD))}`:`Switch to ${esc(T.name)} now`}</button><button class="btn ghost" style="margin-top:8px" data-act="chgback">Back</button>`+cl;
 }
 function daySheet(){
   const g=st.daysh, d=g.date, sc=sched(d), t=todayStr(), [o,cl]=sheetOpen(g,'dayclose');
@@ -2180,7 +2208,7 @@ function daySheet(){
     return `<div class="card"><b>${esc(x.name)}</b><div class="note">${x.type==='lift'?`${n} exercises`:esc(Programs.RUN_KINDS[x.runKind]||'Run')}${x.movedFrom?` · moved from ${day(x.movedFrom)}`:''}${x.reduced?' · reduced':''}${x.status==='skipped'?' · skipped':x.status==='recovery'?' · recovery day':x.status==='missed'?' · missed':''}</div>
       ${dates.length?`<label class="f" style="margin-top:10px">Move to</label><div class="dchips">${dates.map(z=>`<button class="dchip" data-act="dmove" data-o="${esc(x.occ)}" data-d="${z}">${day(z)[0]}<small>${day(z)}</small></button>`).join('')}</div>`:''}
       ${others.length?`<label class="f" style="margin-top:10px">Swap with</label>${others.map(y=>`<button class="opt sm" data-act="dswap" data-o="${esc(x.occ)}" data-p="${esc(y.occ)}"><span>${esc(y.name)}</span><small>${day(y.date)}</small></button>`).join('')}`:''}
-      <div class="rbtns" style="margin-top:10px">${x.type==='lift'&&!x.reduced?`<button class="btn sm ghost" data-act="dset" data-o="${esc(x.occ)}" data-k="reduced">Reduce volume</button>`:''}${x.status!=='skipped'?`<button class="btn sm ghost" data-act="dset" data-o="${esc(x.occ)}" data-k="skipped">Skip</button>`:''}${changed?`<button class="btn sm ghost" data-act="drestore" data-o="${esc(x.occ)}">${(changeOf(x.occ)||{}).add?'Remove':'Undo changes'}</button>`:''}</div></div>`;
+      <div class="rbtns" style="margin-top:10px">${x.type==='run'&&x.runKind!=='easy'?`<button class="btn sm ghost" data-act="deasy" data-o="${esc(x.occ)}">Make it an easy run</button>`:''}${x.type==='lift'&&!x.reduced?`<button class="btn sm ghost" data-act="dset" data-o="${esc(x.occ)}" data-k="reduced">Reduce volume</button>`:''}${x.status!=='skipped'?`<button class="btn sm ghost" data-act="dset" data-o="${esc(x.occ)}" data-k="skipped">Skip</button>`:''}${changed&&(changeOf(x.occ)||{}).add&&(x.reduced||x.status==='skipped'||x.status==='recovery'||(changeOf(x.occ)||{}).easier)?`<button class="btn sm ghost" data-act="rdyundo" data-o="${esc(x.occ)}">Undo</button>`:''}${changed?`<button class="btn sm ghost" data-act="drestore" data-o="${esc(x.occ)}">${(changeOf(x.occ)||{}).add?'Remove':'Undo changes'}</button>`:''}</div></div>`;
   }).join('');
   const wk=Programs.TEMPLATES[sc.config.template].freq[sc.config.lifts].w;
   const add = d>=t && !items.some(x=>x.type==='lift'&&x.status!=='done') ? `<label class="f" style="margin-top:12px">Add a workout on this day</label>${wk.map(k=>`<button class="opt sm" data-act="dadd" data-k="${k}"><span>${esc(sc.workouts[k].name)}</span><span>+</span></button>`).join('')}` : '';
@@ -2202,6 +2230,14 @@ function setOcc(occ, patch, source, date){
   const prev=changeOf(occ)||{}, ws=prev.week||sched(date||st.date).weekStart;
   putChanges([{id:occ, change:{...prev, ...patch, week:ws, source: source==='manual'||prev.source==='manual' ? 'manual' : source}}]);
 }
+/* Undo a readiness or day-sheet choice (reduce, recovery, skip, easier run). A workout added by a switch keeps its
+   own row, with its run type put back. */
+function undoOcc(occ){
+  const prev=changeOf(occ); if(!prev) return;
+  if(prev.add){ const c={...prev}; ['reduced','recovery','skipped','easier','runWas'].forEach(k=>delete c[k]); if(prev.runWas) c.runKind=prev.runWas; putChanges([{id:occ, change:c}]) }
+  else clearOcc(occ,['reduced','recovery','skipped','runKind','easier','runWas']);
+}
+const easierPatch = occ => { const x=sched(occ.slice(0,10)).occs.find(y=>y.occ===occ); return {runKind:'easy', easier:true, runWas:(x&&x.runKind)||'long'} };
 function clearOcc(occ, keys){
   const prev=changeOf(occ); if(!prev) return;
   const rest={...prev}; keys.forEach(k=>delete rest[k]);
@@ -2341,11 +2377,13 @@ app.addEventListener('click',e=>{
     if(a==='move'){ const r=Programs.readiness(sched(t), o, chk.readiness||'very', t, chk.area); if(!r||!r.moveTo) return toast('No clear day left this week');
       setOcc(o,{date:r.moveTo},'readiness'); toast('Moved to '+fmtDate(r.moveTo)) }
     else if(a==='reduce'){ setOcc(o,{reduced:true},'readiness'); toast('Fewer sets today, same targets') }
+    else if(a==='easier'){ setOcc(o,easierPatch(o),'readiness',o.slice(0,10)); toast('Shorter, easy run instead') }
     else if(a==='recovery'){ setOcc(o,{recovery:true},'readiness'); toast('Recovery day. You can still do it later this week') }
     else if(a==='skip'){ setOcc(o,{skipped:true},'readiness'); toast("Skipped. It won't count against your progress") }
     st.auto=true; render(); toTop();
   }
-  else if(act==='rdyundo'){ clearOcc(b.dataset.o,['reduced','recovery','skipped']); st.auto=true; render() }
+  else if(act==='rdyundo'){ undoOcc(b.dataset.o); st.auto=true; render() }
+  else if(act==='deasy'){ setOcc(b.dataset.o,easierPatch(b.dataset.o),'manual',st.daysh.date); st.daysh=null; render(); toast('Easy run instead') }
   // change program
   else if(act==='chgopen'){ st.chg={step:'pick'}; render() }
   else if(act==='chgclose'){ if(e.target.closest('[data-stop]') && !b.classList.contains('btn')) return; st.chg=null; render() }
@@ -2364,11 +2402,21 @@ app.addEventListener('click',e=>{
     render();
   }
   else if(act==='chglevel'){ st.chg.cfg.level=b.dataset.v; render() }
-  else if(act==='chgprev'){ const g=st.chg; g.cfg=Programs.normalize(g.cfg); g.cfg.rotation=Programs.bestRotation(g.cfg); g.step='preview'; g.keep={}; g.sore=''; g.now=false; render(); const sh=document.querySelector('.sheet'); if(sh) sh.scrollTop=0 }
+  else if(act==='chgprev'){ const g=st.chg; g.cfg=Programs.normalize(g.cfg); g.cfg.rotation=Programs.bestRotation(g.cfg); g.step='preview'; g.keep={}; g.sore=''; g.mode=g.mode||'next'; render(); const sh=document.querySelector('.sheet'); if(sh) sh.scrollTop=0 }
   else if(act==='chgback'){ const g=st.chg; g.step = g.step==='preview' ? 'setup' : 'pick'; render() }
   else if(act.startsWith('chgkeep:')){ st.chg.keep[act.slice(8)] = b.dataset.v==='keep'; render() }
   else if(act==='chgsore'){ st.chg.sore=b.dataset.v; render() }
-  else if(act==='chgnow'){ st.chg.now=!st.chg.now; render() }
+  else if(act==='chgmode'){ st.chg.mode=b.dataset.v; st.chg.keep={}; render() }
+  else if(act==='adaptnow'){
+    // The program already chosen for next week, applied to this week instead (previewed before anything changes).
+    const cfg=JSON.parse(JSON.stringify(progCfg())); delete cfg.startedOn; delete cfg.adaptWeek;
+    st.chg={step:'preview', cfg, mode:'adapt', keep:{}, sore:''}; render();
+  }
+  else if(act==='upccancel'){
+    const past=(st.prog&&st.prog.past)||[], last=past[past.length-1];
+    if(!last || last.until<sched(todayStr()).weekStart) return;
+    setProgram({config:last.config, past:past.slice(0,-1)}); render(); toast('Staying on '+Programs.TEMPLATES[Programs.normalize(last.config).template].name);
+  }
   else if(act==='chgok'){
     const g=st.chg, r=g.r; if(!r) return;
     if(r.startNow) dropChanges(st.changes.filter(c=>c.change && c.change.week===r.weekStart && !String(c.id).startsWith('chk:')).map(c=>c.id));
