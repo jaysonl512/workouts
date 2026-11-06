@@ -25,6 +25,12 @@ final class LiftStore: ObservableObject {
         var diff: [String: String]?
         /// Exercises whose warm-ups were skipped.
         var skipWu: [String]?
+        /// This workout's own id (kept through a handoff), the scheduled occurrence it covers, that occurrence's
+        /// own exercise list (reduced or adjusted), and whether it is a reduced workout.
+        var uid: String?
+        var occ: String?
+        var only: [OccEx]?
+        var reduced: Bool?
     }
 
     /// What the next set is: a warm-up or working set, its number, and its planned target.
@@ -71,10 +77,13 @@ final class LiftStore: ObservableObject {
 
     var plan: PlanSession? { draft.flatMap { Plan.session($0.sessionKey) } }
 
+    /// The workout's exercises (or the occurrence's own list, with its set counts), each as the preferred
+    /// alternative unless swapped for this workout.
     var steps: [Step] {
         guard let d = draft, let p = plan else { return [] }
-        return p.exercises.map { e in
-            if let altId = d.swaps[e.id], let a = e.alts.first(where: { $0.id == altId }) { return Step(slot: e, id: a.id, name: a.name) }
+        let list: [PlanExercise] = d.only.map { only in only.compactMap { o in p.exercises.first { $0.id == o.id }?.with(sets: o.sets) } } ?? p.exercises
+        return list.map { e in
+            if let altId = d.swaps[e.id] ?? e.use, altId != e.id, let a = e.alts.first(where: { $0.id == altId }) { return Step(slot: e, id: a.id, name: a.name) }
             return Step(slot: e, id: e.id, name: e.name)
         }
     }
@@ -92,7 +101,7 @@ final class LiftStore: ObservableObject {
     func workingCount(_ id: String) -> Int { sets(for: id).filter { !$0.isWarmup }.count }
     func planFor(_ id: String) -> ExercisePlan? { draft?.plans?[id] }
     /// Working sets planned for this exercise: the plan's count, else the plan file's.
-    func plannedCount(_ step: Step) -> Int { planFor(step.id).map { $0.sets.count } ?? step.slot.sets }
+    func plannedCount(_ step: Step) -> Int { planFor(step.id).map { min($0.sets.count, step.slot.sets) } ?? step.slot.sets }
 
     func nextItem(for step: Step) -> NextItem {
         let all = sets(for: step.id), done = all.filter { !$0.isWarmup }.count, wuDone = all.count - done
@@ -124,11 +133,18 @@ final class LiftStore: ObservableObject {
 
     // MARK: Lifecycle
 
-    func begin(_ key: String) {
+    /// Starts a lift. `occ` is the scheduled occurrence it covers (nil for a repeat or a lift outside the schedule).
+    func begin(_ key: String, occ: ServedOcc? = nil) {
         let today = Day.string()
-        draft = Draft(id: "\(today)-\(key)", date: today, sessionKey: key, startedAt: Date())
+        // A second workout of the same kind today gets its own id (upperA~2), never the first one's.
+        let taken = Set(sync.week.map(\.id) + sync.pending.filter { $0.value.status == "complete" }.map(\.key))
+        var k = key, n = 2
+        while taken.contains("\(today)-\(k)") { k = "\(Plan.base(key))~\(n)"; n += 1 }
+        draft = Draft(id: "\(today)-\(k)", date: today, sessionKey: k, startedAt: Date())
+        draft!.uid = UUID().uuidString.lowercased()
+        if let o = occ, Plan.base(o.key) == Plan.base(key) { draft!.occ = o.occ; draft!.only = o.ex; draft!.reduced = o.reduced == true ? true : nil }
         // Plans come from the cache, so a lift starts with full targets even offline.
-        let cached = plans.session(key)
+        let cached = plans.session(k)
         if !cached.isEmpty { draft!.plans = cached }
         persist()
         // Upload right away (no sets yet) so the phone shows the workout in progress before the first set.
@@ -199,7 +215,8 @@ final class LiftStore: ObservableObject {
 
     func swap(slot: String, to id: String) {
         guard draft != nil else { return }
-        draft!.swaps[slot] = id == slot ? nil : id
+        let preferred = plan?.exercises.first { $0.id == slot }?.use ?? slot
+        draft!.swaps[slot] = id == preferred ? nil : id
         draft!.changedAt = Date()
         persist()
     }
@@ -214,6 +231,10 @@ final class LiftStore: ObservableObject {
         defer { pulling = false }
         guard let row = try? await Supabase.shared.session(id: d.id), let cur = draft, cur.id == d.id else { return }
         let remoteAt = ISO.date(row.data.updatedAt) ?? .distantPast
+        // A different workout under the same id (another uid) is never adopted or treated as this one finishing:
+        // when this one is saved it gets its own id.
+        let mine = cur.sets.values.contains { !$0.isEmpty }
+        if mine, let a = cur.uid, let b = row.data.uid, a != b { return }
         if row.status == "complete" {
             if remoteAt > cur.startedAt, cur.changedAt.map({ remoteAt > $0 }) ?? true {
                 sync.dropInProgress(cur.id)
@@ -248,6 +269,10 @@ final class LiftStore: ObservableObject {
         if let started = ISO.date(row.data.startedAt), started < draft!.startedAt { draft!.startedAt = started }
         if let n = row.data.notes { draft!.notes = n }
         if let dl = row.data.deload { draft!.deload = dl }
+        if let u = row.data.uid { draft!.uid = u }
+        if let o = row.data.occ { draft!.occ = o }
+        if let o = row.data.only { draft!.only = o }
+        if row.data.reduced == true { draft!.reduced = true }
         let s = steps
         draft!.index = s.firstIndex { self.workingCount($0.id) < self.plannedCount($0) } ?? s.count
         nextUp = false
@@ -394,6 +419,7 @@ final class LiftStore: ObservableObject {
                           status: status, savedAt: status == "complete" ? now : nil,
                           data: SessionData(entries: entries(), durationMin: durationMin, hk: hk, notes: d.notes, deload: d.deload,
                                             startedAt: ISO.string(d.startedAt), plans: status == "in_progress" ? d.plans : nil,
+                                            uid: d.uid, occ: d.occ, only: status == "in_progress" ? d.only : nil, reduced: d.reduced,
                                             updatedAt: stamp))
     }
 }

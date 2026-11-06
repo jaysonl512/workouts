@@ -114,3 +114,51 @@ create policy "exercise_settings_select_own" on public.exercise_settings for sel
 create policy "exercise_settings_insert_own" on public.exercise_settings for insert with check (auth.uid() = user_id);
 create policy "exercise_settings_update_own" on public.exercise_settings for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "exercise_settings_delete_own" on public.exercise_settings for delete using (auth.uid() = user_id);
+
+-- ---------------------------------------------------------------------------
+-- Training programs (2026-11-06). Read and written by the web app; read by the "plans" Edge Function, which
+-- serves the Watch its schedule. Nothing here touches public.sessions or public.exercise_settings.
+-- programs: one row per user. config = the program in force (template, lifting days, runs, level, edits,
+--   exercise preferences, week start). past = earlier programs with the last date each was in force.
+--   No row means the original plan, unchanged.
+create table if not exists public.programs (
+  user_id    uuid primary key default auth.uid() references auth.users on delete cascade,
+  config     jsonb not null,
+  past       jsonb not null default '[]'::jsonb,
+  updated_at timestamptz not null default now()
+);
+-- schedule_changes: one row per changed workout occurrence ("<week start>:<key>:<n>", stable across moves) or
+--   per readiness check-in ("chk:YYYY-MM-DD"). change.week = the week start it belongs to.
+create table if not exists public.schedule_changes (
+  user_id    uuid not null default auth.uid() references auth.users on delete cascade,
+  id         text not null,
+  week       date not null,
+  change     jsonb not null,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, id)
+);
+create index if not exists schedule_changes_week_idx on public.schedule_changes (user_id, week);
+
+drop trigger if exists programs_touch on public.programs;
+create trigger programs_touch before update on public.programs for each row execute function public.touch_updated_at();
+drop trigger if exists schedule_changes_touch on public.schedule_changes;
+create trigger schedule_changes_touch before update on public.schedule_changes for each row execute function public.touch_updated_at();
+
+alter table public.programs enable row level security;
+alter table public.schedule_changes enable row level security;
+drop policy if exists "programs_select_own" on public.programs;
+create policy "programs_select_own" on public.programs for select to authenticated using ((select auth.uid()) = user_id);
+drop policy if exists "programs_insert_own" on public.programs;
+create policy "programs_insert_own" on public.programs for insert to authenticated with check ((select auth.uid()) = user_id);
+drop policy if exists "programs_update_own" on public.programs;
+create policy "programs_update_own" on public.programs for update to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+drop policy if exists "programs_delete_own" on public.programs;
+create policy "programs_delete_own" on public.programs for delete to authenticated using ((select auth.uid()) = user_id);
+drop policy if exists "schedule_changes_select_own" on public.schedule_changes;
+create policy "schedule_changes_select_own" on public.schedule_changes for select to authenticated using ((select auth.uid()) = user_id);
+drop policy if exists "schedule_changes_insert_own" on public.schedule_changes;
+create policy "schedule_changes_insert_own" on public.schedule_changes for insert to authenticated with check ((select auth.uid()) = user_id);
+drop policy if exists "schedule_changes_update_own" on public.schedule_changes;
+create policy "schedule_changes_update_own" on public.schedule_changes for update to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+drop policy if exists "schedule_changes_delete_own" on public.schedule_changes;
+create policy "schedule_changes_delete_own" on public.schedule_changes for delete to authenticated using ((select auth.uid()) = user_id);

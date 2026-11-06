@@ -72,26 +72,41 @@ struct TodayView: View {
     @EnvironmentObject var timed: TimedStore
     @EnvironmentObject var workout: WorkoutManager
     @EnvironmentObject var gym: GymStore
+    @EnvironmentObject var plans: PlanCache
     /// A finished lift tapped to do again today.
     @State private var again: WeekRow?
 
     var body: some View {
         let week = WeekPlan(rows: sync.week)
+        // The training program's schedule from the server when it is cached for this week, else the built-in plan.
+        let sch = Schedule(occs: plans.plans?.occs, rows: sync.week)
         NavigationStack {
             ScrollView {
                 VStack(spacing: 6) {
-                    hero(week)
-
-                    header("This week", "\(week.doneCount) of 5")
-                    ForEach(week.slots) { slot in
-                        if let r = slot.done {
-                            doneRow(r)
-                        } else {
-                            tile(title: slot.optional ? "Run 2" : Plan.name(slot.key),
-                                 subtitle: slot.optional ? "Optional" : subtitle(slot.key, short: true)) { start(week.key(for: slot)) }
+                    if let sch {
+                        hero(sch)
+                        header("This week", "\(sch.doneCount) of \(sch.goal)")
+                        ForEach(sch.items) { it in
+                            if let r = it.done {
+                                doneRow(r)
+                            } else {
+                                tile(title: it.occ.name, subtitle: itemSubtitle(it)) { start(it) }
+                            }
                         }
+                        ForEach(sch.extras, id: \.id) { doneRow($0) }
+                    } else {
+                        hero(week)
+                        header("This week", "\(week.doneCount) of 5")
+                        ForEach(week.slots) { slot in
+                            if let r = slot.done {
+                                doneRow(r)
+                            } else {
+                                tile(title: slot.optional ? "Run 2" : Plan.name(slot.key),
+                                     subtitle: slot.optional ? "Optional" : subtitle(slot.key, short: true)) { start(week.key(for: slot)) }
+                            }
+                        }
+                        ForEach(week.extras, id: \.id) { doneRow($0) }
                     }
-                    ForEach(week.extras, id: \.id) { doneRow($0) }
 
                     header("Other", nil)
                     ForEach(Plan.others) { o in
@@ -145,6 +160,59 @@ struct TodayView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(10)
             .background(RoundedRectangle(cornerRadius: 14).fill(Color.card))
+        }
+    }
+
+    /// The scheduled workout for now, from the served schedule.
+    @ViewBuilder private func hero(_ sch: Schedule) -> some View {
+        if let it = sch.next {
+            VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(it.occ.date == sch.today ? "Today" : "Up next").font(.caption2).foregroundStyle(Color.brand)
+                    Text(it.occ.name).font(.system(size: 18, weight: .semibold)).lineLimit(2)
+                    Text(itemSubtitle(it, long: true)).font(.footnote).foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 4)
+                Button(it.isLift ? "Start Workout" : "Start Run") { start(it) }.buttonStyle(PrimaryButtonStyle())
+            }
+            .padding(8)
+            .background(RoundedRectangle(cornerRadius: 16).fill(Color.card))
+        } else {
+            let n = sch.open.count
+            let recovery = sch.items.contains { $0.occ.date == sch.today && $0.status == "recovery" }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(recovery ? "Recovery day" : n > 0 ? "Rest day" : "Week complete").font(.system(size: 18, weight: .semibold))
+                Text(recovery ? "A walk or some mobility if you like." : n > 0 ? "\(n) left this week. Tap one to do it today." : "All \(sch.goal) done. Anything below is a bonus.")
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(10)
+            .background(RoundedRectangle(cornerRadius: 14).fill(Color.card))
+        }
+    }
+
+    /// "Thu · ~45 min" (plus "Reduced" / "Skipped" / "Missed") for a scheduled workout.
+    private func itemSubtitle(_ it: Schedule.Item, long: Bool = false) -> String {
+        let day = WeekPlan.weekday(it.occ.date)
+        if !it.isLift { return [day, it.optional ? "Optional" : (it.occ.runKind.map { $0 == "long" ? "Long run" : $0 == "intervals" ? "Intervals" : "Easy run" } ?? "Run")].joined(separator: " · ") }
+        let tag = it.status == "skipped" ? "Skipped" : it.status == "recovery" ? "Recovery day" : it.status == "missed" ? "Missed" : it.occ.reduced == true ? "Reduced" : nil
+        guard let s = Plan.session(it.occ.key) else { return day }
+        let ex = it.occ.ex.map { only in only.compactMap { o in s.exercises.first { $0.id == o.id }?.with(sets: o.sets) } } ?? s.exercises
+        let secs = ex.reduce(0) { $0 + $1.sets * (40 + $1.restSeconds) }
+        let mins = "~\(Int((Double(secs) / 300).rounded()) * 5) min"
+        return ([long ? "\(ex.count) exercises" : day, mins] + (tag.map { [$0] } ?? [])).joined(separator: " · ")
+    }
+
+    private func start(_ it: Schedule.Item) {
+        if it.isLift {
+            lift.begin(it.occ.key, occ: it.occ)
+            Task { try? await workout.start(.traditionalStrengthTraining) }
+        } else {
+            // A run takes whichever run key is still free today.
+            let used = Set(sync.week.filter { $0.date == Day.string() }.map(\.session))
+            let key = [it.occ.key, "run", "run2", "run3"].first { !used.contains($0) } ?? it.occ.key
+            workout.requestLocation()
+            run.begin(key)
         }
     }
 

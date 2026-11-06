@@ -47,7 +47,7 @@ final class SyncStore: ObservableObject {
         if row.status == "complete", row.data.effort == nil { toRate = row }
         if row.status == "complete" {
             week.removeAll { $0.id == row.id }
-            week.append(WeekRow(id: row.id, date: row.date, session: row.session, name: row.name, type: row.type.rawValue))
+            week.append(WeekRow(id: row.id, date: row.date, session: row.session, name: row.name, type: row.type.rawValue, occ: row.data.occ))
             persistWeek()
         }
         flush()
@@ -83,9 +83,14 @@ final class SyncStore: ObservableObject {
         defer { if finished { Task { await AppModel.shared.plans.refresh() } } }
         for row in pending.values.sorted(by: { $0.data.updatedAt < $1.data.updatedAt }) {
             do {
-                if row.status == "in_progress" { try await Supabase.shared.upsertLive(row) } else { try await Supabase.shared.upsert([row]) }
+                var sent = row
+                if row.status == "in_progress" { try await Supabase.shared.upsertLive(row) }
+                else {
+                    sent = try await reconcile(row)
+                    try await Supabase.shared.upsert([sent])
+                }
                 // Keep it if a newer copy was queued while this one was uploading.
-                if pending[row.id]?.data.updatedAt == row.data.updatedAt { pending[row.id] = nil }
+                if pending[sent.id]?.data.updatedAt == sent.data.updatedAt { pending[sent.id] = nil }
                 if row.status == "complete", row.type == .lift { finished = true }
                 persistQueue()
                 lastError = nil
@@ -95,6 +100,28 @@ final class SyncStore: ObservableObject {
                 return
             }
         }
+    }
+
+    /// A finished workout whose id (date-key) the server already uses for a different finished workout (another
+    /// uid, e.g. the same lift saved on the phone while this Watch was offline) moves to the next free key,
+    /// upperA~2, so nothing is overwritten and nothing is saved twice. Same rule as programs.js rekey.
+    private func reconcile(_ row: SessionRow) async throws -> SessionRow {
+        guard row.data.uid != nil, let remote = try await Supabase.shared.session(id: row.id),
+              remote.status == "complete", remote.data.uid != row.data.uid else { return row }
+        let taken = Set(try await Supabase.shared.ids(on: row.date) + week.map(\.id) + pending.keys)
+        let base = row.session.replacingOccurrences(of: #"~\d+$"#, with: "", options: .regularExpression)
+        var n = 2
+        while taken.contains("\(row.date)-\(base)~\(n)") { n += 1 }
+        var r = row
+        r.session = "\(base)~\(n)"
+        r.id = "\(row.date)-\(r.session)"
+        if !r.name.hasSuffix(" (again)") { r.name += " (again)" }
+        pending[row.id] = nil
+        pending[r.id] = r
+        if let i = week.firstIndex(where: { $0.id == row.id }) { week[i].id = r.id; week[i].session = r.session; week[i].name = r.name; persistWeek() }
+        if let i = history.firstIndex(where: { $0.id == row.id }) { history[i].id = r.id; persistHistory() }
+        persistQueue()
+        return r
     }
 
     private func scheduleRetry() {
@@ -182,7 +209,7 @@ final class PlanCache: ObservableObject {
     private let url = SyncStore.dir.appendingPathComponent("plans.json")
 
     init() {
-        if let d = try? Data(contentsOf: url), let p = try? JSONDecoder().decode(PlansResponse.self, from: d) { plans = p }
+        if let d = try? Data(contentsOf: url), let p = try? JSONDecoder().decode(PlansResponse.self, from: d) { plans = p; Plan.served = p.workouts }
     }
 
     func refresh() async {
@@ -191,6 +218,7 @@ final class PlanCache: ObservableObject {
         defer { refreshing = false }
         guard let p = try? await Supabase.shared.plans(today: Day.string()) else { return }
         plans = p
+        Plan.served = p.workouts
         if let d = try? JSONEncoder().encode(p) { try? d.write(to: url, options: .atomic) }
     }
 

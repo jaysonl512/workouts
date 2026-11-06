@@ -106,7 +106,9 @@ actor Supabase {
         _ = try await token()
         guard let uid = userId else { throw SBError.http(0, "no user id") }
         struct Patch: Encodable { let data: SessionData; let source: String; let name: String }
-        let out = try await request("/rest/v1/sessions?id=eq.\(Self.q(row.id))&status=eq.in_progress", method: "PATCH",
+        // Only over the same workout (same uid, or an older copy without one): never over a different workout.
+        let same = row.data.uid.map { "&or=" + Self.q("(data->>uid.eq.\($0),data->>uid.is.null)") } ?? ""
+        let out = try await request("/rest/v1/sessions?id=eq.\(Self.q(row.id))&status=eq.in_progress" + same, method: "PATCH",
                                     body: try JSONEncoder().encode(Patch(data: row.data, source: row.source, name: row.name)),
                                     prefer: "return=representation")
         if let rows = try? JSONSerialization.jsonObject(with: out) as? [Any], !rows.isEmpty { return }
@@ -165,8 +167,15 @@ actor Supabase {
     /// Watch runs saved before routes were synced: id plus the raw `data` object, newest first.
     /// Completed sessions on or after a date (YYYY-MM-DD), for this week's checklist.
     func sessions(since date: String) async throws -> [WeekRow] {
-        let data = try await request("/rest/v1/sessions?select=id,date,session,name,type&status=eq.complete&date=gte.\(date)&order=date.asc")
+        let data = try await request("/rest/v1/sessions?select=id,date,session,name,type,occ:data->>occ&status=eq.complete&date=gte.\(date)&order=date.asc")
         return try JSONDecoder().decode([WeekRow].self, from: data)
+    }
+
+    /// Every session id on a date (any status), to find a free id for a second workout of the same kind.
+    func ids(on date: String) async throws -> [String] {
+        struct R: Decodable { let id: String }
+        let data = try await request("/rest/v1/sessions?select=id&date=eq.\(date)")
+        return try JSONDecoder().decode([R].self, from: data).map(\.id)
     }
 
     func runsWithoutRoute() async throws -> [(id: String, data: [String: Any])] {

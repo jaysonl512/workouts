@@ -205,3 +205,16 @@ upload, background refresh when granted); nothing depends on those happening on 
 - Discard across devices (web 2026-11-06.2): drafts remember when they were synced with the cloud (liveSeen). If the
   cloud copy is later gone (the Watch deletes its in-progress row on Discard), the web app drops the draft, and leaves
   the workout screen if it is open. Drafts never synced (offline) are kept.
+
+## Training programs (2026-11-06, build 14)
+The program and schedule come from `programs.js` on the server (the `plans` Edge Function). The Watch has no
+scheduling rules: `PlansResponse` now carries `program`, `workouts` (each workout's exercises with the program's set
+counts and preferred alternatives) and `occs` (this week's and next week's scheduled workouts with stable ids and,
+for reduced or adjusted ones, their own exercise list). `Plan.session` uses the cached workouts first, then the
+built-in plan; `Schedule` (Shared/Schedule.swift) shows the cached week and marks what is done (server match, then
+`data.occ`, then the same workout in date order); with nothing cached for the week, Today falls back to `WeekPlan`.
+- Every lift has a `uid` (made at start, adopted in a handoff). The Watch adopts a phone copy only with the same uid
+  (or when nothing is logged yet), live updates only touch a row with the same uid, and an upload whose id is taken
+  by a different finished workout moves to the next free key (`upperA~2`).
+- Not on the Watch yet: the readiness check and schedule edits (web only); the watch-face widget still counts the
+  built-in week.

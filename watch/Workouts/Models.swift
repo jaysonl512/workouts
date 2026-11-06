@@ -94,12 +94,18 @@ struct ExercisePlan: Codable, Hashable {
     var why: String?
 }
 
-/// The cached response: plans for every lift (and every alternative), so lifts can start offline.
+/// The cached response: plans for every lift (and every alternative), so lifts can start offline. Since build 14
+/// it also carries the training program, its workouts and this week's and next week's scheduled workouts
+/// (programs.js on the server); all of it is optional so an older cached file still decodes.
 struct PlansResponse: Codable {
     var v: Int
     var today: String
     var generatedAt: String?
     var sessions: [String: [String: ExercisePlan]]
+    var program: ServedProgram?
+    var weekStart: String?
+    var workouts: [String: ServedWorkout]?
+    var occs: [ServedOcc]?
 }
 
 struct RunData: Codable {
@@ -143,6 +149,15 @@ struct SessionData: Codable {
     var startedAt: String?
     /// The plans frozen when the lift started, shared with the phone while it is in progress.
     var plans: [String: ExercisePlan]?
+    /// This workout's own id, made when it starts and kept through a handoff. Two workouts with the same
+    /// session id but different uids are different workouts: the second is saved under its own id.
+    var uid: String?
+    /// The scheduled occurrence this workout covers (programs.js), so it is matched exactly even if moved.
+    var occ: String?
+    /// The occurrence's own exercise list (reduced or adjusted), shared while in progress.
+    var only: [OccEx]?
+    /// Done as a reduced workout (fewer sets after a readiness check).
+    var reduced: Bool?
     var updatedAt: String
 }
 

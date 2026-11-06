@@ -8,6 +8,8 @@ struct WeekRow: Codable, Hashable {
     var session: String
     var name: String
     var type: String
+    /// The scheduled occurrence it covers (programs.js), when it has one.
+    var occ: String? = nil
 }
 
 /// A workout outside the plan, started from the Other list. Same keys and names as the web app's OTHERS.

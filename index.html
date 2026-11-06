@@ -230,6 +230,39 @@ table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:6px 4px;b
 .tag{font-size:11px;font-weight:800;padding:3px 10px;border-radius:99px;background:#222a33;color:var(--mute)}
 .tag.lift{background:rgba(239,68,68,.16);color:#ff8f8f}
 .tag.run{background:rgba(251,146,60,.16);color:var(--acc2)}
+.tag.ok{background:rgba(34,197,94,.14);color:#4ade80}
+button.dayrow{width:100%;background:none;border-left:0;border-right:0;border-bottom:0;color:var(--text);font:inherit;text-align:left}
+.dayrow .dt small,.mute{color:var(--mute);font-weight:500}
+.pname{font-size:18px}
+.warn{background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.3);color:#fcd34d;border-radius:12px;padding:9px 12px;font-size:13px;margin:8px 0}
+.warn.soft{background:transparent;border-color:var(--line);color:var(--mute)}
+.warnc{color:#fcd34d}
+.exn small.sub,small.sub{display:block;color:var(--mute);font-weight:500;font-size:12px;margin-top:2px}
+.exc{display:flex;align-items:center;gap:6px;flex:none}
+.mini{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:10px;padding:2px}
+.mini button,.ibtn{background:#0f1318;border:1px solid var(--line);color:var(--text);width:30px;height:30px;border-radius:8px;font-size:15px;line-height:1;padding:0}
+.mini button{border:0;background:none;width:26px}
+.mini b{min-width:12px;text-align:center}
+.ibtn{color:var(--mute)}
+.dchips{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.dchip{background:#0f1318;border:1px solid var(--line);color:var(--mute);border-radius:10px;padding:8px 0;font-weight:800;font-size:14px}
+.dchip small{display:block;font-size:10px;font-weight:600}
+.dchip.on{background:rgba(239,68,68,.16);border-color:var(--acc);color:#fff}
+.runr{display:flex;align-items:center;gap:8px;margin:6px 0}.runr b{width:36px;font-size:13px}.runr select{flex:1;padding:8px}
+.chipb{background:#0f1318;border:1px solid var(--line);color:var(--mute);border-radius:99px;padding:6px 10px;font-size:12px;font-weight:700}
+.chipb.on{border-color:var(--acc2);color:var(--acc2)}
+.link.inl{padding:0;font-size:13px}
+.rdy{display:flex;justify-content:space-between;align-items:center;gap:10px;background:#0f1318;border:1px solid var(--line);border-radius:14px;padding:12px;margin:0 0 12px;text-align:left}
+.rdy.col{flex-direction:column;align-items:stretch}
+.rdy>span{font-size:13px;color:var(--mute);font-weight:600}.rdy small{opacity:.7}
+.rbtns{display:flex;flex-wrap:wrap;gap:6px}
+.pv{margin-top:12px}
+.pvd{display:flex;gap:10px;padding:10px 0;border-top:1px solid var(--line);font-size:14px}
+.pvd .dn{width:36px;flex:none;font-weight:800;color:var(--mute);font-size:12px;text-transform:uppercase;padding-top:2px}
+.pvd .was{color:var(--mute);text-decoration:line-through}
+.vt td,.vt th{padding:4px;text-align:right}.vt td:first-child{text-align:left}.vt tr.mute td{color:var(--mute)}
+.conf{border-top:1px solid var(--line);padding:10px 0}.conf .segc{flex:none;width:150px}
+.opt.sm{padding:10px 12px;font-size:15px}
 .pl{padding:0}
 .pl>summary{list-style:none;display:flex;align-items:center;gap:12px;padding:16px;cursor:pointer}
 .pl>summary::-webkit-details-marker{display:none}
@@ -424,24 +457,36 @@ details[open]>summary .chev{transform:rotate(90deg)}
 <div class="toast" id="toast"></div>
 <div class="undo" id="undo" hidden><span></span><button id="undoBtn">Undo</button></div>
 
-<script src="plan.js?v=2026-11-06.1"></script>
+<script src="plan.js?v=2026-11-06.6"></script>
 <script src="progression.js?v=2026-11-06.1"></script>
+<script src="programs.js?v=2026-11-06.6"></script>
 <script>
 const SESS_KEYS = ['upperA','run','lowerA','upperB','lowerB','run2','yoga','rest'];
-const sessBase = k => k==='run2' ? 'run' : k;
+const sessBase = k => Programs.baseKey(k);
 /* Workouts outside the plan: started or logged from the + button. Yoga keeps its own type; the rest are type 'other'. */
 const OTHERS = {yoga:{name:'Hot yoga',e:'🔥'}, hiit:{name:'HIIT',e:'⚡'}, cycling:{name:'Cycling',e:'🚴',dist:1}, walk:{name:'Walk',e:'🚶',dist:1}, sports:{name:'Sports',e:'🏀'}, mobility:{name:'Mobility',e:'🧘'}, other:{name:'Other',e:'✏️'}};
 const isOther = k => !!OTHERS[k] && k!=='yoga';
 /* The week's planned workouts, in order. Five are the goal; the second run is optional. */
 const WEEK_SLOTS = ['upperA','run','lowerA','upperB','lowerB','run2'];
-const sessName = k => k==='run2' ? 'Run 2 (optional)' : isOther(k) ? OTHERS[k].name : PLAN.sessions[k].name;
-const sessDef = k => isOther(k) ? {name:OTHERS[k].name, type:'other', note:''} : (PLAN.sessions[sessBase(k)] || PLAN.sessions.rest);
+const sessName = k => isOther(k) ? OTHERS[k].name : sessBase(k)==='run' ? 'Run' : sessDef(k).name + (/~\d+$/.test(k||'') ? ' (again)' : '');
+/* A workout's definition: the training program's version (programs.js: exercises and set counts for that week),
+   else plan.js. Runs, yoga and rest come from plan.js. */
+function sessDef(k){
+  if(isOther(k)) return {name:OTHERS[k].name, type:'other', note:''};
+  const b=sessBase(k);
+  if(b==='run'||b==='yoga'||b==='rest') return PLAN.sessions[b];
+  const w=progWorkouts()[b];
+  if(w) return w;
+  const t=Programs.WORKOUTS[b];   // a workout from a program not in use that week (editing an old session)
+  if(t) return {key:b, name:t.name, type:'lift', ex:t.ex.map(([id,n,opt])=>({...EXMAP[id], id, slot:id, sets:n, opt:!!opt}))};
+  return PLAN.sessions.rest;
+}
 /* How hard a workout felt, set on the Watch right after a workout or in the web app. */
 const EFFORT = {easy:'Easy', medium:'Medium', hard:'Hard'};
 const effortSeg = (act,cur) => `<div class="segc">${Object.entries(EFFORT).map(([v,l])=>`<button class="${v===cur?'on':''}" data-act="${act}" data-v="${v}">${l}</button>`).join('')}</div>`;
 const kindOf = x => x.yoga ? 'yoga' : x.other ? 'other' : x.run ? 'run' : 'lift';
 const CHEERS = ['Nice one','Solid set','Strong','Locked in','Clean rep','Beast mode','Smooth'];
-const APP_VERSION='2026-11-06.5';
+const APP_VERSION='2026-11-06.6';
 
 
 /* ---------- helpers ---------- */
@@ -459,7 +504,15 @@ const isAssist = n => /\b(pull|chin)-?ups?\b/i.test(n||'');
 const isPerArm = n => /\b(single|one)-arm\b/i.test(n||'');
 const exName = en => (EXMAP[en.id]||en).name;
 /* How an exercise progresses (progression.js): plan defaults from plan.js plus this user's settings. */
-const cfgOf = id => EXMAP[id] ? Progression.configFor(EXMAP[id], st.settings[id]) : null;
+const cfgOf = id => { const d=defOf(id); return d ? Progression.configFor(d, st.settings[id]) : null };
+/* An exercise as the current workout has it (the program's set count and structure), else plan.js. */
+function defOf(id){
+  const b=EXMAP[id]; if(!b) return null;
+  const S=st.sess && !isOther(st.sess) && sessBase(st.sess)!=='run' ? sessDef(st.sess) : null;
+  const se=S && S.ex && S.ex.find(e=>e.id===id || e.id===b.slot);
+  if(!se) return b;
+  return se.id===id ? se : {...b, sets:se.sets, reps:se.reps};
+}
 const workSets = a => (a||[]).filter(x=>x && !x.wu);
 const wUnit = e => { const n=exName(e), c=cfgOf(e.id); return isAssist(n) ? 'lb assist' : c&&c.eq==='dumbbell'&&c.vf===2 ? 'lb each' : isPerArm(n) ? 'lb per arm' : 'lb' };
 /* "−60×12" for 60 lb of assistance, "BW×12" for unassisted pull-ups. */
@@ -483,10 +536,10 @@ const heavier = (en,a,b) => isAssist(exName(en)) ? a<b : a>b;
 const buzz = ms => { try{navigator.vibrate&&navigator.vibrate(ms)}catch(e){} };
 let toastT;
 function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('show'),1500)}
-/* What the day-of-week plan says for a date (Plan tab, insights). */
+/* The workout scheduled on a date (a lift first), or 'rest'. */
 function plannedFor(date){
-  const dow = new Date(date+'T12:00:00').getDay();
-  return dow===6 ? 'run2' : PLAN.week[dow];
+  const s=sched(date), x=s.occs.find(o=>o.date===date && o.type==='lift') || s.occs.find(o=>o.date===date);
+  return x ? x.key : 'rest';
 }
 function burst(x,y,n=30){
   if(matchMedia('(prefers-reduced-motion:reduce)').matches) return;
@@ -530,15 +583,93 @@ const allSessions = () => {
 };
 const sid = () => st.date+'-'+st.sess;
 
+/* ---------- training program (programs.js): settings, schedule changes and check-ins, synced with Supabase ---------- */
+st.prog = LS('wt.prog.v1', null);          // {config, past}; null = the original plan, unchanged
+st.changes = LS('wt.changes.v1', []);      // [{id, change}]: moved / skipped / reduced workouts and readiness check-ins
+st.pv = 0;
+let schedMemo = {};
+const bumpProg = () => { st.pv++; schedMemo={} };
+/* Everything one week shows (programs.js weekSchedule), cached until data changes. */
+function sched(date){
+  const all=allSessions(), d=date||st.date, ws=Programs.weekStartOf(d, Programs.configOn(st.prog,d).weekStart);
+  const key=[st.pv, all.length, all.reduce((m,x)=>Math.max(m,verOf(x)),0), ws, todayStr()].join('|');
+  if(!schedMemo[key]){
+    if(Object.keys(schedMemo).length>24) schedMemo={};
+    schedMemo[key]=Programs.weekSchedule({prog:st.prog, changes:st.changes, sessions:all, today:todayStr(), weekStart:ws, settings:st.settings});
+  }
+  return schedMemo[key];
+}
+const progWorkouts = () => sched(st.date).workouts;
+const occOf = id => id ? sched(st.date).occs.find(x=>x.occ===id) : null;
+/* The newest program settings (what Plan edits change), and the week they start. */
+const progCfg = () => st.prog && st.prog.config ? Programs.normalize(st.prog.config) : Programs.defaultConfig();
+const newUid = () => (self.crypto && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36)+'-'+Math.random().toString(36).slice(2)).toLowerCase();
+const progDirty = () => LS('wt.progDirty', {prog:false, ch:[], del:[]});
+function setProgram(prog){
+  st.prog=prog; SS('wt.prog.v1',prog);
+  const d=progDirty(); d.prog=true; SS('wt.progDirty',d);
+  bumpProg(); syncProgram();
+}
+function putChanges(rows){
+  rows.forEach(r=>{ st.changes=st.changes.filter(c=>c.id!==r.id); st.changes.push(r) });
+  SS('wt.changes.v1',st.changes);
+  const d=progDirty(); d.ch=[...new Set([...d.ch, ...rows.map(r=>r.id)])]; d.del=d.del.filter(i=>!rows.some(r=>r.id===i)); SS('wt.progDirty',d);
+  bumpProg(); syncProgram();
+}
+function dropChanges(ids){
+  if(!ids.length) return;
+  st.changes=st.changes.filter(c=>!ids.includes(c.id)); SS('wt.changes.v1',st.changes);
+  const d=progDirty(); d.del=[...new Set([...d.del, ...ids])]; d.ch=d.ch.filter(i=>!ids.includes(i)); SS('wt.progDirty',d);
+  bumpProg(); syncProgram();
+}
+const changeOf = id => (st.changes.find(c=>c.id===id)||{}).change || null;
+let progSyncT=null;
+function syncProgram(){ clearTimeout(progSyncT); progSyncT=setTimeout(()=>{ if(sbAuth()) pushProgram().catch(()=>{}) }, 400) }
+async function pushProgram(){
+  const t=await sbToken(), uid=t&&jwtSub(t); if(!uid) return false;
+  const d=progDirty(); let ok=true;
+  if(d.prog && st.prog){
+    const r=await sbFetch('/rest/v1/programs?on_conflict=user_id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},
+      body:JSON.stringify([{user_id:uid, config:st.prog.config, past:st.prog.past||[], updated_at:new Date().toISOString()}])});
+    if(r.ok) d.prog=false; else ok=false;
+  }
+  const rows=st.changes.filter(c=>d.ch.includes(c.id));
+  if(rows.length){
+    const r=await sbFetch('/rest/v1/schedule_changes?on_conflict=user_id,id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},
+      body:JSON.stringify(rows.map(c=>({user_id:uid, id:c.id, week:c.change.week, change:c.change, updated_at:new Date().toISOString()})))});
+    if(r.ok) d.ch=d.ch.filter(i=>!rows.some(c=>c.id===i)); else ok=false;
+  }
+  if(d.del.length){
+    const r=await sbFetch('/rest/v1/schedule_changes?id=in.('+d.del.map(i=>'"'+encodeURIComponent(i)+'"').join(',')+')',{method:'DELETE'});
+    if(r.ok) d.del=[]; else ok=false;
+  }
+  SS('wt.progDirty',d); st.progCloud=ok; return ok;
+}
+/* Unsent changes go up first; then the cloud copy is read (changes not yet sent stay as they are here). */
+async function loadProgram(){
+  const d0=progDirty();
+  if(d0.prog || d0.ch.length || d0.del.length) await pushProgram();
+  const [pr,cr]=await Promise.all([sbFetch('/rest/v1/programs?select=config,past'), sbFetch('/rest/v1/schedule_changes?select=id,change&week=gte.'+addDays(todayStr(),-180))]);
+  const d=progDirty();
+  st.progCloud = pr.ok && cr.ok;
+  if(pr.ok){ const row=(await pr.json())[0]; if(!d.prog){ if(row) st.prog={config:row.config, past:row.past||[]}; else if(st.prog){ d.prog=true; SS('wt.progDirty',d) } } }
+  if(cr.ok){ const rows=await cr.json(), mine=st.changes.filter(c=>d.ch.includes(c.id));
+    st.changes=[...rows.filter(r=>!d.ch.includes(r.id) && !d.del.includes(r.id)), ...mine]; }
+  SS('wt.prog.v1',st.prog); SS('wt.changes.v1',st.changes); bumpProg();
+  if(d.prog) pushProgram().catch(()=>{});
+}
+
 /* Supabase is the only store. st.local holds workouts saved on this device that have not reached it yet. */
 async function loadData(){
   if(sbAuth()){
     try{ st.sb=await sbLoad(); await syncLocal() }catch(e){}
     try{ await loadLive() }catch(e){}
     try{ await loadSettings() }catch(e){}
+    try{ await loadProgram() }catch(e){}
     try{ await loadHealth() }catch(e){}
     purgeDeleted();
   }
+  bumpProg();
   if(!st.wk) render();
 }
 
@@ -561,18 +692,26 @@ function bestEver(exId){
 function getDraft(){
   const id=sid(), ex=allSessions().find(s=>s.id===id), lv=st.live[id];
   // A workout in progress on the Watch (or another device) that is newer than this draft replaces it.
-  if(lv && !(ex && verOf(ex)>=verOf(lv)) && verOf(lv)>(st.draft[id]?.touchedAt||0)) adoptLive(id,lv);
+  if(lv && !(ex && verOf(ex)>=verOf(lv)) && verOf(lv)>(st.draft[id]?.touchedAt||0) && sameWorkout(st.draft[id],lv)) adoptLive(id,lv);
   // A saved session wins over a draft that is untouched, empty, or older than the save (e.g. a web draft started
   // before the Watch logged the same workout), so Edit always opens what was actually logged.
   const dr=st.draft[id];
-  if(!dr || (ex && (!dr.touched || !hasDraftData(dr) || (dr.touchedAt||0) < verOf(ex)))) st.draft[id] = ex ? fromSession(ex) : {ex:{},energy:'',notes:'',run:{dist:'',min:''},swaps:{},deload:false};
+  if(!dr || (ex && (!dr.touched || !hasDraftData(dr) || (dr.touchedAt||0) < verOf(ex)))) st.draft[id] = ex ? fromSession(ex) : {ex:{},energy:'',notes:'',run:{dist:'',min:''},swaps:{},deload:false,uid:newUid()};
+  if(!st.draft[id].uid && !ex) st.draft[id].uid=newUid();
   st.draft[id].swaps ||= {};
   return st.draft[id];
 }
+/* A copy from another device is the same workout when either side has nothing logged yet, or both have the same
+   uid (made when a workout starts and kept through a handoff). Two different workouts never overwrite each other. */
+const sameWorkout = (dr,lv) => !dr || !hasDraftData(dr) || !dr.uid || !lv.uid || dr.uid===lv.uid;
 function fromSession(s){
   const d={ex:{},energy:s.energy??'',notes:s.notes||'',run:{dist:s.run?.distanceKm??s.other?.distanceKm??'',min:s.run?.minutes??s.yoga?.minutes??s.other?.minutes??''},swaps:{},deload:!!s.deload,dur:s.durationMin,savedAt:s.savedAt};
   if(s.session==='other') d.label=s.name;
   if(s.effort) d.effort=s.effort;
+  if(s.uid) d.uid=s.uid;
+  if(s.occ) d.occ=s.occ;
+  if(s.only) d.only=s.only;
+  if(s.reduced) d.reduced=true;
   d.plans={}; d.diff={};
   (s.entries||[]).forEach(e=>{
     d.ex[e.id]=e.sets.map(x=>({...x, w:x.w??0}));
@@ -589,7 +728,7 @@ const hasDraftData = d => d.run.dist!==''||d.run.min!==''||Object.values(d.ex).s
 
 /* ---------- smart targets, deload, weekly stats ---------- */
 const roundTo = (v,q) => Math.round(v/q)*q;
-const monOf = ds => addDays(ds, -((new Date(ds+'T12:00:00').getDay()+6)%7));
+const monOf = ds => Programs.weekStartOf(ds, Programs.configOn(st.prog, ds).weekStart);   // start of the week (Monday unless changed)
 /* Plans come from progression.js, the same rules the Watch gets from the Edge Function. An exercise's plan is made
    once, when the workout first needs it, and kept in the draft: planned targets never shift during a workout. */
 function planOf(e){
@@ -601,7 +740,7 @@ function planOf(e){
   }
   return d.plans[e.id];
 }
-const planN = e => { const p=planOf(e); return p && p.sets.length ? p.sets.length : e.sets };
+const planN = e => { const p=planOf(e); return p && p.sets.length ? Math.min(p.sets.length, e.sets||p.sets.length) : e.sets };
 const targetAt = (p,k) => p && p.sets[k] ? {...p.sets[k], ...((p.edits||{})[k]||{})} : null;
 const fmtT = (t,e) => t.w==null ? `? × ${t.r}` : fmtSet({w:t.w, r:t.r}, e);
 /* What comes next: a warm-up (until the first working set, unless skipped), else working set k of the plan. */
@@ -678,12 +817,31 @@ async function sbUpsert(list){
   if(!sbAuth()||!list.length) return false;
   try{
     const t=await sbToken(); const uid=t&&jwtSub(t); if(!uid) return false;
+    await rekeyList(list);
     const r=await sbFetch('/rest/v1/sessions?on_conflict=user_id,id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(list.map(x=>sessToRow(x,uid)))});
     if(!r.ok) return false;
     list.forEach(x=>{ const i=st.sb.findIndex(y=>y.id===x.id); if(i>=0) st.sb[i]=x; else st.sb.push(x) });
     st.local=st.local.filter(l=>!list.some(x=>x.id===l.id&&verOf(x)>=verOf(l))); SS('wt.local.v1',st.local);
     return true;
   }catch(e){ return false }
+}
+/* Before uploading: a workout whose id (date-key) is already used in the cloud by a different finished workout
+   (another uid, e.g. the same lift logged on the Watch while this phone was offline) moves to the next free key,
+   upperA~2. Nothing is overwritten and nothing is saved twice (programs.js rekey). */
+async function rekeyList(list){
+  const ids=list.filter(x=>x.uid).map(x=>x.id); if(!ids.length) return;
+  const r=await sbFetch('/rest/v1/sessions?select=id,date,status,uid:data->>uid&id=in.('+ids.map(i=>'"'+encodeURIComponent(i)+'"').join(',')+')');
+  if(!r.ok) return;
+  const rows=await r.json();
+  for(const x of list){
+    const row=rows.find(y=>y.id===x.id); if(!row) continue;
+    const day=await sbFetch('/rest/v1/sessions?select=id&date=eq.'+x.date); if(!day.ok) continue;
+    const taken=new Set([...(await day.json()).map(y=>y.id), ...allSessions().filter(y=>y.date===x.date).map(y=>y.id)]);
+    const k=Programs.rekey(x, row, taken); if(!k) continue;
+    const old=x.id; x.session=k; x.id=x.date+'-'+k; if(!/\(again\)$/.test(x.name)) x.name+=' (again)';
+    st.local=st.local.map(l=>l.id===old && l.uid===x.uid ? {...x} : l); SS('wt.local.v1',st.local);
+    toast('Saved as a second '+x.name.replace(/ \(again\)$/,''));
+  }
 }
 /* Upload workouts saved on this device while offline or signed out. A copy the cloud already has (same or newer) is dropped. */
 let syncingLocal=false;
@@ -743,13 +901,21 @@ const restOn = () => LS('wt.rest', false);
 /* ---------- workout flow ---------- */
 const stepsFor = () => {
   const S=sessDef(st.sess);
-  return S.type==='lift' ? S.ex.map(e=>{const a=getDraft().swaps[e.id];return a&&EXMAP[a]?EXMAP[a]:e}) : S.type==='run' ? [{id:'run',run:1,name:sessName(st.sess)}] : S.type==='yoga' ? [{id:'yoga',yoga:1,name:S.name}] : S.type==='other' ? [{id:'other',other:1,name:sessLabel()}] : [];
+  if(S.type==='lift'){
+    // The occurrence's own list (a reduced or adjusted workout) or the whole workout; a preferred alternative
+    // (Plan > exercise preferences) unless swapped for this session. Anything logged stays visible.
+    const d=getDraft(), ex=d.only ? Programs.exList(S, d.only) : S.ex;
+    const steps=ex.map(e=>{ const a=d.swaps[e.id]??e.use; return a&&a!==e.id&&EXMAP[a] ? {...EXMAP[a], sets:e.sets, reps:e.reps} : e });
+    Object.keys(d.ex).forEach(id=>{ if((d.ex[id]||[]).length && EXMAP[id] && !steps.some(x=>x.id===id) && !ex.some(e=>e.id===EXMAP[id].slot && (d.swaps[e.id]??e.use)===id)) steps.push(EXMAP[id]) });
+    return steps;
+  }
+  return S.type==='run' ? [{id:'run',run:1,name:sessName(st.sess)}] : S.type==='yoga' ? [{id:'yoga',yoga:1,name:S.name}] : S.type==='other' ? [{id:'other',other:1,name:sessLabel()}] : [];
 };
 /* Display name for the selected session; 'other' carries a name typed in the + sheet. */
 const sessLabel = () => st.sess==='other' ? (getDraft().label||'Other') : sessName(st.sess);
 function startWorkout(resume){
   st.auto=false;
-  const d=getDraft(); if(!d.startedAt){d.startedAt=Date.now();saveDraft()}
+  const d=getDraft(); attachOcc(d); if(!d.startedAt){d.startedAt=Date.now();saveDraft()}
   const steps=stepsFor();
   let first=0;
   if(resume){ const i=steps.findIndex(e=>!e.run && !e.yoga && !e.other && workSets(d.ex[e.id]).length<planN(e)); first = i<0? steps.length : i }
@@ -893,9 +1059,15 @@ async function pushLive(){
     startedAt:new Date(d.startedAt||Date.now()).toISOString(), updatedAt:new Date(d.touchedAt||Date.now()).toISOString()};
   if(d.deload) rec.deload=true;
   if(d.plans) rec.plans=d.plans;
+  if(d.uid) rec.uid=d.uid;
+  if(d.occ) rec.occ=d.occ;
+  if(d.only) rec.only=d.only;
+  if(d.reduced) rec.reduced=true;
   const row={...sessToRow(rec,uid), status:'in_progress'};
-  // Update the row only while it is still in progress; if there is none yet, insert it (never over a finished one).
-  let r=await sbFetch('/rest/v1/sessions?id=eq.'+encodeURIComponent(rec.id)+'&status=eq.in_progress',{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify({data:row.data,source:'web',name:row.name})});
+  // Update the row only while it is still in progress and holds this same workout (or one from an older version
+  // without a uid); if there is none yet, insert it (never over a finished one or a different workout).
+  const same = d.uid ? '&or='+encodeURIComponent(`(data->>uid.eq.${d.uid},data->>uid.is.null)`) : '';
+  let r=await sbFetch('/rest/v1/sessions?id=eq.'+encodeURIComponent(rec.id)+'&status=eq.in_progress'+same,{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify({data:row.data,source:'web',name:row.name})});
   const synced = () => { const dd=st.draft[rec.id]; if(dd && !dd.liveSeen){ dd.liveSeen=true; SS('wt.draft.v1',st.draft) } };
   if(r.ok && (await r.json()).length) return synced();
   r=await sbFetch('/rest/v1/sessions?on_conflict=user_id,id',{method:'POST',headers:{Prefer:'resolution=ignore-duplicates,return=minimal'},body:JSON.stringify([row])});
@@ -927,6 +1099,7 @@ async function pullLive(){
     if(!st.wk||sid()!==id) return;
     const x=rowToSess(row), d=st.draft[id];
     if(verOf(x)<=(d?.touchedAt||0)) return;
+    if(!sameWorkout(d,x)) return;   // a different workout under the same id: saving this one gives it its own id
     if(row.status==='complete'){
       const i=st.sb.findIndex(y=>y.id===id); if(i>=0) st.sb[i]=x; else st.sb.push(x);
       delete st.live[id]; delete st.draft[id]; SS('wt.draft.v1',st.draft);
@@ -959,7 +1132,8 @@ function render(){
   if(st.tab==='today' && !inWk) checkNotePrompt();
   const note = st.note && st.tab==='today' && !inWk && !st.add && !st.recap ? noteSheet() : '';
   const hs = st.hm && st.tab==='progress' ? healthSheet() : '';
-  $('#app').innerHTML = v() + (st.add&&!inWk ? addSheet() : '') + (st.recap ? recapView() : '') + note + hs;
+  const ps = st.tab==='plan' ? (st.chg ? chgSheet() : st.daysh ? daySheet() : st.prefsh ? prefSheet() : '') : '';
+  $('#app').innerHTML = v() + (st.add&&!inWk ? addSheet() : '') + (st.recap ? recapView() : '') + note + hs + ps;
   if(st.wk){ st.wk.anim=false; st.wk.just=null;
     const cur=document.querySelector('.dots .dot.now,.dots .dot.editt'), row=cur&&cur.parentElement;
     if(cur) row.scrollLeft=Math.max(0, cur.offsetLeft-row.clientWidth/2+cur.offsetWidth/2); }
@@ -972,44 +1146,41 @@ function sessStats(x){
   let sets=0,vol=0; (x.entries||[]).forEach(e=>e.sets.forEach(t=>{if(!t.wu) sets++;vol+=setVol(e,t,x.date)}));
   return [[sets,'sets'],[vol>=1000?(vol/1000).toFixed(1)+'k':vol,'lb lifted'],[x.durationMin??'—','minutes']];
 }
-/* This week's planned workouts and the logged session (if any) that covers each. Runs fill the run slots
-   in date order, whichever key they were saved under. Anything else logged that week is an extra. */
+/* This week's scheduled workouts (programs.js) with the session that covers each, and the week's goal
+   (scheduled workouts that are not optional). Used by Today, stats and reviews. */
 function weekPlan(ds){
-  const mon=monOf(ds), end=addDays(mon,6);
-  const list=allSessions().filter(s=>s.date>=mon&&s.date<=end).reverse();
-  const slots=WEEK_SLOTS.map(k=>({k,done:null})), extras=[];
-  list.forEach(s=>{
-    const isRun = !!s.run || sessBase(s.session)==='run';
-    const sl = isRun ? slots.find(x=>sessBase(x.k)==='run'&&!x.done) : slots.find(x=>x.k===s.session&&!x.done);
-    if(sl) sl.done=s; else extras.push(s);
-  });
-  const req=slots.filter(x=>x.k!=='run2');
-  return {mon, slots, extras, left:req.filter(x=>!x.done), doneN:req.filter(x=>x.done).length};
+  const sc=sched(ds), req=sc.occs.filter(x=>!x.optional);
+  return {mon:sc.weekStart, sched:sc, doneN:req.filter(x=>x.status==='done').length, goal:req.length,
+    left:req.filter(x=>x.status==='today'||x.status==='upcoming'||x.status==='missed')};
 }
-/* Session key for a planned slot on a date: a run takes whichever run key is still free that day. */
+/* Session key for a scheduled run on a date: whichever run key is still free that day. */
 function slotKey(k,date){
   if(sessBase(k)!=='run') return k;
   const used=new Set(allSessions().filter(s=>s.date===date).map(s=>s.session));
-  return used.has(k) ? (k==='run'?'run2':'run') : k;
+  return [k,'run','run2','run3'].find(x=>!used.has(x)) || k;
 }
-/* What Today shows for a date: a workout in progress, then what was logged that day, then the day's planned
-   workout if it is still open this week, then the next open one. Past days with nothing logged show nothing. */
+/* What Today shows for a date: a workout in progress, then what was logged that day, then the day's scheduled
+   workout, else (when the day's workout is done or there is none on a training day) the next open one.
+   Past days with nothing logged show nothing. Sets st.occ, the scheduled occurrence being shown. */
 function pickSess(date){
   const t=todayStr(), all=allSessions();
   const open=Object.keys(st.draft).find(id=>id.startsWith(date+'-') && hasDraftData(st.draft[id]) && !all.some(s=>s.id===id));
-  if(open) return open.slice(11);
+  if(open){ st.occ=st.draft[open].occ||null; return open.slice(11) }
   // A workout in progress on the Watch shows even when it is not the day's planned one (a repeat, or a swapped day).
   const live=Object.keys(st.live).find(id=>id.startsWith(date+'-') && !all.some(s=>s.id===id));
-  if(live) return live.slice(11);
+  if(live){ st.occ=st.live[live].occ||null; return live.slice(11) }
   // Today shows a finished plan workout; an extra (HIIT, yoga, ...) stays in the list so the next plan workout shows.
   const day=all.filter(s=>s.date===date && (date<t || !(s.yoga||s.other)));
-  if(day.length && date<=t) return day[0].session;
+  if(day.length && date<=t){ st.occ=day[0].occ||null; return day[0].session }
+  st.occ=null;
   if(date<t) return null;
-  const planned=plannedFor(date);
-  if(planned==='rest') return 'rest';
-  const wp=weekPlan(date);
-  const p=wp.slots.find(x=>!x.done && sessBase(x.k)===sessBase(planned)) || wp.left[0];
-  return p ? slotKey(p.k,date) : null;
+  const sc=sched(date), here=sc.occs.filter(x=>x.date===date), openHere=here.filter(x=>x.status==='today'||x.status==='upcoming');
+  const pick=openHere.find(x=>x.type==='lift') || openHere.find(x=>!x.optional) || openHere[0];
+  if(pick){ st.occ=pick.occ; return slotKey(pick.key,date) }
+  if(!here.length || here.some(x=>x.status==='recovery'||x.status==='skipped')) return 'rest';
+  const next=sc.occs.find(x=>!x.optional && (x.status==='missed'||x.status==='today'||x.status==='upcoming'));
+  if(next){ st.occ=next.occ; return slotKey(next.key,date) }
+  return null;
 }
 function viewToday(){
   if(st.wk) return viewWorkout();
@@ -1018,32 +1189,62 @@ function viewToday(){
   return recapBanners() + weekStrip() + todayHero(wp) + weekList(wp);
 }
 function weekList(wp){
-  const t=todayStr(), cur=monOf(t)===wp.mon;
+  const sc=wp.sched, t=todayStr(), cur=sc.weekStart===monOf(t);
   const logged = st.sess && allSessions().find(s=>s.id===sid());
-  const sel = logged ? wp.slots.find(x=>x.done&&x.done.id===logged.id) : st.sess ? wp.slots.find(x=>!x.done && sessBase(x.k)===sessBase(st.sess)) : null;
-  const next = wp.left[0];
-  const day = d => new Date(d+'T12:00:00').toLocaleDateString(undefined,{weekday:'short'});
-  const sub = k => { const S=sessDef(k); return S.type==='run' ? 'Distance and time' : S.ex.length+' exercises · about '+S.ex.length*7+' min' };
+  const next = wp.left.find(x=>x.status!=='missed') || wp.left[0];
+  const day = d => Programs.DOW_NAME[Programs.dow(d)];
   const doneRow = (s,on) => `<button class="wrow done ${on?'sel':''}" data-act="opensess" data-d="${s.date}" data-s="${esc(s.session)}"><i class="wck">✓</i><span><b>${esc(s.name)}</b><small>Done ${day(s.date)}</small></span></button>`;
-  const rows = wp.slots.map(x=> x.done ? doneRow(x.done, x===sel)
-    : `<button class="wrow ${x===sel?'sel':''}" data-act="pick" data-k="${x.k}"><i class="wck"></i><span><b>${esc(x.k==='run2'?'Run 2':sessName(x.k))}</b><small>${x.k==='run2'?'If you feel like it':sub(x.k)}</small></span>${x.k==='run2'?'<em class="soft">Optional</em>':x===next&&cur?'<em>Up next</em>':''}</button>`).join('');
-  const extras = wp.extras.map(s=>doneRow(s, logged&&logged.id===s.id)).join('');
-  return `<div class="schhd"><b>${cur?'This week':'That week'}</b><span>${wp.doneN} of 5 done</span></div>
-    <div class="card wlist">${rows}${extras?`<div class="wsub">Also this week</div>${extras}`:''}</div>`;
+  const rows = sc.occs.map(x=>{
+    if(x.done) return doneRow(x.done, logged&&logged.id===x.done.id);
+    const n = x.type==='run' ? 0 : Programs.exList(sc.workouts[x.key], x.ex).length;
+    const sub = x.type==='run' ? (x.optional?'If you feel like it':'Distance and time') : `${n} exercises · about ${n*7} min`;
+    const tag = x.status==='skipped' ? '<em class="soft">Skipped</em>' : x.status==='recovery' ? '<em class="soft">Recovery day</em>'
+      : x.status==='missed' ? '<em class="soft">Missed</em>' : x.reduced ? '<em>Reduced</em>' : x.optional ? '<em class="soft">Optional</em>' : x===next&&cur ? '<em>Up next</em>' : '';
+    return `<button class="wrow ${!logged&&st.occ===x.occ?'sel':''}" data-act="pick" data-k="${esc(x.key)}" data-o="${esc(x.occ)}"><i class="wck"></i><span><b>${esc(x.name)}</b><small>${day(x.date)} · ${sub}</small></span>${tag}</button>`;
+  }).join('');
+  const extras = sc.extras.map(s=>doneRow(s, logged&&logged.id===s.id)).join('');
+  return `<div class="schhd"><b>${cur?'This week':'That week'}</b><span>${wp.doneN} of ${wp.goal} done</span></div>
+    <div class="card wlist">${rows||'<div class="note" style="padding:10px">Nothing scheduled this week.</div>'}${extras?`<div class="wsub">Also this week</div>${extras}`:''}</div>`;
+}
+/* Optional readiness check before a scheduled lift (programs.js readiness): never changes weights. */
+function readyCard(x){
+  if(!x || x.type!=='lift' || x.done || st.date!==todayStr()) return '';
+  if(x.reduced) return `<div class="rdy"><div><b>Reduced volume today</b><div class="note">Fewer sets, same targets. It won't count against your progress.</div></div><button class="link" data-act="rdyundo" data-o="${esc(x.occ)}">Undo</button></div>`;
+  if(!progCfg().readiness) return '';
+  const chk=changeOf('chk:'+todayStr()), ans=chk&&chk.readiness;
+  if(!ans) return `<div class="rdy col"><span>How are you feeling? <small>Optional</small></span>${seg('rdy','',[['ready','Ready'],['sore','A little sore'],['very','Very sore']])}</div>`;
+  if(ans==='ready') return '';
+  const r=Programs.readiness(sched(st.date), x.occ, ans, todayStr(), chk.area);
+  const b=(a,l,rec)=>`<button class="btn sm ${rec?'':'ghost'}" data-act="rdyact" data-a="${a}" data-o="${esc(x.occ)}">${l}</button>`;
+  const move = r.moveTo ? b('move','Move to '+Programs.DOW_NAME[Programs.dow(r.moveTo)], r.recommend==='move') : '';
+  if(ans==='sore') return `<div class="rdy col"><div><b>A little sore</b><div class="note">Start as planned: the warm-ups help. Or do fewer sets today.</div></div><div class="rbtns">${b('reduce','Reduce volume')}<button class="link" data-act="rdyclear">Change answer</button></div></div>`;
+  return `<div class="rdy col"><div><b>Not recovered</b><div class="note">${r.moveTo?`${Programs.DOW_NAME[Programs.dow(r.moveTo)]} is clear of your sore muscles.`:'No later day this week is clear of your sore muscles.'} None of these change your weights.</div></div>
+    <div class="rbtns">${r.recommend==='move'?move:b('reduce','Reduce volume',true)}${r.recommend==='move'?b('reduce','Reduce volume'):move}${b('recovery','Recovery day')}${b('skip','Skip')}</div><button class="link" data-act="rdyclear">Change answer</button></div>`;
+}
+/* The scheduled occurrence for the workout shown, attached to a draft that has nothing logged yet (so a workout's
+   exercise list is fixed once it starts). Workouts started outside the schedule (repeats, extras) have none. */
+function attachOcc(d){
+  if(!d || hasDraftData(d) || sessDef(st.sess).type!=='lift' && sessBase(st.sess)!=='run') return;
+  const x=occOf(st.occ);
+  if(x && !x.done && sessBase(x.key)===sessBase(st.sess)){ d.occ=x.occ; d.only=x.ex||null; d.reduced=!!x.reduced }
+  else { delete d.occ; delete d.only; delete d.reduced }
 }
 function todayHero(wp){
   const t=todayStr();
   if(!st.sess){
     if(st.date<t) return `<div class="hero"><h2>Nothing logged</h2><div class="meta">${esc(fmtDate(st.date))}</div><div class="note">Tap a workout below to add it to this day, or + for something else.</div></div>`;
-    const opt = wp.slots.find(x=>x.k==='run2'&&!x.done);
-    return `<div class="hero doneh"><div class="chk">✓</div><h2>Week complete</h2><div class="meta">All 5 workouts done.${opt?' The optional run is still open below.':''} Tap + for anything extra.</div></div>`;
+    const opt = wp.sched.occs.find(x=>x.optional&&x.status!=='done');
+    return `<div class="hero doneh"><div class="chk">✓</div><h2>Week complete</h2><div class="meta">All ${wp.goal} workouts done.${opt?' The optional run is still open below.':''} Tap + for anything extra.</div></div>`;
   }
   if(st.sess==='rest'){
-    const n=wp.left.length;
+    const n=wp.left.length, rec=wp.sched.occs.find(x=>x.date===st.date && x.status==='recovery');
+    if(rec) return `<div class="hero"><h2>Recovery day 🌿</h2><div class="meta">${esc(rec.name)} is off today.</div><div class="note">Optional: a 20 to 30 minute walk or some mobility work (+ to log it). Sleep and eat well.${n?` ${n} workout${n>1?'s':''} still open this week.`:''}</div><button class="link" data-act="rdyundo" data-o="${esc(rec.occ)}">Undo recovery day</button></div>`;
     return `<div class="hero"><h2>Rest day 😴</h2><div class="meta">Recover, eat, sleep.</div>${n?`<div class="note">${n} workout${n>1?'s':''} left this week. Tap one below to do it ${st.date===t?'today':'that day'}.</div>`:''}</div>`;
   }
   const S=sessDef(st.sess), d=getDraft();
   const lg = allSessions().find(x=>x.id===sid());
+  if(!lg) attachOcc(d);
+  const oc = !lg ? occOf(d.occ) : null;
   let h='';
   const steps=stepsFor(), resume=hasDraftData(d);
   const done = e => (e.run||e.yoga||e.other) ? (d.run.dist!==''||d.run.min!=='') : (d.ex[e.id]||[]).length>0;
@@ -1067,10 +1268,11 @@ function todayHero(wp){
   }
   const onWatch = S.type==='lift' && st.live[sid()]?.source==='watch' && st.date===t;
   const what = S.type==='run'?'Distance and time':S.type==='yoga'?'Class length':S.type==='other'?'Timed workout':steps.length+' exercises';
-  return h + `<div class="hero"><h2>${esc(sessLabel())}</h2>
-    <div class="meta">${what} · about ${mins} min</div>
+  return h + `<div class="hero"><h2>${esc(oc&&st.sess!=='other'?oc.name:sessLabel())}</h2>
+    <div class="meta">${what} · about ${mins} min${oc&&oc.date!==st.date?` · planned for ${Programs.DOW_NAME[Programs.dow(oc.date)]}`:''}</div>
     ${S.type==='lift'?`<div class="chips">${steps.map(e=>`<span class="${done(e)?'ok':''}">${esc(e.name.split(/[\/(]/)[0].trim())}</span>`).join('')}</div>`:S.note?`<div class="note" style="margin-bottom:16px">${esc(S.note)}</div>`:''}
     ${onWatch?`<div class="note" style="text-align:center;margin-bottom:10px">⌚ In progress on your Watch. Resume here to keep going on your phone.</div>`:''}
+    ${!resume && !onWatch ? readyCard(oc) : ''}
     ${st.date>t ? `<div class="note" style="text-align:center">Coming up. You can log it on the day.</div>`
       : `<button class="btn big ${isManual()?'':'pulse'}" data-act="start" data-resume="${resume?1:0}">${onWatch?'Resume workout':resume?(isManual()?'Continue adding':'Resume workout'):(isManual()?'Add workout manually':S.type==='run'?'Start run':'Start workout')}</button>`}</div>`;
 }
@@ -1135,11 +1337,10 @@ const isManual = () => st.date<todayStr();
 
 const addDays = (ds,n) => { const d=new Date(ds+'T12:00:00'); d.setDate(d.getDate()+n); return d.toLocaleDateString('en-CA') };
 function weekStrip(){
-  const sel=new Date(st.date+'T12:00:00'), mon=addDays(st.date,-((sel.getDay()+6)%7));
+  const mon=monOf(st.date);
   const logged=new Set(allSessions().map(s=>s.date)), t=todayStr();
-  const letters=['M','T','W','T','F','S','S'];
-  const cells=letters.map((L,i)=>{
-    const ds=addDays(mon,i), n=+ds.slice(8);
+  const cells=[...Array(7)].map((_,i)=>{
+    const ds=addDays(mon,i), n=+ds.slice(8), L=Programs.DOW_NAME[Programs.dow(ds)][0];
     return `<button data-act="day" data-d="${ds}" class="${logged.has(ds)?'done':''} ${ds===st.date?'sel':''} ${ds===t?'today':''}" aria-label="${ds}"><small>${L}</small><b>${n}</b><i></i></button>`;
   }).join('');
   const m1=new Date(mon+'T12:00:00').toLocaleDateString(undefined,{month:'short',day:'numeric'}), m2=new Date(addDays(mon,6)+'T12:00:00').toLocaleDateString(undefined,{month:'short',day:'numeric'});
@@ -1221,6 +1422,7 @@ function sheetHtml(e){
   return `<div class="sheetbg" data-act="sheetclose"><div class="sheet" data-stop="1"><h3>Swap exercise</h3>
     <div class="note">Instead of ${esc(orig.name)}. Each option keeps its own weight history.</div>
     ${opts.map(o=>`<button class="opt ${o.id===e.id?'cur':''}" data-act="swap" data-id="${o.id}"><span>${esc(o.name)}${o.id===slot?' <small>(planned)</small>':''}</span><span>${o.id===e.id?'✓':''}</span></button>`).join('')}
+    ${e.id!==slot && progCfg().prefs.use[slot]!==e.id ? `<button class="link" data-act="prefalways" data-id="${e.id}" data-s="${slot}">Always use ${esc(e.name)} instead of ${esc(orig.name)}</button>` : ''}
     ${progSettings(e)}
     <button class="btn ghost" style="margin-top:6px" data-act="sheetclose">Done</button></div></div>`;
 }
@@ -1478,12 +1680,13 @@ function prList(){
 const prText = p => p.as ? (p.w ? `${p.w} lb assist × ${p.r}` : `Bodyweight × ${p.r}`) : `${p.w} lb × ${p.r}`;
 
 function weekCard(){
-  const w=weekStats(monOf(todayStr())), pct=Math.min(100,Math.round(w.sessions/5*100));
-  const pips=Array.from({length:5},(_,i)=>`<i class="${i<w.sessions?'on':''}"></i>`).join('');
+  const w=weekStats(monOf(todayStr())), wp=weekPlan(todayStr()), goal=Math.max(1,wp.goal), pct=Math.min(100,Math.round(w.sessions/goal*100));
+  const lifts=wp.sched.occs.filter(x=>x.type==='lift').length;
+  const pips=Array.from({length:goal},(_,i)=>`<i class="${i<w.sessions?'on':''}"></i>`).join('');
   return `<div class="card pcard"><div class="phead">${ico('cal','acc')}<b>This Week</b><span class="ppill">${pct}% Complete</span></div>
-    <div class="wbig"><b>${w.sessions}</b> of 5 workouts</div><div class="pips">${pips}</div>
+    <div class="wbig"><b>${w.sessions}</b> of ${goal} workouts</div><div class="pips">${pips}</div>
     <div class="tiles3">
-      <div>${ico('dumb')}<b>${w.lifts} / 4</b><span>Lifts</span></div>
+      <div>${ico('dumb')}<b>${w.lifts} / ${lifts}</b><span>Lifts</span></div>
       <div>${ico('run')}<b>${w.km?w.km.toFixed(1).replace(/\.0$/,'')+' km':'0 km'}</b><span>Running</span></div>
       <div>${ico('layers')}<b>${kfmt(w.volume)} lb</b><span>Volume</span></div></div>
     ${w.extra.length?`<div class="note" style="margin-top:10px">Extras: ${esc(w.extra.join(', '))} · ${w.extraMin} min</div>`:''}</div>`;
@@ -1575,8 +1778,8 @@ function insightsCard(){
   const hg=HM.filter(m=>m.better).map(m=>[m,hTrend(m)]).find(([m,t])=>t&&t.tone==='good');
   if(hg){ const [m,tr]=hg; out.push([m.ico,'up',`${m.short} ${tr.diff>0?'up':'down'} ${hFmt(m,Math.abs(tr.diff))} ${m.unit}`,`Since ${shortDate(tr.since)}. ${m.better<0?'Lower':'Higher'} is better.`]) }
   const t=todayStr(), mon=monOf(t), w=weekStats(mon);
-  const planned=[...Array(7)].map((_,i)=>addDays(mon,i)).filter(d=>d<=t&&!['rest','run2'].includes(plannedFor(d))).length;
-  out.push(['cal','', w.sessions>=planned?'On track':'Catch up', `${w.sessions} of 5 workouts done this week${w.sessions<planned?`, ${planned} planned by today`:''}.`]);
+  const wpl=weekPlan(t), planned=wpl.sched.occs.filter(x=>!x.optional && x.date<=t && x.status!=='skipped' && x.status!=='recovery').length;
+  out.push(['cal','', w.sessions>=planned?'On track':'Catch up', `${w.sessions} of ${wpl.goal} workouts done this week${w.sessions<planned?`, ${planned} planned by today`:''}.`]);
   const runs=runPoints().filter(r=>r.pace&&r.km>=0.5);
   if(runs.length>=2){ const last=runs[runs.length-1].pace, avg=Math.round(runs.slice(0,-1).reduce((a,r)=>a+r.pace,0)/(runs.length-1));
     out.push([last<=avg?'trend':'down', last<=avg?'up':'', last<=avg?'Pace improving':'Pace slower last run', `Last run ${mmss(last)}/km vs ${mmss(avg)}/km average before it.`]); }
@@ -1709,11 +1912,12 @@ function periodReview(kind,key){
   const days={}; list.forEach(s=>{ (days[s.date] ||= []).push(kindOf(s)) });
   const R={kind,key,start,end,cur,was,prs:[...prs.values()].sort((a,b)=>(b.as?-1:b.w)-(a.as?-1:a.w)),gain,bestPace,days};
   if(kind==='week'){
-    R.done=weekPlan(start).doneN;
-    let k=0, m=start; while(k<52 && weekPlan(m).doneN>=5){k++;m=addDays(m,-7)} R.streak=k;
+    const wp0=weekPlan(start); R.done=wp0.doneN; R.goal=wp0.goal;
+    const hit = m => { const w=weekPlan(m); return w.goal>0 && w.doneN>=w.goal };
+    let k=0, m=start; while(k<52 && hit(m)){k++;m=addDays(m,-7)} R.streak=k;
   } else {
     const mons=[]; for(let m=monOf(start); m<=end; m=addDays(m,7)) if(m>=start) mons.push(m);
-    R.weeks=mons.length; R.weeksHit=mons.filter(m=>weekPlan(m).doneN>=5).length;
+    R.weeks=mons.length; R.weeksHit=mons.filter(m=>{ const w=weekPlan(m); return w.goal>0 && w.doneN>=w.goal }).length;
   }
   const hl=[];
   if(R.prs.length>2){ const p=R.prs[0]; hl.push(`${R.prs.length} new PRs`, `Top PR: ${p.name} ${prText(p)}`) }
@@ -1810,7 +2014,7 @@ function recapBanners(){
   const lw=addDays(monOf(t),-7);
   if(dow<=2 && seen.week!==lw && all.some(s=>s.date>=lw&&s.date<=addDays(lw,6))){
     const R=periodReview('week',lw);
-    out.push(['week',lw,'Your week in review',`${shortDate(R.start)} – ${shortDate(R.end)} · ${R.done} of 5 workouts`]);
+    out.push(['week',lw,'Your week in review',`${shortDate(R.start)} – ${shortDate(R.end)} · ${R.done} of ${R.goal} workouts`]);
   }
   const lm=monthAdd(t.slice(0,7),-1);
   if(+t.slice(8)<=5 && seen.month!==lm && all.some(s=>s.date.startsWith(lm))) out.push(['month',lm,'Your month in review',monthName(lm)]);
@@ -1841,22 +2045,168 @@ function exportData(){
   else { const a=document.createElement('a'), u=URL.createObjectURL(file); a.href=u; a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(u),5000); toast('Export saved') }
 }
 function viewPlan(){
-  const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], todayDow=new Date(todayStr()+'T12:00:00').getDay();
-  const tag = t => t==='lift'?'<span class="tag lift">Lift</span>':t==='run'?'<span class="tag run">Run</span>':'<span class="tag">Rest</span>';
-  let h = `<div class="sect">This week</div><div class="card" style="padding:6px">${[1,2,3,4,5,6,0].map(d=>{
-    const opt = d===6, S=PLAN.sessions[PLAN.week[d]];
-    return `<div class="dayrow ${d===todayDow?'now':''}"><span class="dn">${days[d]}</span><span class="dt">${esc(opt?'Run · optional':S.name)}</span>${tag(opt?'run':S.type)}</div>`;
-  }).join('')}</div>`;
-  h += `<div class="sect">Workouts</div>`;
-  ['upperA','lowerA','upperB','lowerB'].forEach(k=>{
-    const S=PLAN.sessions[k];
-    h += `<details class="card pl"><summary><div class="ttl"><b>${esc(S.name)}</b><span>${S.ex.length} exercises · about ${S.ex.length*7} min</span></div><span class="chev">›</span></summary><div class="body">${S.ex.map(e=>`<div class="exr"><div class="exn">${esc(e.name)}${/Main lift/.test(e.note||'')?'<i>MAIN</i>':''}</div><div class="exs">${e.sets} × ${e.reps[0]===e.reps[1]?e.reps[0]:e.reps[0]+'–'+e.reps[1]}<small>rest ${e.rest}</small></div></div>`).join('')}</div></details>`;
+  const t=todayStr(), c=progCfg(), T=Programs.TEMPLATES[c.template], sc=sched(t), vol=sc.volume;
+  const starts = c.startedOn && c.startedOn>t ? c.startedOn : null;
+  const runs=c.runs||[], req=runs.filter(r=>!r.optional).length, opt=runs.length-req;
+  const runTxt = !runs.length ? 'no runs' : [req?`${req} run${req>1?'s':''}`:'', opt?`${opt} optional run${opt>1?'s':''}`:''].filter(Boolean).join(' + ');
+  const stage = c.level!=='returning' ? '' : vol.stage==='reg' ? 'Built back up to regular volume' : `Building back up: stage ${vol.stage==='r1'?1:2} of 3`;
+  let h=`<div class="sect">Current program</div><div class="card"><div class="row2"><div><b class="pname">${esc(T.name)}</b>
+    <div class="note">${c.lifts} lifts · ${runTxt} · ${Programs.LEVELS[c.level]}</div>
+    ${stage?`<div class="note">${stage}${vol.held?' (on hold)':''} · <button class="link inl" data-act="ramphold">${c.rampHold?'Keep building':'Hold this stage'}</button></div>`:''}
+    ${starts?`<div class="note">Starts ${esc(fmtDate(starts))}. This week finishes as planned.</div>`:''}</div>
+    <button class="btn sm" data-act="chgopen">Change</button></div>
+    ${!st.prog?'<div class="note" style="margin-top:8px">Your original plan. Change program, or customize it below.</div>':''}
+    ${st.prog && sbAuth() && st.progCloud===false?'<div class="note warnc" style="margin-top:8px">Saved on this phone. It reaches your Watch once the database update is in place.</div>':''}</div>`;
+  // the week
+  const day = d => Programs.DOW_NAME[Programs.dow(d)];
+  const rows=[...Array(7)].map((_,i)=>{
+    const d=addDays(sc.weekStart,i), items=sc.occs.filter(x=>x.date===d);
+    const label = items.length ? items.map(x=>esc(x.name)+(x.optional?' <small>optional</small>':'')).join(' · ') : '<span class="mute">Rest</span>';
+    const lift=items.find(x=>x.type==='lift'), main=lift||items[0];
+    const st2 = !main ? '' : items.every(x=>x.status==='done'||x.optional&&x.status!=='done'&&items.some(y=>y.status==='done')) && items.some(x=>x.status==='done') ? '<span class="tag ok">✓ Done</span>'
+      : main.status==='recovery' ? '<span class="tag">Recovery</span>' : main.status==='skipped' ? '<span class="tag">Skipped</span>' : main.status==='missed' ? '<span class="tag">Missed</span>'
+      : main.reduced ? '<span class="tag lift">Reduced</span>' : main.type==='lift' ? '<span class="tag lift">Lift</span>' : '<span class="tag run">Run</span>';
+    return `<button class="dayrow ${d===t?'now':''}" data-act="dayopen" data-d="${d}"><span class="dn">${day(d)}</span><span class="dt">${label}</span>${st2}</button>`;
+  }).join('');
+  const warns=sc.warnings.map(w=>`<div class="warn ${w.soft?'soft':''}">${w.soft?'ⓘ':'⚠'} ${esc(w.text)}</div>`).join('');
+  h+=`<div class="schhd"><b>This week</b><span>${esc(shortDate(sc.weekStart))} – ${esc(shortDate(addDays(sc.weekStart,6)))}</span></div>
+    <div class="card" style="padding:6px">${rows}</div>${warns}<div class="note" style="margin:0 4px">Tap a day to move, swap, reduce or skip it. Warnings never block a change.</div>`;
+  // workouts (the program's newest settings)
+  const pv=Programs.volumeFor(st.prog, {sessions:allSessions(), changes:st.changes}, starts||sc.weekStart);
+  const wks=Programs.workoutsFor(c, pv, st.settings), order=T.freq[c.lifts].w;
+  h+=`<div class="sect">Workouts</div>`;
+  order.forEach(k=>{
+    const S=wks[k], sets=S.ex.reduce((a,e)=>a+e.sets,0), lib=Object.keys(EXMAP).filter(id=>!EXMAP[id].alt && Programs.musclesOf(id) && !S.ex.some(e=>e.id===id));
+    h+=`<details class="card pl" ${st.openW===k?'open':''} data-w="${k}"><summary><div class="ttl"><b>${esc(S.name)}</b><span>${S.ex.length} exercises · ${sets} sets · about ${S.ex.length*7} min</span></div><span class="chev">›</span></summary><div class="body">${S.ex.map(e=>{
+      const nm=EXMAP[e.use||e.id].name, str=!e.use&&e.prog&&e.prog.s==='pyramid' ? `Pyramid ${e.prog.pattern.join('·')}` : !e.use&&e.prog&&e.prog.s==='topback' ? `Top set + ${e.prog.backSets} back-off${e.prog.backSets>1?'s':''}` : `${e.sets} × ${e.reps[0]===e.reps[1]?e.reps[0]:e.reps[0]+'–'+e.reps[1]}`;
+      const straight=!(e.prog&&(e.prog.s==='pyramid'||e.prog.s==='topback'));
+      return `<div class="exr"><div class="exn">${esc(nm)}${/Main lift/.test(e.note||'')?'<i>MAIN</i>':''}${e.use?`<small class="sub">instead of ${esc(EXMAP[e.id].name)}</small>`:''}<small class="sub">${esc(str)} · rest ${esc(e.rest)}</small></div>
+        <div class="exc">${straight?`<span class="mini"><button data-act="pset" data-w="${k}" data-id="${e.id}" data-n="-1" aria-label="Fewer sets">−</button><b>${e.sets}</b><button data-act="pset" data-w="${k}" data-id="${e.id}" data-n="1" aria-label="More sets">+</button></span>`:''}
+        <button class="ibtn" data-act="pswap" data-id="${e.id}" aria-label="Substitute">⇄</button><button class="ibtn" data-act="prem" data-w="${k}" data-id="${e.id}" aria-label="Remove">✕</button></div></div>`;
+    }).join('')}<div class="exr"><select data-padd="${k}" aria-label="Add an exercise"><option value="">+ Add an exercise</option>${lib.map(id=>`<option value="${id}">${esc(EXMAP[id].name)}</option>`).join('')}</select></div>
+    ${(c.edits[k]&&Object.keys(c.edits[k]).length)?`<button class="link" data-act="preset" data-w="${k}">Reset this workout</button>`:''}</div></details>`;
   });
-  h += `<details class="card pl"><summary><div class="ttl"><b>Running build-up</b><span>Tuesday, plus Saturday if you feel like it</span></div><span class="chev">›</span></summary><div class="body"><ul class="bul" style="margin-bottom:6px"><li><b>Weeks 1–2:</b> 20–25 min easy</li><li><b>Weeks 3–4:</b> 30 min easy</li><li><b>Weeks 5–8:</b> build to 40–45 min, add one interval session (6 × 2 min hard / 2 min easy)</li></ul></div></details>`;
-  h += `<div class="sect">How to progress</div><div class="card" style="padding:6px 16px"><ul class="bul"><li><b>Straight sets</b> (most exercises): same weight every set. Add a rep when you hit every target; once every set reaches the top of the range, the weight goes up a step and reps go back to the bottom.</li><li><b>Pyramids</b> (bench, incline press, squat, overhead press): each set a little heavier with fewer reps. The top set gains a rep each time you hit every target; at the top of its range the whole pyramid moves up a step.</li><li><b>Top set + back-offs</b> (deadlift): one heavy set, then lighter sets at a fixed percentage of it. Each part progresses on its own.</li><li>Close to target: same plan next time. Missed twice in a row: one step lighter. Targets never change during a workout unless you edit them.</li><li>Warm-ups and an optional Easy / Moderate / Hard rating per exercise. Hard keeps the weight where it is for one more session.</li><li>Change any exercise's structure, equipment or weight step from its ⇄ Swap sheet. Each alternative keeps its own history.</ul></div>`;
+  h+=`<div class="note" style="margin:0 4px">Set counts here are where you start; weights and reps still come from your progress. Pyramid and top-set lifts keep their structure.</div>`;
+  // settings
+  const pick=st.pdays||c.days, need=Object.keys(T.freq).map(Number);
+  const dayBtns=[...Array(7)].map((_,i)=>{ const dw=(c.weekStart+i)%7; return `<button class="dchip ${pick.includes(dw)?'on':''}" data-act="pday" data-v="${dw}">${Programs.DOW_NAME[dw][0]}<small>${Programs.DOW_NAME[dw]}</small></button>` }).join('');
+  const runRows=runs.map(r=>`<div class="runr"><b>${Programs.DOW_NAME[r.dow]}</b><select data-prun="${r.dow}">${Object.entries(Programs.RUN_KINDS).map(([v,l])=>`<option value="${v}" ${r.kind===v?'selected':''}>${l}</option>`).join('')}</select>
+    <button class="chipb ${r.optional?'on':''}" data-act="prunopt" data-v="${r.dow}">Optional</button><button class="ibtn" data-act="prunrem" data-v="${r.dow}" aria-label="Remove run">✕</button></div>`).join('');
+  const free=[0,1,2,3,4,5,6].filter(d=>!runs.some(r=>r.dow===d));
+  const prefs=c.prefs, prefRows=[...Object.entries(prefs.use).map(([slot,id])=>`<div class="ln"><b>${esc(EXMAP[id]?.name||id)}</b><span>instead of ${esc(EXMAP[slot]?.name||slot)} <button class="ibtn" data-act="prefdel" data-k="use" data-id="${slot}" aria-label="Remove">✕</button></span></div>`),
+    ...prefs.avoid.map(id=>`<div class="ln"><b>${esc(EXMAP[id]?.name||id)}</b><span>never <button class="ibtn" data-act="prefdel" data-k="avoid" data-id="${id}" aria-label="Remove">✕</button></span></div>`)].join('');
+  h+=`<div class="sect">Program settings</div><div class="card">
+    <label class="f">Lifting days ${need.length>1?`(${need[0]} to ${need[need.length-1]})`:`(${need[0]})`}</label><div class="dchips">${dayBtns}</div>
+    ${st.pdays&&!need.includes(st.pdays.length)?`<div class="note warnc">Pick ${need.length>1?need.join(' or '):need[0]} days for ${esc(T.name)}.</div>`:''}
+    <div class="sep"></div><label class="f">Runs</label>${runRows||'<div class="note">No runs scheduled.</div>'}
+    ${free.length&&runs.length<3?`<select data-prunadd="1" style="margin-top:6px"><option value="">+ Add a run day</option>${free.map(d=>`<option value="${d}">${Programs.DOW_NAME[d]}</option>`).join('')}</select>`:''}
+    <div class="note">Easy runs fit any day. Long runs and intervals are kept away from demanding leg days.</div>
+    <div class="sep"></div><label class="f">Training level</label>${seg('plevel',c.level,[['returning','Returning'],['regular','Regular'],['higher','Higher volume']])}
+    <div class="note">${c.level==='returning'?'Fewer sets to start. Volume steps up after two good weeks at a time, and holds when recovery is poor.':c.level==='higher'?'One more set on most exercises.':'The program as written.'}</div>
+    <div class="sep"></div><div class="row2"><div><b>Readiness check</b><div class="note">A quick "how do you feel?" before each lift</div></div><button class="sw ${c.readiness?'on':''}" role="switch" aria-checked="${!!c.readiness}" aria-label="Readiness check" data-act="pready"><i></i></button></div>
+    <div class="sep"></div><div class="row2"><div><b>Week starts on</b><div class="note">For your schedule and weekly stats</div></div><select id="pweek" style="width:auto">${[1,0,6].map(d=>`<option value="${d}" ${c.weekStart===d?'selected':''}>${['Sunday','Monday','','','','','Saturday'][d]}</option>`).join('')}</select></div>
+    <div class="sep"></div><label class="f">Exercise preferences</label>${prefRows||'<div class="note">None yet. Use ⇄ on an exercise to always use something else, or to never use it.</div>'}
+  </div>`;
+  h += `<div class="sect">How to progress</div><div class="card" style="padding:6px 16px"><ul class="bul"><li><b>Straight sets</b> (most exercises): same weight every set. Add a rep when you hit every target; once every set reaches the top of the range, the weight goes up a step and reps go back to the bottom.</li><li><b>Pyramids</b> (bench, incline press, squat, overhead press): each set a little heavier with fewer reps. The top set gains a rep each time you hit every target; at the top of its range the whole pyramid moves up a step.</li><li><b>Top set + back-offs</b> (deadlift): one heavy set, then lighter sets at a fixed percentage of it. Each part progresses on its own.</li><li>Close to target: same plan next time. Missed twice in a row: one step lighter. Targets never change during a workout unless you edit them.</li><li>Warm-ups and an optional Easy / Moderate / Hard rating per exercise. Hard keeps the weight where it is for one more session.</li><li>Change any exercise's structure, equipment or weight step from its ⇄ Swap sheet. Each alternative keeps its own history.</li><li><b>Programs</b> decide which workouts, which days and how many sets; the rules above still decide every weight and rep. Switching programs keeps all your history. A reduced or skipped workout never counts against you, and fewer sets never earn a weight increase.</li></ul></div>`;
   return h+`<div class="sect">Settings</div><details class="card set"${st.setOpen?' open':''}><summary><b>Settings</b><span>Cloud ${sbAuth()?'on':'off'}</span></summary><div style="margin-top:12px"><div class="row2"><div><b>Rest timer</b><div class="note">Counts down after each set</div></div><button class="sw ${restOn()?'on':''}" role="switch" aria-checked="${restOn()}" aria-label="Rest timer" data-act="resttoggle"><i></i></button></div><div class="sep"></div><div class="row2"><div><b>Body weight</b><div class="note">${st.health.some(h=>h.wt!=null)?'From Apple Health. This is only a fallback.':'For pull-up volume, until Apple Health has your weight'}</div></div><span class="bwin"><input id="bw" type="number" inputmode="decimal" min="50" max="600" placeholder="—" value="${esc(LS('wt.bw','')??'')}" aria-label="Body weight in pounds"><small>lb</small></span></div><div class="sep"></div>${cloudCard()}<div class="sep"></div>${exportCard()}<div class="sep"></div><div class="row2"><div><b>App version</b><div class="note">${APP_VERSION}</div></div><button class="btn ghost sm" data-act="refresh">Refresh app</button></div></div></details>`;
 }
 
+/* ---------- Plan sheets: change program (with the rest-of-week preview), a day's actions, exercise preferences ---------- */
+const sheetOpen = (o,act) => { const na=o.shown?' style="animation:none"':''; o.shown=true; return [`<div class="sheetbg" data-act="${act}"${na}><div class="sheet" data-stop="1"${na}>`, `</div></div>`] };
+/* Change settings: a copy of the newest config, edited, normalized, with a day order that avoids warnings. */
+function editCfg(fn, msg){
+  const c=JSON.parse(JSON.stringify(progCfg())), before=JSON.stringify(c.days)+c.lifts+c.template;
+  fn(c);
+  if(JSON.stringify(c.days)+c.lifts+c.template!==before) c.rotation=Programs.bestRotation(c);
+  setProgram({config:Programs.normalize(c), past:(st.prog&&st.prog.past)||[]});
+  render(); if(msg) toast(msg);
+}
+function chgSheet(){
+  const g=st.chg, [o,cl]=sheetOpen(g,'chgclose'), t=todayStr();
+  if(g.step==='pick'){
+    const cur=st.prog?progCfg().template:null;
+    return o+`<h3>Choose a program</h3><div class="note">Your workout history and progress carry over to any program.</div><div style="margin-top:12px">${Object.entries(Programs.TEMPLATES).map(([k,T])=>{
+      const n=Object.keys(T.freq), days=n.length>1?`${n[0]} to ${n[n.length-1]} lifts`:`${n[0]} lifts`;
+      return `<button class="opt" data-act="chgpick" data-t="${k}"><span>${esc(k==='current'?'Keep my current plan':T.name)}<small style="display:block">${esc(T.blurb)} · ${days}</small></span><span>${cur===k||(!cur&&k==='current')?'<small>Now</small> ':''}›</span></button>`;
+    }).join('')}</div><button class="btn ghost" data-act="chgclose">Cancel</button>`+cl;
+  }
+  const T=Programs.TEMPLATES[g.cfg.template], freqs=Object.keys(T.freq).map(Number);
+  if(g.step==='setup'){
+    const dayBtns=[...Array(7)].map((_,i)=>{ const dw=(g.cfg.weekStart+i)%7; return `<button class="dchip ${g.cfg.days.includes(dw)?'on':''}" data-act="chgday" data-v="${dw}">${Programs.DOW_NAME[dw][0]}<small>${Programs.DOW_NAME[dw]}</small></button>` }).join('');
+    const ok=freqs.includes(g.cfg.days.length);
+    return o+`<h3>${esc(T.name)}</h3><div class="note">${esc(T.blurb)}</div>
+      ${freqs.length>1?`<label class="f" style="margin-top:14px">Lifts per week</label>${seg('chglifts',String(g.cfg.lifts),freqs.map(n=>[String(n),String(n)]))}`:''}
+      <label class="f" style="margin-top:14px">Lifting days</label><div class="dchips">${dayBtns}</div>${ok?'':`<div class="note warnc">Pick ${freqs.length>1?freqs.join(' or '):freqs[0]} days.</div>`}
+      <label class="f" style="margin-top:14px">Training level</label>${seg('chglevel',g.cfg.level,[['returning','Returning'],['regular','Regular'],['higher','Higher volume']])}
+      <div class="note">${g.cfg.level==='returning'?'Fewer sets to start, building back up as you recover well.':g.cfg.level==='higher'?'One more set on most exercises.':'The program as written.'}</div>
+      <button class="btn" style="margin-top:16px" data-act="chgprev" ${ok?'':'disabled style="margin-top:16px;opacity:.4"'}>See this week's changes</button>
+      <button class="btn ghost" style="margin-top:8px" data-act="chgback">Back</button>`+cl;
+  }
+  // preview
+  const r=Programs.planSwitch({prog:st.prog, next:g.cfg, changes:st.changes, sessions:allSessions(), today:t, settings:st.settings, sore:g.sore||null, startNow:!!g.now, keep:g.keep});
+  g.r=r;
+  const day=d=>Programs.DOW_NAME[Programs.dow(d)];
+  const done=sched(t).occs.filter(x=>x.status==='done');
+  const exNames = (x,key) => { const w=Programs.workoutsFor(g.cfg,{stage:'reg',fresh:{}})[key]||sched(t).workouts[key]; return x.ex&&w ? Programs.exList(w,x.ex).map(e=>`${EXMAP[e.use||e.id].name} ${e.sets}`).join(' · ') : '' };
+  const dayRows=r.days.map(d=>{
+    const b=d.before.map(x=>esc(x.name)).join(', '), a=d.after.map(x=>`<b>${esc(x.name)}</b>${x.ex?`<small class="sub">${esc(exNames(x,x.occ.split(':').slice(-2)[0]))}</small>`:''}`).join('');
+    const drop={}; d.after.forEach(x=>(x.dropped||[]).forEach(e=>{ (drop[e.why] ||= []).push(e.name) }));
+    const why=Object.entries(drop).map(([w,n])=>`Left out ${n.join(', ')}: ${w}.`).join(' ');
+    const same=b===d.after.map(x=>esc(x.name)).join(', ');
+    return `<div class="pvd"><span class="dn">${day(d.date)}</span><div>${d.done.length?`<div class="mute">Done: ${esc(d.done.join(', '))}</div>`:''}${same?(b?`<div>${b} <small class="mute">(no change)</small></div>`:'<div class="mute">Rest</div>'):`${b?`<div class="was">${b}</div>`:''}${a||'<div class="mute">Rest</div>'}`}${why?`<small class="sub">${esc(why)}</small>`:''}${d.note&&!same?`<small class="sub">${esc(d.note)}</small>`:''}</div></div>`;
+  }).join('');
+  const conf=r.conflicts.map(c=>`<div class="row2 conf"><div><b>${esc(c.name)}</b> · ${day(c.date)}<div class="note">${esc(c.why)}</div></div>${seg('chgkeep:'+c.occ, c.keep?'keep':'replace', [['keep','Keep'],['replace','Replace']])}</div>`).join('');
+  const M=Programs.MUSCLE_LIST, cap=m=>m[0].toUpperCase()+m.slice(1);
+  const vol=r.startNow?'':`<label class="f" style="margin-top:14px">This week's volume (working sets credited per muscle)</label><table class="vt"><tr><th></th><th>Done</th><th>After</th><th>Target</th></tr>${M.map(m=>`<tr class="${Programs.MAJOR.includes(m)?'':'mute'}"><td>${cap(m)}</td><td>${r.before.credits[m]}</td><td>${r.after.credits[m]}</td><td>${r.target[m]}</td></tr>`).join('')}</table>
+    <div class="note">Working sets: ${r.before.sets} done, ${r.after.sets} with the rest of this week. ${r.gaps.length?r.gaps.map(x=>`${cap(x.muscle)} finish ${x.short} short`).join(', ')+'. That\'s fine: no catching up crammed into the last days.':'Every main muscle is covered.'}</div>`;
+  const next=r.nextWeek.filter(x=>!x.optional).map(x=>`${day(x.date)} ${esc(x.name)}`).join(' · ');
+  const warn=r.warnings.filter(w=>!w.soft).map(w=>`<div class="warn">⚠ ${esc(w.text)}</div>`).join('');
+  return o+`<h3>${esc(T.name)}: rest of this week</h3><div class="note">${done.length?`Kept as done: ${esc(done.map(x=>x.name+' ('+day(x.done.date)+')').join(', '))}. Their sets count toward the new program.`:'Nothing done yet this week.'}</div>
+    ${conf?`<label class="f" style="margin-top:14px">Workouts you scheduled yourself</label>${conf}`:''}
+    <div class="pv">${dayRows}</div>${warn}${vol}
+    <label class="f" style="margin-top:14px">Anything sore right now?</label>${seg('chgsore',g.sore||'',[['','No'],['legs','Legs'],['upper','Upper body']])}
+    <div class="note" style="margin-top:10px">${g.now?'The full program starts today.':`Next week: ${esc(next)}`}</div>
+    <div class="row2" style="margin-top:10px"><div><b>Start the full program now</b><div class="note">Instead of adapting this week</div></div><button class="sw ${g.now?'on':''}" role="switch" aria-checked="${!!g.now}" aria-label="Start now" data-act="chgnow"><i></i></button></div>
+    <button class="btn" style="margin-top:16px" data-act="chgok">Switch to ${esc(T.name)}</button><button class="btn ghost" style="margin-top:8px" data-act="chgback">Back</button>`+cl;
+}
+function daySheet(){
+  const g=st.daysh, d=g.date, sc=sched(d), t=todayStr(), [o,cl]=sheetOpen(g,'dayclose');
+  const items=sc.occs.filter(x=>x.date===d), day=x=>Programs.DOW_NAME[Programs.dow(x)];
+  const dates=[...Array(7)].map((_,i)=>addDays(sc.weekStart,i)).filter(x=>x>=t && x!==d);
+  const body=items.map(x=>{
+    if(x.status==='done') return `<div class="card"><b>${esc(x.name)}</b><div class="note">Done ${day(x.done.date)} ✓</div></div>`;
+    const changed=!!changeOf(x.occ), others=sc.occs.filter(y=>y!==x && y.status!=='done' && y.date>=t && y.date!==d);
+    const n=x.type==='lift'?Programs.exList(sc.workouts[x.key],x.ex).length:0;
+    return `<div class="card"><b>${esc(x.name)}</b><div class="note">${x.type==='lift'?`${n} exercises`:esc(Programs.RUN_KINDS[x.runKind]||'Run')}${x.movedFrom?` · moved from ${day(x.movedFrom)}`:''}${x.reduced?' · reduced':''}${x.status==='skipped'?' · skipped':x.status==='recovery'?' · recovery day':x.status==='missed'?' · missed':''}</div>
+      ${dates.length?`<label class="f" style="margin-top:10px">Move to</label><div class="dchips">${dates.map(z=>`<button class="dchip" data-act="dmove" data-o="${esc(x.occ)}" data-d="${z}">${day(z)[0]}<small>${day(z)}</small></button>`).join('')}</div>`:''}
+      ${others.length?`<label class="f" style="margin-top:10px">Swap with</label>${others.map(y=>`<button class="opt sm" data-act="dswap" data-o="${esc(x.occ)}" data-p="${esc(y.occ)}"><span>${esc(y.name)}</span><small>${day(y.date)}</small></button>`).join('')}`:''}
+      <div class="rbtns" style="margin-top:10px">${x.type==='lift'&&!x.reduced?`<button class="btn sm ghost" data-act="dset" data-o="${esc(x.occ)}" data-k="reduced">Reduce volume</button>`:''}${x.status!=='skipped'?`<button class="btn sm ghost" data-act="dset" data-o="${esc(x.occ)}" data-k="skipped">Skip</button>`:''}${changed?`<button class="btn sm ghost" data-act="drestore" data-o="${esc(x.occ)}">${(changeOf(x.occ)||{}).add?'Remove':'Undo changes'}</button>`:''}</div></div>`;
+  }).join('');
+  const wk=Programs.TEMPLATES[sc.config.template].freq[sc.config.lifts].w;
+  const add = d>=t && !items.some(x=>x.type==='lift'&&x.status!=='done') ? `<label class="f" style="margin-top:12px">Add a workout on this day</label>${wk.map(k=>`<button class="opt sm" data-act="dadd" data-k="${k}"><span>${esc(sc.workouts[k].name)}</span><span>+</span></button>`).join('')}` : '';
+  return o+`<h3>${esc(fmtDate(d))}</h3>${body||'<div class="note">Rest day.</div>'}${add}
+    ${sc.warnings.filter(w=>(w.occs||[]).some(id=>items.some(x=>x.occ===id))).map(w=>`<div class="warn">⚠ ${esc(w.text)}</div>`).join('')}
+    <button class="btn ghost" style="margin-top:8px" data-act="dayclose">Done</button>`+cl;
+}
+function prefSheet(){
+  const g=st.prefsh, slot=g.id, c=progCfg(), [o,cl]=sheetOpen(g,'prefclose');
+  const opts=[slot,...(ALTS[slot]||[]).map(n=>altId(slot,n))], cur=c.prefs.use[slot]||slot;
+  return o+`<h3>${esc(EXMAP[slot].name)}</h3><div class="note">Use this in every workout and program from now on. Each exercise keeps its own weight history.</div>
+    <div style="margin-top:10px">${opts.map(id=>`<button class="opt ${id===cur?'cur':''}" data-act="prefuse" data-id="${id}" data-s="${slot}" ${c.prefs.avoid.includes(id)?'disabled style="opacity:.4"':''}><span>${esc(EXMAP[id].name)}${id===slot?' <small>(planned)</small>':''}</span><span>${id===cur?'✓':''}</span></button>`).join('')}</div>
+    <button class="btn ghost" data-act="prefavoid" data-id="${cur}" data-s="${slot}">${c.prefs.avoid.includes(cur)?'Allow':'Never use'} ${esc(EXMAP[cur].name)}</button>
+    <button class="btn ghost" style="margin-top:8px" data-act="prefclose">Done</button>`+cl;
+}
+/* A change to one scheduled workout, merged with any earlier change to it. Anything you change yourself is marked
+   manual, so a later program switch keeps it unless you choose otherwise. */
+function setOcc(occ, patch, source, date){
+  const prev=changeOf(occ)||{}, ws=prev.week||sched(date||st.date).weekStart;
+  putChanges([{id:occ, change:{...prev, ...patch, week:ws, source: source==='manual'||prev.source==='manual' ? 'manual' : source}}]);
+}
+function clearOcc(occ, keys){
+  const prev=changeOf(occ); if(!prev) return;
+  const rest={...prev}; keys.forEach(k=>delete rest[k]);
+  if(Object.keys(rest).every(k=>k==='week'||k==='source')) dropChanges([occ]); else putChanges([{id:occ, change:rest}]);
+}
 /* ---------- events ---------- */
 document.getElementById('addBtn').addEventListener('click',openAdd);
 document.querySelector('nav').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;st.tab=b.dataset.tab;render();toTop()});
@@ -1868,6 +2218,10 @@ app.addEventListener('change',e=>{
   else if(t.id==='progEx'){st.progEx=t.value;render()}
   else if(t.id==='seteq'&&st.wk) saveSetting(stepsFor()[st.wk.step].id, {equipment:t.value});
   else if(t.id==='setstep'&&st.wk) saveSetting(stepsFor()[st.wk.step].id, {step:t.value?+t.value:undefined});
+  else if(t.dataset.padd && t.value){ const w=t.dataset.padd, id=t.value; st.openW=w; editCfg(c=>{ const ed=c.edits[w] ||= {}; ed.add=[...(ed.add||[]).filter(a=>a.id!==id), {id, sets:EXMAP[id].sets||3}]; if(ed.remove) ed.remove=ed.remove.filter(x=>x!==id) }, 'Added '+EXMAP[id].name) }
+  else if(t.dataset.prun){ const dw=+t.dataset.prun; editCfg(c=>{ const r=c.runs.find(x=>x.dow===dw); if(r) r.kind=t.value }) }
+  else if(t.dataset.prunadd && t.value!==''){ editCfg(c=>{ c.runs.push({dow:+t.value, kind:'easy', optional:true}) }, 'Run added') }
+  else if(t.id==='pweek'){ editCfg(c=>{ c.weekStart=+t.value }, 'Week start saved') }
   else if(t.id==='bw'){ const v=num(t.value); if(v&&v>=50&&v<=600) SS('wt.bw',v); else { try{localStorage.removeItem('wt.bw')}catch(e){} t.value='' } toast(v?'Body weight saved':'Body weight cleared') }
 });
 function fldObj(f){ return (f==='dist'||f==='min') ? getDraft().run : st.wk.cur }
@@ -1893,7 +2247,7 @@ app.addEventListener('click',e=>{
   const act=b.dataset.act, wk=st.wk;
   if(act==='day'){ st.date=b.dataset.d; st.auto=true; render() }
   else if(act==='wk'){ st.date=addDays(st.date,+b.dataset.n); st.auto=true; render() }
-  else if(act==='pick'){ st.auto=false; st.sess=slotKey(b.dataset.k,st.date); render(); toTop() }
+  else if(act==='pick'){ st.auto=false; st.occ=b.dataset.o||null; st.sess=slotKey(b.dataset.k,st.date); render(); toTop() }
   else if(act==='opensess'){ st.auto=false; st.date=b.dataset.d; st.sess=b.dataset.s; render(); toTop() }
   else if(act==='again'){ st.auto=false; st.date=todayStr(); st.sess=b.dataset.s; render(); toTop(); toast('Repeating '+sessName(b.dataset.s)+' today') }
   else if(act==='effort'){ const d2=getDraft(); d2.effort = d2.effort===b.dataset.v ? '' : b.dataset.v; saveDraft(); buzz(10); render() }
@@ -1950,8 +2304,8 @@ app.addEventListener('click',e=>{
   else if(act==='swapopen'){ wk.sheet=true; render() }
   else if(act==='sheetclose'){ if(e.target.closest('[data-stop]') && !b.classList.contains('btn')) return; wk.sheet=false; render() }
   else if(act==='swap'){
-    const cur=stepsFor()[wk.step], slot=cur.slot||cur.id, d2=getDraft(), id=b.dataset.id;
-    if(id===slot) delete d2.swaps[slot]; else d2.swaps[slot]=id;
+    const cur=stepsFor()[wk.step], slot=cur.slot||cur.id, d2=getDraft(), id=b.dataset.id, sd=(sessDef(st.sess).ex||[]).find(x=>x.id===slot);
+    if(id===((sd&&sd.use)||slot)) delete d2.swaps[slot]; else d2.swaps[slot]=id;
     saveDraft(); wk.sheet=false; wk.editing=null; clearRest(); initCur(); render(); toast('Swapped to '+EXMAP[id].name);
   }
   else if(act==='deload'){ const d2=getDraft(); d2.deload=!d2.deload; if(d2.plans) Object.keys(d2.plans).forEach(id=>{ if(!workSets(d2.ex[id]).length) delete d2.plans[id] }); saveDraft(); render() }
@@ -1974,6 +2328,91 @@ app.addEventListener('click',e=>{
   else if(act==='prgo'){ st.progEx=b.dataset.id; st.pm='e1'; render(); const el=document.getElementById('strength'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}) }
   else if(act==='del'||act==='swdel') askDelete(b.dataset.id);
   else if(act==='resttoggle'){ SS('wt.rest',!restOn()); if(!restOn()) clearRest(); b.classList.toggle('on',restOn()); b.setAttribute('aria-checked',String(restOn())); buzz(10) }
+  // readiness check (Today)
+  else if(act==='rdy'){
+    const t=todayStr(), x=occOf(getDraft().occ), w=x&&sched(st.date).workouts[x.key], v=b.dataset.v;
+    const L=w ? Programs.groupLoads(Programs.plannedVolume(w,x.ex).credits) : {legs:0,push:0,pull:0};
+    putChanges([{id:'chk:'+t, change:{week:sched(t).weekStart, readiness:v, area:L.legs>=Math.max(L.push,L.pull)?'legs':'upper', source:'readiness'}}]);
+    buzz(10); render(); if(v==='ready') toast("Let's go 💪");
+  }
+  else if(act==='rdyclear'){ dropChanges(['chk:'+todayStr()]); render() }
+  else if(act==='rdyact'){
+    const t=todayStr(), o=b.dataset.o, a=b.dataset.a, chk=changeOf('chk:'+t)||{};
+    if(a==='move'){ const r=Programs.readiness(sched(t), o, chk.readiness||'very', t, chk.area); if(!r||!r.moveTo) return toast('No clear day left this week');
+      setOcc(o,{date:r.moveTo},'readiness'); toast('Moved to '+fmtDate(r.moveTo)) }
+    else if(a==='reduce'){ setOcc(o,{reduced:true},'readiness'); toast('Fewer sets today, same targets') }
+    else if(a==='recovery'){ setOcc(o,{recovery:true},'readiness'); toast('Recovery day. You can still do it later this week') }
+    else if(a==='skip'){ setOcc(o,{skipped:true},'readiness'); toast("Skipped. It won't count against your progress") }
+    st.auto=true; render(); toTop();
+  }
+  else if(act==='rdyundo'){ clearOcc(b.dataset.o,['reduced','recovery','skipped']); st.auto=true; render() }
+  // change program
+  else if(act==='chgopen'){ st.chg={step:'pick'}; render() }
+  else if(act==='chgclose'){ if(e.target.closest('[data-stop]') && !b.classList.contains('btn')) return; st.chg=null; render() }
+  else if(act==='chgpick'){
+    const t=b.dataset.t, base=progCfg(), T=Programs.TEMPLATES[t];
+    const cfg = st.prog && base.template===t ? JSON.parse(JSON.stringify(base)) : !st.prog && t==='current' ? Programs.defaultConfig() : Programs.configFor(t, +Object.keys(T.freq)[0], base);
+    st.chg={step:'setup', cfg, shown:true}; render();
+  }
+  else if(act==='chglifts'){ const g=st.chg, n=+b.dataset.v, f=Programs.TEMPLATES[g.cfg.template].freq[n]; g.cfg={...g.cfg, lifts:n, days:f.days.slice(), runs:f.runs.map(x=>({...x})), edits:{}}; render() }
+  else if(act==='chgday'){
+    const g=st.chg, dw=+b.dataset.v, T=Programs.TEMPLATES[g.cfg.template];
+    g.cfg.days = g.cfg.days.includes(dw) ? g.cfg.days.filter(x=>x!==dw) : [...g.cfg.days, dw];
+    const n=g.cfg.days.length;
+    if(T.freq[n] && n!==g.cfg.lifts){ g.cfg.lifts=n; g.cfg.runs=T.freq[n].runs.map(x=>({...x})); g.cfg.edits={} }
+    if(T.freq[n]) g.cfg.runs=g.cfg.runs.filter(r=>!g.cfg.days.includes(r.dow));
+    render();
+  }
+  else if(act==='chglevel'){ st.chg.cfg.level=b.dataset.v; render() }
+  else if(act==='chgprev'){ const g=st.chg; g.cfg=Programs.normalize(g.cfg); g.cfg.rotation=Programs.bestRotation(g.cfg); g.step='preview'; g.keep={}; g.sore=''; g.now=false; render(); const sh=document.querySelector('.sheet'); if(sh) sh.scrollTop=0 }
+  else if(act==='chgback'){ const g=st.chg; g.step = g.step==='preview' ? 'setup' : 'pick'; render() }
+  else if(act.startsWith('chgkeep:')){ st.chg.keep[act.slice(8)] = b.dataset.v==='keep'; render() }
+  else if(act==='chgsore'){ st.chg.sore=b.dataset.v; render() }
+  else if(act==='chgnow'){ st.chg.now=!st.chg.now; render() }
+  else if(act==='chgok'){
+    const g=st.chg, r=g.r; if(!r) return;
+    if(r.startNow) dropChanges(st.changes.filter(c=>c.change && c.change.week===r.weekStart && !String(c.id).startsWith('chk:')).map(c=>c.id));
+    setProgram(r.prog); if(r.rows.length) putChanges(r.rows);
+    st.chg=null; st.auto=true; render(); toTop(); toast('Switched to '+Programs.TEMPLATES[r.prog.config.template].name+' ✓');
+  }
+  // a day in the Plan tab
+  else if(act==='dayopen'){ st.daysh={date:b.dataset.d}; render() }
+  else if(act==='dayclose'){ if(e.target.closest('[data-stop]') && !b.classList.contains('btn')) return; st.daysh=null; render() }
+  else if(act==='dmove'){ setOcc(b.dataset.o,{date:b.dataset.d},'manual',st.daysh.date); st.daysh=null; st.auto=true; render(); toast('Moved to '+fmtDate(b.dataset.d)) }
+  else if(act==='dswap'){
+    const sc=sched(st.daysh.date), x=sc.occs.find(y=>y.occ===b.dataset.o), y=sc.occs.find(z=>z.occ===b.dataset.p); if(!x||!y) return;
+    setOcc(x.occ,{date:y.date},'manual',x.date); setOcc(y.occ,{date:x.date},'manual',x.date); st.daysh=null; st.auto=true; render(); toast('Swapped');
+  }
+  else if(act==='dset'){ setOcc(b.dataset.o,{[b.dataset.k]:true},'manual',st.daysh.date); st.auto=true; render(); toast(b.dataset.k==='reduced'?'Reduced: fewer sets, same targets':"Skipped. It won't count against your progress") }
+  else if(act==='drestore'){ dropChanges([b.dataset.o]); st.auto=true; render(); toast('Back to the plan') }
+  else if(act==='dadd'){
+    const d=st.daysh.date, sc=sched(d), k=b.dataset.k; let n=1; while(sc.occs.some(x=>x.occ===`${sc.weekStart}:m:${k}:${n}`)) n++;
+    putChanges([{id:`${sc.weekStart}:m:${k}:${n}`, change:{week:sc.weekStart, add:true, key:k, date:d, type:'lift', name:sc.workouts[k].name, source:'manual'}}]);
+    st.daysh=null; st.auto=true; render(); toast('Added '+sc.workouts[k].name);
+  }
+  // program settings and workouts
+  else if(act==='pset'){ const w=b.dataset.w, id=b.dataset.id, n=+b.dataset.n; st.openW=w;
+    const cur=Programs.workoutsFor(progCfg(), Programs.volumeFor(st.prog,{sessions:allSessions(),changes:st.changes},sched(todayStr()).weekStart), st.settings)[w].ex.find(x=>x.id===id).sets;
+    editCfg(c=>{ const ed=c.edits[w] ||= {}; ed.sets ||= {}; ed.sets[id]=Math.max(1,Math.min(6,cur+n)) }) }
+  else if(act==='prem'){ const w=b.dataset.w, id=b.dataset.id; st.openW=w; editCfg(c=>{ const ed=c.edits[w] ||= {}; ed.remove=[...new Set([...(ed.remove||[]), id])]; if(ed.add) ed.add=ed.add.filter(a=>a.id!==id) }, 'Removed '+EXMAP[id].name) }
+  else if(act==='preset'){ const w=b.dataset.w; st.openW=w; editCfg(c=>{ delete c.edits[w] }, 'Workout reset') }
+  else if(act==='pswap'){ st.prefsh={id:b.dataset.id}; render() }
+  else if(act==='prefclose'){ if(e.target.closest('[data-stop]') && !b.classList.contains('btn')) return; st.prefsh=null; render() }
+  else if(act==='prefuse'){ const id=b.dataset.id, slot=b.dataset.s; editCfg(c=>{ if(id===slot) delete c.prefs.use[slot]; else c.prefs.use[slot]=id }, id===slot?'Back to '+EXMAP[slot].name:'Always '+EXMAP[id].name) }
+  else if(act==='prefavoid'){ const id=b.dataset.id, slot=b.dataset.s; editCfg(c=>{ const i=c.prefs.avoid.indexOf(id); if(i>=0) c.prefs.avoid.splice(i,1); else { c.prefs.avoid.push(id); if(c.prefs.use[slot]===id) delete c.prefs.use[slot] } }) }
+  else if(act==='prefalways'){ const id=b.dataset.id, slot=b.dataset.s; editCfg(c=>{ c.prefs.use[slot]=id; const i=c.prefs.avoid.indexOf(id); if(i>=0) c.prefs.avoid.splice(i,1) }, 'From now on: '+EXMAP[id].name) }
+  else if(act==='prefdel'){ const k=b.dataset.k, id=b.dataset.id; editCfg(c=>{ if(k==='use') delete c.prefs.use[id]; else c.prefs.avoid=c.prefs.avoid.filter(x=>x!==id) }) }
+  else if(act==='pday'){
+    const c=progCfg(), T=Programs.TEMPLATES[c.template], dw=+b.dataset.v, cur=st.pdays||c.days.slice();
+    const next = cur.includes(dw) ? cur.filter(x=>x!==dw) : [...cur, dw];
+    if(T.freq[next.length]){ st.pdays=null; editCfg(c2=>{ if(c2.lifts!==next.length){ c2.lifts=next.length; c2.edits={} } c2.days=next }, 'Lifting days saved') }
+    else { st.pdays=next; render() }
+  }
+  else if(act==='prunopt'){ const dw=+b.dataset.v; editCfg(c=>{ const r=c.runs.find(x=>x.dow===dw); if(r) r.optional=!r.optional }) }
+  else if(act==='prunrem'){ const dw=+b.dataset.v; editCfg(c=>{ c.runs=c.runs.filter(x=>x.dow!==dw) }, 'Run removed') }
+  else if(act==='plevel'){ const v=b.dataset.v; editCfg(c=>{ if(c.level!==v){ c.level=v; if(v==='returning'){ c.levelSince=todayStr(); c.rampHold=null } } }, 'Training level: '+Programs.LEVELS[v]) }
+  else if(act==='pready'){ editCfg(c=>{ c.readiness=!c.readiness }) }
+  else if(act==='ramphold'){ editCfg(c=>{ c.rampHold = c.rampHold ? null : todayStr() }, progCfg().rampHold?'Building back up again':'Holding at this stage') }
   else if(act==='save') save();
 });
 
@@ -1986,6 +2425,10 @@ function entriesOf(S,d){
       if(sets.length) out.push({id,name:EXMAP[id].name,...(id!==slotEx.id?{slot:slotEx.id}:{}),sets,...(pl&&pl.state?{prog:pl.state}:{}),...(df?{diff:df}:{})});
     });
   });
+  // Anything else logged (an exercise since removed from the workout) is kept, never dropped.
+  Object.keys(d.ex).forEach(id=>{ if(out.some(e=>e.id===id) || !EXMAP[id]) return;
+    const sets=(d.ex[id]||[]).map(Progression.cleanSet).filter(s=>s.r>0), pl=d.plans&&d.plans[id], df=d.diff&&d.diff[id], sl=EXMAP[id].slot;
+    if(sets.length) out.push({id,name:EXMAP[id].name,...(sl&&sl!==id?{slot:sl}:{}),sets,...(pl&&pl.state?{prog:pl.state}:{}),...(df?{diff:df}:{})}); });
   return out;
 }
 function save(){
@@ -1994,6 +2437,9 @@ function save(){
     energy:num(d.energy), effort:d.effort||undefined, notes:(d.notes||'').trim()||undefined, savedAt:new Date().toISOString(), updatedAt:new Date().toISOString()};
   if(S.type==='lift'){ if(isManual() && d.dur) rec.durationMin=d.dur; else if(d.firstAt && d.lastAt){const m=Math.max(1,Math.round((d.lastAt-d.firstAt)/60000)); if(m<300) rec.durationMin=m} else if(d.dur) rec.durationMin=d.dur }
   if(d.savedAt) rec.savedAt=d.savedAt;
+  if(d.uid) rec.uid=d.uid;
+  if(d.occ) rec.occ=d.occ;
+  if(d.reduced) rec.reduced=true;
   // Editing a Watch session keeps what only the Watch records (Health link, route, indoor, climb).
   const prev=allSessions().find(x=>x.id===rec.id);
   if(prev) ['hk','route','indoor','elevationGainM'].forEach(k=>{ if(prev[k]!=null) rec[k]=prev[k] });

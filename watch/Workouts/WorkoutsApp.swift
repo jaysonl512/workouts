@@ -15,6 +15,7 @@ struct WorkoutsApp: App {
                 .environmentObject(AppModel.shared.run)
                 .environmentObject(AppModel.shared.timed)
                 .environmentObject(AppModel.shared.gym)
+                .environmentObject(AppModel.shared.plans)
         }
         .onChange(of: phase) { _, p in
             if p == .active {

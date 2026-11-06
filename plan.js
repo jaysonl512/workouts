@@ -75,11 +75,29 @@ const ALTS = {
   'knee-raise':['Cable crunch','Ab wheel','Decline sit-up'],
   plank:['Side plank','Dead bug','Hollow hold']
 };
+/* Exercises that only appear in program templates (programs.js), not in the original four workouts. */
+const EXTRA = [
+  {id:'lat-raise',eq:'dumbbell',name:'Lateral raise',sets:3,reps:[12,15],rest:'1 min',small:1}
+];
+ALTS['lat-raise'] = ['Cable lateral raise','Machine lateral raise'];
+/* Muscles each exercise trains, for weekly volume (programs.js): 1 = a main muscle, 0.5 = a supporting one.
+   One working set of bench press counts 1 chest + 0.5 triceps + 0.5 shoulders. Alternatives count as the
+   exercise they replace. Muscles: chest back shoulders triceps biceps quads glutes hamstrings calves core. */
+const MUSCLES = {
+  bench:{chest:1,triceps:.5,shoulders:.5}, 'inc-db':{chest:1,shoulders:.5,triceps:.5}, fly:{chest:1},
+  ohp:{shoulders:1,triceps:.5}, 'ohp-db':{shoulders:1,triceps:.5}, 'lat-raise':{shoulders:1}, rear:{shoulders:1},
+  row:{back:1,biceps:.5}, 'cable-row':{back:1,biceps:.5}, pulldown:{back:1,biceps:.5}, pullup:{back:1,biceps:.5},
+  pushdown:{triceps:1}, 'ss-tri':{triceps:1}, 'db-curl':{biceps:1}, 'ss-curl':{biceps:1},
+  squat:{quads:1,glutes:.5}, 'front-sq':{quads:1,glutes:.5}, lunge:{quads:1,glutes:.5}, 'leg-ext':{quads:1},
+  rdl:{hamstrings:1,glutes:.5}, 'leg-curl':{hamstrings:1}, deadlift:{hamstrings:1,glutes:1,back:.5},
+  'hip-thrust':{glutes:1,hamstrings:.5}, 'calf-st':{calves:1}, 'calf-seat':{calves:1},
+  'knee-raise':{core:1}, plank:{core:1}
+};
 const EXMAP = {};
-Object.values(PLAN.sessions).forEach(S=>(S.ex||[]).forEach(e=>{
+[...Object.values(PLAN.sessions), {ex:EXTRA}].forEach(S=>(S.ex||[]).forEach(e=>{
   EXMAP[e.id]={...e,slot:e.id};
   (ALTS[e.id]||[]).forEach(n=>{ const id=altId(e.id,n); EXMAP[id]={...e,id,name:n,slot:e.id,note:undefined,alt:true,eq:undefined,prog:undefined,timed:e.timed&&/plank|hold/i.test(n)?1:undefined} });
 }));
 
-if(typeof module!=='undefined' && module.exports) module.exports={PLAN,ALTS,slug,altId,EXMAP};
-globalThis.WorkoutPlan={PLAN,ALTS,slug,altId,EXMAP};
+if(typeof module!=='undefined' && module.exports) module.exports={PLAN,ALTS,slug,altId,EXMAP,MUSCLES,EXTRA};
+globalThis.WorkoutPlan={PLAN,ALTS,slug,altId,EXMAP,MUSCLES,EXTRA};

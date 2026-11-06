@@ -21,6 +21,14 @@ struct PlanExercise: Hashable, Identifiable {
     /// Neighbouring exercises with the same tag are done as a superset: one set each, then rest.
     let superset: String?
     let alts: [PlanAlt]
+    /// A preferred alternative used by default (Plan > exercise preferences on the web).
+    var use: String? = nil
+
+    /// The same exercise with another set count (a reduced or adjusted workout).
+    func with(sets n: Int) -> PlanExercise {
+        PlanExercise(id: id, name: name, sets: n, reps: reps, rest: rest, restSeconds: restSeconds, note: note, small: small,
+                     superset: superset, alts: alts, use: use)
+    }
 
     var repsText: String { reps.lowerBound == reps.upperBound ? "\(reps.lowerBound)" : "\(reps.lowerBound)–\(reps.upperBound)" }
     /// Crown step for weight: 2.5 lb on small lifts, 5 lb otherwise (same as the web app's progression step).
@@ -65,14 +73,35 @@ enum Load {
 }
 
 extension Plan {
-    /// Same as the web app's sessBase: run2 is the Saturday run and uses the run plan.
-    static func base(_ key: String) -> String { key == "run2" ? "run" : key }
+    /// The program's workouts from the cached "plans" response, set by PlanCache when present.
+    static var served: [String: ServedWorkout]?
 
-    static func session(_ key: String) -> PlanSession? { sessions[base(key)] }
+    /// Same as the web app's sessBase: run, run2 and run3 use the run plan; "upperA~2" (a second Upper A on one
+    /// day) uses Upper A.
+    static func base(_ key: String) -> String {
+        if key.hasPrefix("run"), key == "run" || Int(key.dropFirst(3)) != nil { return "run" }
+        if let i = key.range(of: #"~\d+$"#, options: .regularExpression) { return String(key[..<i.lowerBound]) }
+        return key
+    }
+
+    /// A workout: the program's version from the server (its exercises and set counts), else the built-in plan.
+    static func session(_ key: String) -> PlanSession? {
+        let b = base(key)
+        if b != "run", let w = served?[b] {
+            return PlanSession(key: b, name: w.name, type: .lift, note: nil, exercises: w.exercises.map { e in
+                PlanExercise(id: e.id, name: e.name, sets: e.sets, reps: e.low...max(e.low, e.high), rest: e.rest, restSeconds: e.restSeconds,
+                             note: e.note, small: e.small ?? false, superset: e.superset, alts: e.alts.map { PlanAlt(id: $0.id, name: $0.name) }, use: e.use)
+            })
+        }
+        return sessions[b]
+    }
 
     /// Same as the web app's sessName.
     static func name(_ key: String) -> String {
-        key == "run2" ? "Run 2 (optional)" : (sessions[key]?.name ?? other(key)?.name ?? key)
+        let b = base(key)
+        if b == "run" { return key == "run2" ? "Run 2 (optional)" : "Run" }
+        let n = session(b)?.name ?? other(key)?.name ?? key
+        return b != key ? n + " (again)" : n
     }
 
     static func todayKey(_ date: Date = Date()) -> String {
@@ -83,6 +112,12 @@ extension Plan {
 
     /// Display name for any exercise id, including alternatives (slot~slug).
     static func exerciseName(_ id: String) -> String? {
+        for w in (served ?? [:]).values {
+            for e in w.exercises {
+                if e.id == id { return e.name }
+                if let a = e.alts.first(where: { $0.id == id }) { return a.name }
+            }
+        }
         for s in sessions.values {
             for e in s.exercises {
                 if e.id == id { return e.name }
