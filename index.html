@@ -89,7 +89,7 @@ table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:6px 4px;b
 @keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 
 /* ---- workout flow ---- */
-.wkTop{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.wkTop{display:flex;align-items:center;gap:12px;margin-bottom:10px}
 .xbtn{background:#171c22;border:1px solid var(--line);color:var(--mute);width:36px;height:36px;border-radius:12px;font-size:18px;flex:none}
 .seg{display:flex;gap:5px;flex:1}
 .seg i{flex:1;height:7px;border-radius:9px;background:var(--line);position:relative;overflow:hidden;cursor:pointer}
@@ -114,21 +114,55 @@ table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:6px 4px;b
 .dot.now{border:2px solid var(--acc2);color:var(--acc2);animation:glow 1.6s ease-in-out infinite}
 .dot.pop{animation:pop .5s cubic-bezier(.3,1.7,.5,1)}
 .dot small{display:block;font-size:10px;font-weight:600;color:var(--mute);margin-top:1px;text-transform:lowercase}
-.dot.wu{min-width:48px;border-style:dotted;opacity:.85}.dot.editt{border:2px solid #fbbf24;color:#fbbf24}
+.dot.editt{border:2px solid #fbbf24;color:#fbbf24}
+/* Active workout: compact header, badges, one-line history, and a single scrolling row of sets */
+.whead{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.btn.xs{width:auto;padding:6px 11px;font-size:13px;border-radius:10px}
+.stage h2.wname{margin:0 0 6px;font-size:24px}
+.chips3{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:11.5px;font-weight:700;color:var(--mute);background:#151a20;border:1px solid var(--line);border-radius:99px;padding:3px 9px;white-space:nowrap}
+.chip.ss{color:var(--acc);border-color:rgba(239,68,68,.4)}
+.chip.pr{color:var(--warn);background:#2b2410;border-color:#5a4a14}
+.wnote{font-size:12px;color:var(--mute);margin-top:6px}
+.lastd{margin-top:8px;font-size:13px}
+.lastd summary{list-style:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--acc2);cursor:pointer}
+.lastd summary::-webkit-details-marker{display:none}
+.lastd summary span{color:var(--mute);font-weight:700;margin-right:6px}
+.lastfull{margin-top:6px;background:#0f1318;border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+.lastfull>small{color:var(--mute);font-size:12px}
+.lastfull div{display:grid;grid-template-columns:70px 1fr auto;gap:8px;padding:2px 0;font-size:13px}
+.lastfull div span,.lastfull div small{color:var(--mute)}
+.wub,.tline{display:flex;align-items:center;gap:10px;margin-top:10px;padding:7px 8px 7px 12px;border-radius:12px;font-size:15px;min-height:38px}
+.wub{background:#14181d;border:1px dashed #3a4350}
+.tline{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3)}
+.tline.edit{background:rgba(251,191,36,.08);border-color:rgba(251,191,36,.55)}
+.wub>span,.tline>span{color:var(--mute);font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap}
+.wub b,.tline b{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wub .link,.tline .link{padding:4px 6px;color:var(--acc2);text-decoration:none;font-weight:700}
+.tline em{font-style:normal;font-size:11px;font-weight:700;color:#fbbf24}
+.twhy{font-size:12px;color:var(--mute);margin:4px 2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dots{flex-wrap:nowrap;overflow-x:auto;gap:6px;margin:10px -16px;padding:2px 16px 4px;scrollbar-width:none;-webkit-overflow-scrolling:touch;scroll-behavior:smooth}
+.dots::-webkit-scrollbar{display:none}
+.dot{flex:none;min-width:54px;padding:7px 8px}
+.dot.wu{min-width:46px;padding:5px 7px;font-size:12px;border:1px dashed #3a4350;color:var(--mute)}
+.dot.wu.done{border:1px solid #4b5563;background:transparent;color:var(--mute)}
+.dot.wu.now{border:2px solid var(--acc2);color:var(--acc2)}
+.dot.skip{text-decoration:line-through;opacity:.45}
+.dsep{flex:none;width:1px;align-self:stretch;margin:6px 2px;background:var(--line)}
 .rate{margin:14px 0 4px}.rate>span{display:block;font-size:13px;color:var(--mute);margin-bottom:6px}.rate small{opacity:.7}
 @keyframes pop{0%{transform:scale(.4);background:rgba(239,68,68,.6)}100%{transform:scale(1)}}
 @keyframes glow{50%{box-shadow:0 0 0 5px rgba(251,146,60,.14)}}
-.steppers{display:grid;grid-template-columns:1fr;gap:12px}
-.stp{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:12px 12px 14px}
-.stp .lbl{font-size:12px;color:var(--mute);font-weight:600;letter-spacing:.4px;text-transform:uppercase;text-align:center;margin-bottom:6px}
+.steppers{display:grid;grid-template-columns:1fr;gap:8px}
+.stp{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:7px 10px 8px}
+.stp .lbl{font-size:11px;color:var(--mute);font-weight:600;letter-spacing:.4px;text-transform:uppercase;text-align:center;margin-bottom:2px}
 .stp .ctl{display:flex;align-items:center;gap:10px}
-.stp button{flex:none;width:62px;height:62px;border-radius:50%;border:1px solid var(--line);background:#0f1318;color:var(--text);font-size:30px;font-weight:300;line-height:1}
+.stp button{flex:none;width:54px;height:54px;border-radius:50%;border:1px solid var(--line);background:#0f1318;color:var(--text);font-size:30px;font-weight:300;line-height:1}
 .stp button:active{background:#2a1717;border-color:var(--acc)}
-.stp input{flex:1;min-width:0;text-align:center;font-size:44px;font-weight:800;letter-spacing:-1px;background:transparent;border:0;padding:0;height:62px}
+.stp input{flex:1;min-width:0;text-align:center;font-size:40px;font-weight:800;letter-spacing:-1px;background:transparent;border:0;padding:0;height:54px}
 .stp input:focus{outline:0}
 .stp input.bump{animation:bump .18s var(--ease)}
 @keyframes bump{50%{transform:scale(1.12);color:var(--acc)}}
-.stp .unit{text-align:center;color:var(--mute);font-size:12px;margin-top:2px}
+.stp .unit{text-align:center;color:var(--mute);font-size:12px;margin-top:0}
 .rest{display:flex;align-items:center;gap:14px;background:#241512;border:1px solid #4a2a1c;border-radius:16px;padding:10px 14px;margin:12px 0 0;animation:rise .3s var(--ease)}
 .rest .t{font-size:24px;font-weight:800;font-variant-numeric:tabular-nums}
 .rest .s{color:var(--mute);font-size:13px}
@@ -136,13 +170,13 @@ table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:6px 4px;b
 .ring circle{fill:none;stroke-width:4}
 .ring .bg{stroke:#3a2417}
 .ring .fg{stroke:var(--acc2);stroke-linecap:round;transform:rotate(-90deg);transform-origin:50% 50%;transition:stroke-dashoffset .25s linear}
-.logwrap{margin-top:14px}
+.logwrap{margin-top:10px}
 .btn.log{box-shadow:0 8px 24px rgba(239,68,68,.22)}
 .btn.log.ok{animation:ok .55s var(--ease)}
 @keyframes ok{0%{transform:scale(1)}30%{transform:scale(.94)}60%{transform:scale(1.04);filter:brightness(1.2)}100%{transform:scale(1)}}
 .btn.shake{animation:shake .35s}
 @keyframes shake{20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
-.nav3{display:flex;gap:10px;margin-top:12px}
+.nav3{display:flex;gap:10px;margin-top:8px}
 .nav3 button{flex:1}
 .btn.pulse{animation:pulse 1.5s ease-in-out infinite}
 @keyframes pulse{50%{box-shadow:0 0 0 7px rgba(239,68,68,.2);transform:scale(1.02)}}
@@ -407,7 +441,7 @@ const EFFORT = {easy:'Easy', medium:'Medium', hard:'Hard'};
 const effortSeg = (act,cur) => `<div class="segc">${Object.entries(EFFORT).map(([v,l])=>`<button class="${v===cur?'on':''}" data-act="${act}" data-v="${v}">${l}</button>`).join('')}</div>`;
 const kindOf = x => x.yoga ? 'yoga' : x.other ? 'other' : x.run ? 'run' : 'lift';
 const CHEERS = ['Nice one','Solid set','Strong','Locked in','Clean rep','Beast mode','Smooth'];
-const APP_VERSION='2026-11-06.4';
+const APP_VERSION='2026-11-06.5';
 
 
 /* ---------- helpers ---------- */
@@ -926,7 +960,9 @@ function render(){
   const note = st.note && st.tab==='today' && !inWk && !st.add && !st.recap ? noteSheet() : '';
   const hs = st.hm && st.tab==='progress' ? healthSheet() : '';
   $('#app').innerHTML = v() + (st.add&&!inWk ? addSheet() : '') + (st.recap ? recapView() : '') + note + hs;
-  if(st.wk){ st.wk.anim=false; st.wk.just=null }
+  if(st.wk){ st.wk.anim=false; st.wk.just=null;
+    const cur=document.querySelector('.dots .dot.now,.dots .dot.editt'), row=cur&&cur.parentElement;
+    if(cur) row.scrollLeft=Math.max(0, cur.offsetLeft-row.clientWidth/2+cur.offsetWidth/2); }
 }
 
 const MOODS=['😫','😕','😐','🙂','🔥'];
@@ -1036,7 +1072,7 @@ function todayHero(wp){
     ${S.type==='lift'?`<div class="chips">${steps.map(e=>`<span class="${done(e)?'ok':''}">${esc(e.name.split(/[\/(]/)[0].trim())}</span>`).join('')}</div>`:S.note?`<div class="note" style="margin-bottom:16px">${esc(S.note)}</div>`:''}
     ${onWatch?`<div class="note" style="text-align:center;margin-bottom:10px">⌚ In progress on your Watch. Resume here to keep going on your phone.</div>`:''}
     ${st.date>t ? `<div class="note" style="text-align:center">Coming up. You can log it on the day.</div>`
-      : `<button class="btn big ${isManual()?'':'pulse'}" data-act="start" data-resume="${resume?1:0}">${onWatch?'Continue on phone':resume?(isManual()?'Continue adding':'Resume workout'):(isManual()?'Add workout manually':S.type==='run'?'Start run':'Start workout')}</button>`}</div>`;
+      : `<button class="btn big ${isManual()?'':'pulse'}" data-act="start" data-resume="${resume?1:0}">${onWatch?'Resume workout':resume?(isManual()?'Continue adding':'Resume workout'):(isManual()?'Add workout manually':S.type==='run'?'Start run':'Start workout')}</button>`}</div>`;
 }
 /* After a Watch workout: the next time the web app opens, ask how it went and for a note (once per workout). */
 function checkNotePrompt(){
@@ -1125,8 +1161,12 @@ function viewWorkout(){
   const a=d.ex[e.id]||[], last=lastFor(e.id), p=planOf(e), c=cfgOf(e.id), it=nextItem(e), N=planN(e);
   const ws=a.map((x,i)=>[x,i]).filter(([x])=>!x.wu), complete = ws.length>=N && wk.editing==null && wk.editT==null;
   let dots='';
+  const wuPlan=(p&&p.warmups)||[], wuDone=a.filter(x=>x.wu).length;
   a.forEach((x,i)=>{ if(x.wu) dots+=`<button class="dot wu done ${wk.editing===i?'now':''}" data-act="dot" data-i="${i}">${esc(fmtSet(x,e))}<small>warm-up</small></button>` });
-  if(it.wu) p.warmups.forEach((t,j)=>{ if(j>=it.i) dots+=`<button class="dot wu ${j===it.i&&wk.editing==null&&wk.editT==null?'now':''}" tabindex="-1">${esc(fmtT(t,e))}<small>warm-up</small></button>` });
+  wuPlan.forEach((t,j)=>{ if(j<wuDone) return;
+    if(it.wu) dots+=`<span class="dot wu ${j===it.i&&wk.editing==null&&wk.editT==null?'now':''}">${esc(fmtT(t,e))}<small>warm-up</small></span>`;
+    else dots+=`<span class="dot wu skip">${esc(fmtT(t,e))}<small>skipped</small></span>`; });
+  if(dots) dots+='<i class="dsep" aria-hidden="true"></i>';
   for(let k=0;k<Math.max(N,ws.length);k++){
     if(k<ws.length){ const [x,i]=ws[k], tg = x.pr!=null ? {w:x.pw??null, r:x.pr} : x.tr!=null ? {w:x.tw??null, r:x.tr} : null, off = tg && (tg.w!==x.w || tg.r!==x.r);
       dots+=`<button class="dot done ${wk.just===i?'pop':''} ${wk.editing===i?'now':''}" data-act="dot" data-i="${i}">${esc(fmtSet(x,e))}${off?`<small>plan ${esc(fmtT(tg,e))}</small>`:''}</button>`; }
@@ -1143,18 +1183,19 @@ function viewWorkout(){
     : `${e.sets} × ${e.reps[0]===e.reps[1]?e.reps[0]:e.reps[0]+'–'+e.reps[1]}`;
   const tShow = t => t.w==null ? `pick a weight × ${t.r}${reps}` : (t.w===0&&!isAssist(e.name) ? `${t.r}${reps}` : `${t.w} ${u} × ${t.r}${t.w&&!isAssist(e.name)?'':reps}`);
   let box='';
-  if(wk.editT!=null){ const o=p&&p.sets[wk.editT]; box=`<div class="sug">✏️ Editing the target for set ${wk.editT+1}<small>Planned ${o?esc(fmtT(o,e)):'—'}. Your edit is saved next to the plan; progress is judged on the plan. <button class="link" data-act="tdot" data-k="${wk.editT}">Cancel</button></small></div>` }
-  else if(wk.editing!=null){ const x=a[wk.editing]; box=`<div class="sug">✏️ Editing a logged set<small>${x.tr!=null?`Target was ${esc(fmtT({w:x.tw??null,r:x.tr},e))}. `:''}<button class="link" data-act="togglewu">${x.wu?'Count as a working set':'Mark as warm-up'}</button></small></div>` }
-  else if(it.wu) box=`<div class="sug">Warm-up ${it.i+1} of ${it.n}: <b>${esc(tShow(it.t))}</b><small>Light sets before the working sets. They don't count toward progress. <button class="link" data-act="skipwu">Skip warm-ups</button></small></div>`;
-  else if(it.t){ const ed=p&&p.edits&&p.edits[it.i]; box=`<div class="sug">🎯 Set ${it.i+1} of ${N}: <b>${esc(tShow(it.t))}</b><small>${ed?`Edited (plan ${esc(fmtT(p.sets[it.i],e))}). `:''}${esc((p&&p.why)||'')}</small></div>` }
+  if(wk.editT!=null){ const o=p&&p.sets[wk.editT]; box=`<div class="tline edit"><span>Set ${wk.editT+1} target</span><b>Planned ${o?esc(fmtT(o,e)):'—'}</b><button class="link" data-act="tdot" data-k="${wk.editT}">Cancel</button></div>` }
+  else if(wk.editing!=null){ const x=a[wk.editing]; box=`<div class="tline edit"><span>Editing</span><b>${x.tr!=null?`Target ${esc(fmtT({w:x.tw??null,r:x.tr},e))}`:'Logged set'}</b><button class="link" data-act="togglewu">${x.wu?'Working set':'Warm-up'}</button></div>` }
+  else if(it.wu) box=`<div class="wub"><span>Warm-up ${it.i+1} of ${it.n}</span><b>${esc(tShow(it.t))}</b><button class="link" data-act="skipwu">Skip</button></div>`;
+  else if(it.t){ const ed=p&&p.edits&&p.edits[it.i];
+    box=`<div class="tline"><span>Set ${it.i+1} of ${N}</span><b>${esc(tShow(it.t))}</b>${ed?'<em>edited</em>':''}</div>${!ws.length&&p&&p.why?`<div class="twhy">${esc(p.why)}</div>`:''}` }
+  const note=(e.note||'').replace(/^Main lift\.?\s*/i,'').trim();
+  const fullLast = l => `<div class="lastfull"><small>${esc(fmtDate(l.date))}</small>${l.sets.map((x,k)=>`<div><span>${x.wu?'Warm-up':'Set '+(workSets(l.sets.slice(0,k+1)).length)}</span><b>${esc(fmtSet(x,e))}</b>${x.pr!=null&&(x.pw!==x.w||x.pr!==x.r)?`<small>plan ${esc(fmtT({w:x.pw??null,r:x.pr},e))}</small>`:'<small></small>'}</div>`).join('')}</div>`;
   const rated=(d.diff||{})[e.id];
-  h+=`<div class="${cls}"><div class="kicker">Exercise ${wk.step+1} of ${n}${sp!=null?` · <span class="sstag">Superset</span>`:''}</div>
-    <div class="hdr"><h2>${esc(e.name)}</h2><button class="btn ghost sm" data-act="swapopen">⇄ Swap</button></div>
-    <div class="tgt">${scheme} · rest ${e.rest}${sp!=null?' after each pair':''}${e.note?' · '+esc(e.note):''}</div>
-    ${sp!=null?`<div class="ssnote">Alternate with <b>${esc(steps[sp].name)}</b>: one set each, then rest.</div>`:''}
-    ${wk.prs[e.id]?`<span class="badge">🏆 New PR</span>`:''}
-    ${isAssist(e.name)?`<div class="last">Log the machine's assistance as the weight. Less assistance is harder.</div>`:isPerArm(e.name)?`<div class="last">Log the weight for one arm.</div>`:c&&c.eq==='dumbbell'?`<div class="last">Log the weight of one dumbbell.</div>`:''}
-    ${last?`<div class="last">Last time (${fmtDate(last.date)}): ${workSets(last.sets).map(x=>fmtSet(x,e)).join(', ')}</div>`:''}
+  h+=`<div class="${cls}"><div class="whead"><div class="kicker">Exercise ${wk.step+1} of ${n}</div><button class="btn ghost xs" data-act="swapopen">⇄ Swap</button></div>
+    <h2 class="wname">${esc(e.name)}</h2>
+    <div class="chips3">${sp!=null?`<span class="chip ss">Superset · ${esc(steps[sp].name.split(/ [\/(]/)[0])}</span>`:''}<span class="chip">${esc(scheme)}</span><span class="chip">Rest ${esc(e.rest)}${sp!=null?' per pair':''}</span>${wk.prs[e.id]?'<span class="chip pr">🏆 New PR</span>':''}</div>
+    ${note?`<div class="wnote">${esc(note)}</div>`:''}
+    ${last?`<details class="lastd"><summary><span>Last ${esc(shortDate(last.date))}</span>${esc(workSets(last.sets).map(x=>fmtSet(x,e)).join(' · '))}</summary>${fullLast(last)}</details>`:''}
     ${box}
     <div class="dots">${dots}</div>
     <div class="steppers">
