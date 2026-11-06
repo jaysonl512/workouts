@@ -234,6 +234,14 @@ table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:6px 4px;b
 button.dayrow{width:100%;background:none;border-left:0;border-right:0;border-bottom:0;color:var(--text);font:inherit;text-align:left}
 .dayrow .dt small,.mute{color:var(--mute);font-weight:500}
 .pname{font-size:18px}
+.subhd{display:flex;align-items:center;gap:10px;margin:4px 0 6px}.subhd b{font-size:18px}
+.pcardb{display:flex;width:100%;align-items:center;justify-content:space-between;gap:10px;text-align:left;color:var(--text);font:inherit;margin:6px 0}
+.pcardb small,.lrow small{display:block;color:var(--mute);font-size:13px;margin-top:2px}.pcardb small.nxt{color:var(--acc2)}
+.card.list{padding:2px 14px}
+.lrow{display:flex;width:100%;align-items:center;justify-content:space-between;gap:10px;background:none;border:0;border-top:1px solid var(--line);color:var(--text);font:inherit;text-align:left;padding:12px 0}
+.card.list .lrow:first-child,.card.list .exr:first-child{border-top:0}
+.card.lrow{border:1px solid var(--line);padding:12px 14px;background:var(--card)}
+.schhd .link.inl{font-size:13px;text-decoration:none;color:var(--mute)}
 .hrest{font-size:13px;color:var(--mute);padding:4px 6px 8px}
 .kick{display:block;font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--mute);margin-bottom:2px}
 .upc{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);margin-top:12px;padding-top:12px}
@@ -491,7 +499,7 @@ const EFFORT = {easy:'Easy', medium:'Medium', hard:'Hard'};
 const effortSeg = (act,cur) => `<div class="segc">${Object.entries(EFFORT).map(([v,l])=>`<button class="${v===cur?'on':''}" data-act="${act}" data-v="${v}">${l}</button>`).join('')}</div>`;
 const kindOf = x => x.yoga ? 'yoga' : x.other ? 'other' : x.run ? 'run' : 'lift';
 const CHEERS = ['Nice one','Solid set','Strong','Locked in','Clean rep','Beast mode','Smooth'];
-const APP_VERSION='2026-11-06.10';
+const APP_VERSION='2026-11-06.11';
 
 
 /* ---------- helpers ---------- */
@@ -1131,6 +1139,7 @@ function render(){
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===st.tab));
   const TT={today:'Today',history:'History',progress:'Progress',plan:'Plan'};
   $('#ttl').textContent = TT[st.tab];
+  $('#addBtn').style.display = st.tab==='plan' ? 'none' : '';
   const uns = st.local.length ? st.local.length+' unsynced' : '';
   $('#sub').textContent = st.tab==='today' ? [new Date(st.date+'T12:00:00').toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'}),uns].filter(Boolean).join(' · ') : uns;
   const v = {today:viewToday, history:viewHistory, progress:viewProgress, plan:viewPlan}[st.tab];
@@ -2047,24 +2056,24 @@ function exportData(){
   if(navigator.canShare&&navigator.canShare({files:[file]})) navigator.share({files:[file]}).catch(()=>{});
   else { const a=document.createElement('a'), u=URL.createObjectURL(file); a.href=u; a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(u),5000); toast('Export saved') }
 }
+/* ---------- Plan tab: the week first; program details, a workout's editor, settings and help are sub-screens ---------- */
+const PVIEW_PARENT = {program:'main', workout:'program', settings:'main', help:'settings'};
 function viewPlan(){
+  const v=st.pview||'main';
+  return v==='program' ? planProgram() : v==='workout' ? planWorkout(st.pwk) : v==='settings' ? planSettings() : v==='help' ? planHelp() : planMain();
+}
+const subHead = title => `<div class="subhd"><button class="xbtn" data-act="pback" aria-label="Back">‹</button><b>${esc(title)}</b></div>`;
+function planCtx(){
   const t=todayStr(), c=progCfg(), sc=sched(t), vol=sc.volume, ps=Programs.programStatus(st.prog, t);
-  const cur=ps.current, CT=Programs.TEMPLATES[cur.template], T=Programs.TEMPLATES[c.template];
-  const starts = ps.startsOn;
+  const cur=ps.current, CT=Programs.TEMPLATES[cur.template], T=Programs.TEMPLATES[c.template], starts=ps.startsOn;
   const runsTxt = cf => { const runs=cf.runs||[], req=runs.filter(r=>!r.optional).length, opt=runs.length-req;
-    return !runs.length ? 'no runs' : [req?`${req} run${req>1?'s':''}`:'', opt?`${opt} optional run${opt>1?'s':''}`:''].filter(Boolean).join(' + ') };
-  const stage = cur.level!=='returning' ? '' : vol.stage==='reg' ? 'Built back up to regular volume' : `Building back up: stage ${vol.stage==='r1'?1:2} of 3`;
+    return !runs.length ? 'no runs' : [req?`${req} run${req>1?'s':''}`:'', opt?`${opt} optional`:''].filter(Boolean).join(' + ') };
   const day = d => Programs.DOW_NAME[Programs.dow(d)];
-  let h=`<div class="sect">Program</div><div class="card"><div class="row2"><div><small class="kick">This week</small><b class="pname">${esc(CT.name)}</b>
-    <div class="note">${cur.lifts} lifts · ${runsTxt(cur)} · ${Programs.LEVELS[cur.level]}</div>
-    ${ps.adapted?`<div class="note">Adapted this week from ${esc(Programs.TEMPLATES[ps.from.template].name)}</div>`:''}
-    ${stage?`<div class="note">${stage}${vol.held?' (on hold)':''} · <button class="link inl" data-act="ramphold">${c.rampHold?'Keep building':'Hold this stage'}</button></div>`:''}</div>
-    <button class="btn sm" data-act="chgopen">Change</button></div>
-    ${ps.upcoming?`<div class="upc"><div><small class="kick">Next</small><b>${esc(T.name)}</b><div class="note">Starts ${esc(day(starts))}, ${esc(shortDate(starts))} · ${c.lifts} lifts · ${runsTxt(c)}</div></div>
-      <div class="rbtns"><button class="btn sm ghost" data-act="adaptnow">Adapt this week instead</button><button class="link inl" data-act="upccancel">Cancel</button></div></div>`:''}
-    ${!st.prog?'<div class="note" style="margin-top:8px">Your original plan. Change program, or customize it below.</div>':''}
-    ${st.prog && sbAuth() && st.progCloud===false?'<div class="note warnc" style="margin-top:8px">Saved on this phone. It reaches your Watch once the database update is in place.</div>':''}</div>`;
-  // the week
+  const cloudNote = st.prog && sbAuth() && st.progCloud===false ? '<div class="note warnc">Saved on this phone only for now.</div>' : '';
+  return {t, c, sc, vol, ps, cur, CT, T, starts, runsTxt, day, cloudNote};
+}
+function planMain(){
+  const {t, sc, ps, cur, CT, T, starts, runsTxt, day, cloudNote}=planCtx();
   const rows=[...Array(7)].map((_,i)=>{
     const d=addDays(sc.weekStart,i), items=sc.occs.filter(x=>x.date===d);
     const label = items.length ? items.map(x=>(x.status==='skipped'?`<s class="mute">${esc(x.name)}</s>`:esc(x.name))+(x.optional?' <small>optional</small>':'')).join(' · ') : '<span class="mute">Rest</span>';
@@ -2077,25 +2086,49 @@ function viewPlan(){
   const warns=sc.warnings.map(w=>`<div class="warn ${w.soft?'soft':''}">${w.soft?'ⓘ':'⚠'} ${esc(w.text)}</div>`).join('')
     + Programs.recoveryAdvice(st.changes, t).map(a=>`<div class="warn soft">💡 ${esc(a.text)}</div>`).join('')
     + (sa=>sa?`<div class="warn soft">💡 ${esc(sa.text)}</div>`:'')(Programs.scheduleAdvice(st.prog, {sessions:allSessions(), changes:st.changes, settings:st.settings}, t));
-  h+=`<div class="schhd"><b>This week</b><span>${esc(shortDate(sc.weekStart))} – ${esc(shortDate(addDays(sc.weekStart,6)))}</span></div>
-    <div class="card" style="padding:6px">${rows}</div>${warns}<div class="note" style="margin:0 4px">Tap a day to move, swap, reduce or skip it. Warnings never block a change.</div>`;
-  // workouts (the program's newest settings)
+  return `<div class="schhd"><b>Program</b><button class="link inl" data-act="pview" data-v="settings">⚙ Settings</button></div>
+    <button class="card pcardb" data-act="pview" data-v="program"><span><b class="pname">${esc(CT.name)}</b><small>${cur.lifts} lifts · ${runsTxt(cur)} · ${Programs.LEVELS[cur.level]}</small>
+      ${ps.upcoming?`<small class="nxt">Next: ${esc(T.name)} from ${esc(day(starts))}, ${esc(shortDate(starts))}</small>`:''}${ps.adapted?`<small>Adapted this week</small>`:''}</span><span class="chev">›</span></button>
+    ${cloudNote}
+    <div class="schhd"><b>This week</b><span>${esc(shortDate(sc.weekStart))} – ${esc(shortDate(addDays(sc.weekStart,6)))}</span></div>
+    <div class="card" style="padding:4px 6px">${rows}</div>${warns}`;
+}
+function planProgram(){
+  const {c, sc, vol, ps, cur, CT, T, starts, runsTxt, day, cloudNote}=planCtx();
+  const stage = cur.level!=='returning' ? '' : vol.stage==='reg' ? 'Built back up to regular volume' : `Building back up: stage ${vol.stage==='r1'?1:2} of 3`;
   const pv=Programs.volumeFor(st.prog, {sessions:allSessions(), changes:st.changes}, starts||sc.weekStart);
   const wks=Programs.workoutsFor(c, pv, st.settings), order=T.freq[c.lifts].w;
-  h+=`<div class="sect">Workouts${ps.upcoming?` <span class="mute">· ${esc(T.name)}, from ${esc(day(starts))}</span>`:''}</div>`;
-  order.forEach(k=>{
-    const S=wks[k], sets=S.ex.reduce((a,e)=>a+e.sets,0), lib=Object.keys(EXMAP).filter(id=>!EXMAP[id].alt && Programs.musclesOf(id) && !S.ex.some(e=>e.id===id));
-    h+=`<details class="card pl" ${st.openW===k?'open':''} data-w="${k}"><summary><div class="ttl"><b>${esc(S.name)}</b><span>${S.ex.length} exercises · ${sets} sets · about ${S.ex.length*7} min</span></div><span class="chev">›</span></summary><div class="body">${S.ex.map(e=>{
+  return subHead('Program') + `<div class="card"><small class="kick">This week</small><b class="pname">${esc(CT.name)}</b>
+      <div class="note">${cur.lifts} lifts · ${runsTxt(cur)} · ${Programs.LEVELS[cur.level]}</div>
+      ${ps.adapted?`<div class="note">Adapted this week from ${esc(Programs.TEMPLATES[ps.from.template].name)}</div>`:''}
+      ${stage?`<div class="note">${stage}${vol.held?' (on hold)':''} · <button class="link inl" data-act="ramphold">${c.rampHold?'Keep building':'Hold this stage'}</button></div>`:''}
+      ${ps.upcoming?`<div class="upc"><div><small class="kick">Next</small><b>${esc(T.name)}</b><div class="note">Starts ${esc(day(starts))}, ${esc(shortDate(starts))} · ${c.lifts} lifts · ${runsTxt(c)}</div></div>
+        <div class="rbtns"><button class="btn sm ghost" data-act="adaptnow">Adapt this week instead</button><button class="link inl" data-act="upccancel">Cancel</button></div></div>`:''}
+      <button class="btn sm" style="margin-top:12px" data-act="chgopen">Change program</button>${cloudNote}</div>
+    <div class="schhd"><b>Workouts</b><span>${ps.upcoming?`${esc(T.name)}, from ${esc(day(starts))}`:''}</span></div>
+    <div class="card list">${order.map(k=>{ const S=wks[k], sets=S.ex.reduce((a,e)=>a+e.sets,0);
+      return `<button class="lrow" data-act="pwk" data-k="${k}"><span><b>${esc(S.name)}</b><small>${S.ex.length} exercises · ${sets} sets · ~${S.ex.length*7} min${(c.edits[k]&&Object.keys(c.edits[k]).length)?' · edited':''}</small></span><span class="chev">›</span></button>` }).join('')}</div>`;
+}
+function planWorkout(k){
+  const {c, sc, T, starts}=planCtx();
+  const pv=Programs.volumeFor(st.prog, {sessions:allSessions(), changes:st.changes}, starts||sc.weekStart);
+  const wks=Programs.workoutsFor(c, pv, st.settings), S=wks[k];
+  if(!S){ st.pview='program'; return planProgram() }
+  const lib=Object.keys(EXMAP).filter(id=>!EXMAP[id].alt && Programs.musclesOf(id) && !S.ex.some(e=>e.id===id));
+  return subHead(S.name) + `<div class="card list">${S.ex.map(e=>{
       const nm=EXMAP[e.use||e.id].name, str=!e.use&&e.prog&&e.prog.s==='pyramid' ? `Pyramid ${e.prog.pattern.join('·')}` : !e.use&&e.prog&&e.prog.s==='topback' ? `Top set + ${e.prog.backSets} back-off${e.prog.backSets>1?'s':''}` : `${e.sets} × ${e.reps[0]===e.reps[1]?e.reps[0]:e.reps[0]+'–'+e.reps[1]}`;
       const straight=!(e.prog&&(e.prog.s==='pyramid'||e.prog.s==='topback'));
       return `<div class="exr"><div class="exn">${esc(nm)}${/Main lift/.test(e.note||'')?'<i>MAIN</i>':''}${e.use?`<small class="sub">instead of ${esc(EXMAP[e.id].name)}</small>`:''}<small class="sub">${esc(str)} · rest ${esc(e.rest)}</small></div>
         <div class="exc">${straight?`<span class="mini"><button data-act="pset" data-w="${k}" data-id="${e.id}" data-n="-1" aria-label="Fewer sets">−</button><b>${e.sets}</b><button data-act="pset" data-w="${k}" data-id="${e.id}" data-n="1" aria-label="More sets">+</button></span>`:''}
         <button class="ibtn" data-act="pswap" data-id="${e.id}" aria-label="Substitute">⇄</button><button class="ibtn" data-act="prem" data-w="${k}" data-id="${e.id}" aria-label="Remove">✕</button></div></div>`;
-    }).join('')}<div class="exr"><select data-padd="${k}" aria-label="Add an exercise"><option value="">+ Add an exercise</option>${lib.map(id=>`<option value="${id}">${esc(EXMAP[id].name)}</option>`).join('')}</select></div>
-    ${(c.edits[k]&&Object.keys(c.edits[k]).length)?`<button class="link" data-act="preset" data-w="${k}">Reset this workout</button>`:''}</div></details>`;
-  });
-  h+=`<div class="note" style="margin:0 4px">Set counts here are where you start; weights and reps still come from your progress. Pyramid and top-set lifts keep their structure.</div>`;
-  // settings
+    }).join('')}
+    <div class="exr"><select data-padd="${k}" aria-label="Add an exercise"><option value="">+ Add an exercise</option>${lib.map(id=>`<option value="${id}">${esc(EXMAP[id].name)}</option>`).join('')}</select></div></div>
+    <div class="note" style="margin:0 4px">Set counts are where you start. Weights and reps come from your progress. ⇄ picks a substitute.</div>
+    ${(c.edits[k]&&Object.keys(c.edits[k]).length)?`<button class="link" data-act="preset" data-w="${k}">Reset ${esc(S.name)}</button>`:''}`;
+}
+function planSettings(){
+  const {c, ps, T}=planCtx();
+  let h=subHead('Settings');
   const pick=st.pdays||c.days, need=Object.keys(T.freq).map(Number);
   const dayBtns=[...Array(7)].map((_,i)=>{ const dw=(c.weekStart+i)%7; return `<button class="dchip ${pick.includes(dw)?'on':''}" data-act="pday" data-v="${dw}">${Programs.DOW_NAME[dw][0]}<small>${Programs.DOW_NAME[dw]}</small></button>` }).join('');
   const runs=c.runs||[];
@@ -2104,7 +2137,7 @@ function viewPlan(){
   const free=[0,1,2,3,4,5,6].filter(d=>!runs.some(r=>r.dow===d));
   const prefs=c.prefs, prefRows=[...Object.entries(prefs.use).map(([slot,id])=>`<div class="ln"><b>${esc(EXMAP[id]?.name||id)}</b><span>instead of ${esc(EXMAP[slot]?.name||slot)} <button class="ibtn" data-act="prefdel" data-k="use" data-id="${slot}" aria-label="Remove">✕</button></span></div>`),
     ...prefs.avoid.map(id=>`<div class="ln"><b>${esc(EXMAP[id]?.name||id)}</b><span>never <button class="ibtn" data-act="prefdel" data-k="avoid" data-id="${id}" aria-label="Remove">✕</button></span></div>`)].join('');
-  h+=`<div class="sect">Program settings${ps.upcoming?` <span class="mute">· ${esc(T.name)}</span>`:''}</div><div class="card">
+  h+=`<div class="schhd"><b>Program</b><span>${ps.upcoming?esc(T.name):''}</span></div><div class="card">
     <label class="f">Lifting days ${need.length>1?`(${need[0]} to ${need[need.length-1]})`:`(${need[0]})`}</label><div class="dchips">${dayBtns}</div>
     ${st.pdays&&!need.includes(st.pdays.length)?`<div class="note warnc">Pick ${need.length>1?need.join(' or '):need[0]} days for ${esc(T.name)}.</div>`:''}
     <div class="sep"></div><label class="f">Runs</label>${runRows||'<div class="note">No runs scheduled.</div>'}
@@ -2116,8 +2149,11 @@ function viewPlan(){
     <div class="sep"></div><div class="row2"><div><b>Week starts on</b><div class="note">For your schedule and weekly stats</div></div><select id="pweek" style="width:auto">${[1,0,6].map(d=>`<option value="${d}" ${c.weekStart===d?'selected':''}>${['Sunday','Monday','','','','','Saturday'][d]}</option>`).join('')}</select></div>
     <div class="sep"></div><label class="f">Exercise preferences</label>${prefRows||'<div class="note">None yet. Use ⇄ on an exercise to always use something else, or to never use it.</div>'}
   </div>`;
-  h += `<div class="sect">How to progress</div><div class="card" style="padding:6px 16px"><ul class="bul"><li><b>Straight sets</b> (most exercises): same weight every set. Add a rep when you hit every target; once every set reaches the top of the range, the weight goes up a step and reps go back to the bottom.</li><li><b>Pyramids</b> (bench, incline press, squat, overhead press): each set a little heavier with fewer reps. The top set gains a rep each time you hit every target; at the top of its range the whole pyramid moves up a step.</li><li><b>Top set + back-offs</b> (deadlift): one heavy set, then lighter sets at a fixed percentage of it. Each part progresses on its own.</li><li>Close to target: same plan next time. Missed twice in a row: one step lighter. Targets never change during a workout unless you edit them.</li><li>Warm-ups and an optional Easy / Moderate / Hard rating per exercise. Hard keeps the weight where it is for one more session.</li><li>Change any exercise's structure, equipment or weight step from its ⇄ Swap sheet. Each alternative keeps its own history.</li><li><b>Programs</b> decide which workouts, which days and how many sets; the rules above still decide every weight and rep. Switching programs keeps all your history. A reduced or skipped workout never counts against you, and fewer sets never earn a weight increase.</li></ul></div>`;
-  return h+`<div class="sect">Settings</div><details class="card set"${st.setOpen?' open':''}><summary><b>Settings</b><span>Cloud ${sbAuth()?'on':'off'}</span></summary><div style="margin-top:12px"><div class="row2"><div><b>Rest timer</b><div class="note">Counts down after each set</div></div><button class="sw ${restOn()?'on':''}" role="switch" aria-checked="${restOn()}" aria-label="Rest timer" data-act="resttoggle"><i></i></button></div><div class="sep"></div><div class="row2"><div><b>Body weight</b><div class="note">${st.health.some(h=>h.wt!=null)?'From Apple Health. This is only a fallback.':'For pull-up volume, until Apple Health has your weight'}</div></div><span class="bwin"><input id="bw" type="number" inputmode="decimal" min="50" max="600" placeholder="—" value="${esc(LS('wt.bw','')??'')}" aria-label="Body weight in pounds"><small>lb</small></span></div><div class="sep"></div>${cloudCard()}<div class="sep"></div>${exportCard()}<div class="sep"></div><div class="row2"><div><b>App version</b><div class="note">${APP_VERSION}</div></div><button class="btn ghost sm" data-act="refresh">Refresh app</button></div></div></details>`;
+  h+=`<button class="card lrow" data-act="pview" data-v="help"><span><b>How progression works</b><small>Straight sets, pyramids, top sets, warm-ups</small></span><span class="chev">›</span></button>`;
+  return h+`<div class="schhd"><b>App</b><span>Cloud ${sbAuth()?'on':'off'}</span></div><div class="card"><div class="row2"><div><b>Rest timer</b><div class="note">Counts down after each set</div></div><button class="sw ${restOn()?'on':''}" role="switch" aria-checked="${restOn()}" aria-label="Rest timer" data-act="resttoggle"><i></i></button></div><div class="sep"></div><div class="row2"><div><b>Body weight</b><div class="note">${st.health.some(h=>h.wt!=null)?'From Apple Health. This is only a fallback.':'For pull-up volume, until Apple Health has your weight'}</div></div><span class="bwin"><input id="bw" type="number" inputmode="decimal" min="50" max="600" placeholder="—" value="${esc(LS('wt.bw','')??'')}" aria-label="Body weight in pounds"><small>lb</small></span></div><div class="sep"></div>${cloudCard()}<div class="sep"></div>${exportCard()}<div class="sep"></div><div class="row2"><div><b>App version</b><div class="note">${APP_VERSION}</div></div><button class="btn ghost sm" data-act="refresh">Refresh app</button></div></div>`;
+}
+function planHelp(){
+  return subHead('How progression works')+`<div class="card" style="padding:6px 16px"><ul class="bul"><li><b>Straight sets</b> (most exercises): same weight every set. Add a rep when you hit every target; once every set reaches the top of the range, the weight goes up a step and reps go back to the bottom.</li><li><b>Pyramids</b> (bench, incline press, squat, overhead press): each set a little heavier with fewer reps. The top set gains a rep each time you hit every target; at the top of its range the whole pyramid moves up a step.</li><li><b>Top set + back-offs</b> (deadlift): one heavy set, then lighter sets at a fixed percentage of it. Each part progresses on its own.</li><li>Close to target: same plan next time. Missed twice in a row: one step lighter. Targets never change during a workout unless you edit them.</li><li>Warm-ups and an optional Easy / Moderate / Hard rating per exercise. Hard keeps the weight where it is for one more session.</li><li>Change any exercise's structure, equipment or weight step from its ⇄ Swap sheet. Each alternative keeps its own history.</li><li><b>Programs</b> decide which workouts, which days and how many sets; the rules above still decide every weight and rep. Switching programs keeps all your history. A reduced or skipped workout never counts against you, and fewer sets never earn a weight increase.</li></ul></div>`;
 }
 
 /* ---------- Plan sheets: change program (with the rest-of-week preview), a day's actions, exercise preferences ---------- */
@@ -2187,6 +2223,7 @@ function chgSheet(){
 function daySheet(){
   const g=st.daysh, d=g.date, sc=sched(d), t=todayStr(), [o,cl]=sheetOpen(g,'dayclose');
   const items=sc.occs.filter(x=>x.date===d), day=x=>Programs.DOW_NAME[Programs.dow(x)];
+  const editable=Programs.TEMPLATES[progCfg().template].freq[progCfg().lifts].w;   // workouts the editor can open
   const dates=[...Array(7)].map((_,i)=>addDays(sc.weekStart,i)).filter(x=>x>=t && x!==d);
   const body=items.map(x=>{
     if(x.status==='done') return `<div class="card"><b>${esc(x.name)}</b><div class="note">Done ${day(x.done.date)} ✓</div></div>`;
@@ -2200,12 +2237,13 @@ function daySheet(){
         ${dates.length?`<div class="ropt"><b>Move workout</b><small>Do it on another day this week.</small><div class="dchips" style="margin-top:8px">${dates.map(z=>`<button class="dchip" data-act="dmove" data-o="${esc(x.occ)}" data-d="${z}">${day(z)[0]}<small>${day(z)}</small></button>`).join('')}</div></div>`:''}
         ${optRow(`data-act="drec" data-o="${esc(x.occ)}"`, 'Recovery day', ACT_DESC.recovery)}
         ${optRow(`data-act="dskip" data-o="${esc(x.occ)}"`, 'Skip workout', ACT_DESC.skip)}</div>
-      <div class="rbtns" style="margin-top:10px">${x.type==='run'&&x.runKind!=='easy'?`<button class="btn sm ghost" data-act="deasy" data-o="${esc(x.occ)}">Make it an easy run</button>`:''}${x.type==='lift'&&!x.reduced?`<button class="btn sm ghost" data-act="dset" data-o="${esc(x.occ)}" data-k="reduced">Reduce volume</button>`:''}${undo}${ch.add?`<button class="btn sm ghost" data-act="drestore" data-o="${esc(x.occ)}">Remove</button>`:changed&&!undo?`<button class="btn sm ghost" data-act="drestore" data-o="${esc(x.occ)}">Undo changes</button>`:''}</div>
+      <div class="rbtns" style="margin-top:10px">${x.type==='lift'&&editable.includes(x.key)?`<button class="btn sm ghost" data-act="pwkopen" data-k="${esc(x.key)}">Edit workout</button>`:''}${x.type==='run'&&x.runKind!=='easy'?`<button class="btn sm ghost" data-act="deasy" data-o="${esc(x.occ)}">Make it an easy run</button>`:''}${x.type==='lift'&&!x.reduced?`<button class="btn sm ghost" data-act="dset" data-o="${esc(x.occ)}" data-k="reduced">Reduce volume</button>`:''}${undo}${ch.add?`<button class="btn sm ghost" data-act="drestore" data-o="${esc(x.occ)}">Remove</button>`:changed&&!undo?`<button class="btn sm ghost" data-act="drestore" data-o="${esc(x.occ)}">Undo changes</button>`:''}</div>
       ${others.length?`<details class="swapd"><summary>Swap with another day</summary>${others.map(y=>`<button class="opt sm" data-act="dswap" data-o="${esc(x.occ)}" data-p="${esc(y.occ)}"><span>${esc(y.name)}</span><small>${day(y.date)}</small></button>`).join('')}</details>`:''}`}</div>`;
   }).join('');
   const wk=Programs.TEMPLATES[sc.config.template].freq[sc.config.lifts].w;
-  const add = d>=t && !items.some(x=>x.type==='lift'&&x.status!=='done') ? `<label class="f" style="margin-top:12px">Add a workout on this day</label>${wk.map(k=>`<button class="opt sm" data-act="dadd" data-k="${k}"><span>${esc(sc.workouts[k].name)}</span><span>+</span></button>`).join('')}` : '';
-  return o+`<h3>${esc(fmtDate(d))}</h3>${body||'<div class="note">Rest day.</div>'}${add}
+  const add = d>=t && !items.some(x=>x.type==='lift'&&x.status!=='done') ? `<details class="swapd"${items.length?'':' open'}><summary>Add a workout</summary>${wk.map(k=>`<button class="opt sm" data-act="dadd" data-k="${k}"><span>${esc(sc.workouts[k].name)}</span><span>+</span></button>`).join('')}</details>` : '';
+  const other = d<=t ? `<button class="link" data-act="dother">+ Other activity (yoga, HIIT, walk…)</button>` : '';
+  return o+`<h3>${esc(fmtDate(d))}</h3>${body||'<div class="note">Rest day.</div>'}${add}${other}
     ${sc.warnings.filter(w=>(w.occs||[]).some(id=>items.some(x=>x.occ===id))).map(w=>`<div class="warn">⚠ ${esc(w.text)}</div>`).join('')}
     <button class="btn ghost" style="margin-top:8px" data-act="dayclose">Done</button>`+cl;
 }
@@ -2239,7 +2277,7 @@ function clearOcc(occ, keys){
 }
 /* ---------- events ---------- */
 document.getElementById('addBtn').addEventListener('click',openAdd);
-document.querySelector('nav').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;st.tab=b.dataset.tab;render();toTop()});
+document.querySelector('nav').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;st.tab=b.dataset.tab;if(st.tab==='plan'){st.pview='main';st.daysh=null;st.prefsh=null}render();toTop()});
 const app=$('#app');
 app.addEventListener('change',e=>{
   const t=e.target;
@@ -2417,6 +2455,12 @@ app.addEventListener('click',e=>{
     setProgram(r.prog); if(r.rows.length) putChanges(r.rows);
     st.chg=null; st.auto=true; render(); toTop(); toast('Switched to '+Programs.TEMPLATES[r.prog.config.template].name+' ✓');
   }
+  // Plan sub-screens
+  else if(act==='pview'){ st.pview=b.dataset.v; render(); toTop() }
+  else if(act==='pback'){ st.pview=PVIEW_PARENT[st.pview]||'main'; render(); toTop() }
+  else if(act==='pwk'){ st.pwk=b.dataset.k; st.pview='workout'; render(); toTop() }
+  else if(act==='pwkopen'){ st.daysh=null; st.pwk=b.dataset.k; st.pview='workout'; render(); toTop() }
+  else if(act==='dother'){ const d=st.daysh.date; st.daysh=null; st.add={date:d, other:false, label:''}; render() }
   // a day in the Plan tab
   else if(act==='dayopen'){ st.daysh={date:b.dataset.d}; render() }
   else if(act==='dayclose'){ if(e.target.closest('[data-stop]') && !b.classList.contains('btn')) return; st.daysh=null; render() }
