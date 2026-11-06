@@ -407,7 +407,7 @@ const EFFORT = {easy:'Easy', medium:'Medium', hard:'Hard'};
 const effortSeg = (act,cur) => `<div class="segc">${Object.entries(EFFORT).map(([v,l])=>`<button class="${v===cur?'on':''}" data-act="${act}" data-v="${v}">${l}</button>`).join('')}</div>`;
 const kindOf = x => x.yoga ? 'yoga' : x.other ? 'other' : x.run ? 'run' : 'lift';
 const CHEERS = ['Nice one','Solid set','Strong','Locked in','Clean rep','Beast mode','Smooth'];
-const APP_VERSION='2026-11-06.3';
+const APP_VERSION='2026-11-06.4';
 
 
 /* ---------- helpers ---------- */
@@ -962,6 +962,9 @@ function pickSess(date){
   const t=todayStr(), all=allSessions();
   const open=Object.keys(st.draft).find(id=>id.startsWith(date+'-') && hasDraftData(st.draft[id]) && !all.some(s=>s.id===id));
   if(open) return open.slice(11);
+  // A workout in progress on the Watch shows even when it is not the day's planned one (a repeat, or a swapped day).
+  const live=Object.keys(st.live).find(id=>id.startsWith(date+'-') && !all.some(s=>s.id===id));
+  if(live) return live.slice(11);
   // Today shows a finished plan workout; an extra (HIIT, yoga, ...) stays in the list so the next plan workout shows.
   const day=all.filter(s=>s.date===date && (date<t || !(s.yoga||s.other)));
   if(day.length && date<=t) return day[0].session;
@@ -1026,14 +1029,14 @@ function todayHero(wp){
       <details class="recap"><summary><span>Workout details</span><span class="chev">›</span></summary><div class="wbody">${woBody(lg, kindOf(lg), true)}</div></details>
       <button class="editlink" data-act="edit">Edit this workout</button>${again?`<button class="btn sm" style="margin-top:12px" data-act="again" data-s="${esc(lg.session)}">Do it again today</button>`:''}</div>`;
   }
-  const onWatch = S.type==='lift' && st.live[sid()]?.source==='watch' && resume && st.date===t;
+  const onWatch = S.type==='lift' && st.live[sid()]?.source==='watch' && st.date===t;
   const what = S.type==='run'?'Distance and time':S.type==='yoga'?'Class length':S.type==='other'?'Timed workout':steps.length+' exercises';
   return h + `<div class="hero"><h2>${esc(sessLabel())}</h2>
     <div class="meta">${what} · about ${mins} min</div>
     ${S.type==='lift'?`<div class="chips">${steps.map(e=>`<span class="${done(e)?'ok':''}">${esc(e.name.split(/[\/(]/)[0].trim())}</span>`).join('')}</div>`:S.note?`<div class="note" style="margin-bottom:16px">${esc(S.note)}</div>`:''}
     ${onWatch?`<div class="note" style="text-align:center;margin-bottom:10px">⌚ In progress on your Watch. Resume here to keep going on your phone.</div>`:''}
     ${st.date>t ? `<div class="note" style="text-align:center">Coming up. You can log it on the day.</div>`
-      : `<button class="btn big ${isManual()?'':'pulse'}" data-act="start" data-resume="${resume?1:0}">${resume?(isManual()?'Continue adding':'Resume workout'):(isManual()?'Add workout manually':S.type==='run'?'Start run':'Start workout')}</button>`}</div>`;
+      : `<button class="btn big ${isManual()?'':'pulse'}" data-act="start" data-resume="${resume?1:0}">${onWatch?'Continue on phone':resume?(isManual()?'Continue adding':'Resume workout'):(isManual()?'Add workout manually':S.type==='run'?'Start run':'Start workout')}</button>`}</div>`;
 }
 /* After a Watch workout: the next time the web app opens, ask how it went and for a note (once per workout). */
 function checkNotePrompt(){

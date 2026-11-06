@@ -131,6 +131,8 @@ final class LiftStore: ObservableObject {
         let cached = plans.session(key)
         if !cached.isEmpty { draft!.plans = cached }
         persist()
+        // Upload right away (no sets yet) so the phone shows the workout in progress before the first set.
+        upload(status: "in_progress")
     }
 
     func go(to index: Int) {
