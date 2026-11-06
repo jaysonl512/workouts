@@ -407,7 +407,7 @@ const EFFORT = {easy:'Easy', medium:'Medium', hard:'Hard'};
 const effortSeg = (act,cur) => `<div class="segc">${Object.entries(EFFORT).map(([v,l])=>`<button class="${v===cur?'on':''}" data-act="${act}" data-v="${v}">${l}</button>`).join('')}</div>`;
 const kindOf = x => x.yoga ? 'yoga' : x.other ? 'other' : x.run ? 'run' : 'lift';
 const CHEERS = ['Nice one','Solid set','Strong','Locked in','Clean rep','Beast mode','Smooth'];
-const APP_VERSION='2026-11-06.2';
+const APP_VERSION='2026-11-06.3';
 
 
 /* ---------- helpers ---------- */
@@ -1016,12 +1016,15 @@ function todayHero(wp){
       <div style="margin-top:10px"><button class="btn sm ${d.deload?'ghost':''}" data-act="deload">${d.deload?'Turn off':'Use deload weights'}</button></div></div>`;
   }
   if(lg){
+    // A lift done on an earlier day can be done again today (it counts as an extra); a second copy on the same day
+    // would replace the first, so that one is edit-only.
+    const again = sessDef(lg.session).type==='lift' && lg.date!==t && !allSessions().some(x=>x.id===t+'-'+lg.session);
     const mood = (lg.effort ? ` · ${EFFORT[lg.effort]}` : '') + (lg.energy ? ` · feeling ${MOODS[lg.energy-1]}` : '');
     return h + `<div class="hero doneh"><div class="chk">✓</div><h2>${esc(lg.name)}</h2>
       <div class="meta">Completed${st.date===t?' today':' on '+fmtDate(st.date)}${mood}</div>
       <div class="sum sum3">${sessStats(lg).map(([b,l])=>`<div class="stat"><b>${b}</b><span>${l}</span></div>`).join('')}</div>
       <details class="recap"><summary><span>Workout details</span><span class="chev">›</span></summary><div class="wbody">${woBody(lg, kindOf(lg), true)}</div></details>
-      <button class="editlink" data-act="edit">Edit this workout</button></div>`;
+      <button class="editlink" data-act="edit">Edit this workout</button>${again?`<button class="btn sm" style="margin-top:12px" data-act="again" data-s="${esc(lg.session)}">Do it again today</button>`:''}</div>`;
   }
   const onWatch = S.type==='lift' && st.live[sid()]?.source==='watch' && resume && st.date===t;
   const what = S.type==='run'?'Distance and time':S.type==='yoga'?'Class length':S.type==='other'?'Timed workout':steps.length+' exercises';
@@ -1848,6 +1851,7 @@ app.addEventListener('click',e=>{
   else if(act==='wk'){ st.date=addDays(st.date,+b.dataset.n); st.auto=true; render() }
   else if(act==='pick'){ st.auto=false; st.sess=slotKey(b.dataset.k,st.date); render(); toTop() }
   else if(act==='opensess'){ st.auto=false; st.date=b.dataset.d; st.sess=b.dataset.s; render(); toTop() }
+  else if(act==='again'){ st.auto=false; st.date=todayStr(); st.sess=b.dataset.s; render(); toTop(); toast('Repeating '+sessName(b.dataset.s)+' today') }
   else if(act==='effort'){ const d2=getDraft(); d2.effort = d2.effort===b.dataset.v ? '' : b.dataset.v; saveDraft(); buzz(10); render() }
   else if(act==='noteeffort'){ st.note.effort = st.note.effort===b.dataset.v ? '' : b.dataset.v; buzz(10); render() }
   else if(act==='notesave') saveNote();

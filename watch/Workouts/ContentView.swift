@@ -72,6 +72,8 @@ struct TodayView: View {
     @EnvironmentObject var timed: TimedStore
     @EnvironmentObject var workout: WorkoutManager
     @EnvironmentObject var gym: GymStore
+    /// A finished lift tapped to do again today.
+    @State private var again: WeekRow?
 
     var body: some View {
         let week = WeekPlan(rows: sync.week)
@@ -112,6 +114,9 @@ struct TodayView: View {
                 }
             }
             .navigationTitle("Today")
+            .confirmationDialog("Do \(again?.name ?? "it") again today?", isPresented: Binding(get: { again != nil }, set: { if !$0 { again = nil } })) {
+                Button("Start") { if let r = again { start(r.session) }; again = nil }
+            } message: { Text("It counts as an extra this week.") }
         }
     }
 
@@ -179,16 +184,26 @@ struct TodayView: View {
         .buttonStyle(.plain)
     }
 
+    /// A finished workout. A lift done on an earlier day can be tapped to do it again today; one done today cannot
+    /// (a second copy on the same day would replace the first).
     private func doneRow(_ r: WeekRow) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.brand)
-            VStack(alignment: .leading, spacing: 0) {
-                Text(r.name).font(.system(size: 14, weight: .semibold)).foregroundStyle(.secondary).lineLimit(1)
-                Text("Done \(WeekPlan.weekday(r.date))").font(.caption2).foregroundStyle(.secondary)
+        let today = Day.string()
+        let canRepeat = r.type == "lift" && r.date != today && !sync.week.contains { $0.date == today && $0.session == r.session }
+        return Button { if canRepeat { again = r } } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.brand)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(r.name).font(.system(size: 14, weight: .semibold)).foregroundStyle(.secondary).lineLimit(1)
+                    Text(canRepeat ? "Done \(WeekPlan.weekday(r.date)) · tap to repeat" : "Done \(WeekPlan.weekday(r.date))")
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
             }
-            Spacer(minLength: 0)
+            .padding(.horizontal, 10).padding(.vertical, 6)
+            .contentShape(Rectangle())
         }
-        .padding(.horizontal, 10).padding(.vertical, 6)
+        .buttonStyle(.plain)
+        .disabled(!canRepeat)
     }
 
     /// "6 exercises · ~45 min" for lifts (sets × (40 s work + rest)); just "~45 min" in the list.
