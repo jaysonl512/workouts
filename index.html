@@ -82,6 +82,9 @@ table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:6px 4px;b
 /* ---- start card ---- */
 .hero{background:linear-gradient(160deg,#2a1416,#171c22 60%);border:1px solid #4a2226;border-radius:20px;padding:20px;margin:12px 0;animation:rise .4s var(--ease)}
 .hero h2{margin:0 0 4px;font-size:26px;letter-spacing:-.4px}
+.hero{position:relative}
+.hmore{position:absolute;top:12px;right:12px;width:36px;height:36px;border-radius:12px;border:1px solid var(--line);background:rgba(15,19,24,.6);color:var(--text);font-size:20px;line-height:1;padding:0}
+.hero:has(.hmore) h2{padding-right:40px}
 .hero .meta{color:var(--mute);margin-bottom:14px}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px}
 .chips span{background:#0f1318;border:1px solid var(--line);border-radius:99px;padding:4px 10px;font-size:12px;color:var(--mute)}
@@ -499,7 +502,7 @@ const EFFORT = {easy:'Easy', medium:'Medium', hard:'Hard'};
 const effortSeg = (act,cur) => `<div class="segc">${Object.entries(EFFORT).map(([v,l])=>`<button class="${v===cur?'on':''}" data-act="${act}" data-v="${v}">${l}</button>`).join('')}</div>`;
 const kindOf = x => x.yoga ? 'yoga' : x.other ? 'other' : x.run ? 'run' : 'lift';
 const CHEERS = ['Nice one','Solid set','Strong','Locked in','Clean rep','Beast mode','Smooth'];
-const APP_VERSION='2026-11-06.11';
+const APP_VERSION='2026-11-09.1';
 
 
 /* ---------- helpers ---------- */
@@ -1146,7 +1149,7 @@ function render(){
   if(st.tab==='today' && !inWk) checkNotePrompt();
   const note = st.note && st.tab==='today' && !inWk && !st.add && !st.recap ? noteSheet() : '';
   const hs = st.hm && st.tab==='progress' ? healthSheet() : '';
-  const ps = st.tab==='plan' ? (st.chg ? chgSheet() : st.daysh ? daySheet() : st.prefsh ? prefSheet() : '') : '';
+  const ps = st.tab==='plan' ? (st.chg ? chgSheet() : st.daysh ? daySheet() : st.prefsh ? prefSheet() : '') : st.tab==='today' && !inWk && st.daysh && st.daysh.compact ? daySheet() : '';
   $('#app').innerHTML = v() + (st.add&&!inWk ? addSheet() : '') + (st.recap ? recapView() : '') + note + hs + ps;
   if(st.wk){ st.wk.anim=false; st.wk.just=null;
     const cur=document.querySelector('.dots .dot.now,.dots .dot.editt'), row=cur&&cur.parentElement;
@@ -1267,6 +1270,8 @@ function todayHero(wp){
   }
   if(st.sess==='rest'){
     const n=wp.left.length, rec=wp.sched.occs.find(x=>x.date===st.date && x.status==='recovery');
+    const skp=wp.sched.occs.find(x=>x.date===st.date && x.status==='skipped');
+    if(skp && !rec) return `<div class="hero"><h2>Skipped today</h2><div class="meta">${esc(skp.name)} is off this week.</div>${n?`<div class="note">${n} workout${n>1?'s':''} still open this week. Tap one below to do it today.</div>`:''}<button class="link" data-act="rdyundo" data-o="${esc(skp.occ)}">Undo skip</button></div>`;
     if(rec) return `<div class="hero"><h2>Recovery day 🌿</h2><div class="meta">${esc(rec.name)} is off today.</div><div class="note">Optional: a 20 to 30 minute walk or some mobility work (+ to log it). Sleep and eat well.${n?` ${n} workout${n>1?'s':''} still open this week.`:''}</div><button class="link" data-act="rdyundo" data-o="${esc(rec.occ)}">Undo recovery day</button></div>`;
     return `<div class="hero"><h2>Rest day 😴</h2><div class="meta">Recover, eat, sleep.</div>${n?`<div class="note">${n} workout${n>1?'s':''} left this week. Tap one below to do it ${st.date===t?'today':'that day'}.</div>`:''}</div>`;
   }
@@ -1297,7 +1302,8 @@ function todayHero(wp){
   }
   const onWatch = S.type==='lift' && st.live[sid()]?.source==='watch' && st.date===t;
   const what = S.type==='run'?'Distance and time':S.type==='yoga'?'Class length':S.type==='other'?'Timed workout':steps.length+' exercises';
-  return h + `<div class="hero"><h2>${esc(oc&&st.sess!=='other'?oc.name:sessLabel())}</h2>
+  const more = oc && !resume && !onWatch && !oc.done ? `<button class="hmore" data-act="occmenu" data-o="${esc(oc.occ)}" data-d="${oc.date}" aria-label="Skip, move or recovery day">⋯</button>` : '';
+  return h + `<div class="hero">${more}<h2>${esc(oc&&st.sess!=='other'?oc.name:sessLabel())}</h2>
     <div class="meta">${what} · about ${mins} min${oc&&oc.date!==st.date?` · planned for ${Programs.DOW_NAME[Programs.dow(oc.date)]}`:''}</div>
     ${S.type==='lift'?`<div class="chips">${steps.map(e=>`<span class="${done(e)?'ok':''}">${esc(e.name.split(/[\/(]/)[0].trim())}</span>`).join('')}</div>`:S.note?`<div class="note" style="margin-bottom:16px">${esc(S.note)}</div>`:''}
     ${onWatch?`<div class="note" style="text-align:center;margin-bottom:10px">⌚ In progress on your Watch. Resume here to keep going on your phone.</div>`:''}
@@ -2222,7 +2228,17 @@ function chgSheet(){
 }
 function daySheet(){
   const g=st.daysh, d=g.date, sc=sched(d), t=todayStr(), [o,cl]=sheetOpen(g,'dayclose');
-  const items=sc.occs.filter(x=>x.date===d), day=x=>Programs.DOW_NAME[Programs.dow(x)];
+  const items=sc.occs.filter(x=>x.date===d && (!g.compact || x.occ===g.occ)), day=x=>Programs.DOW_NAME[Programs.dow(x)];
+  if(g.compact){
+    // From the ⋯ menu on Today's workout: the three choices only, same actions as the Plan tab.
+    const x=items[0]; if(!x){ st.daysh=null; return '' }
+    const dates=[...Array(7)].map((_,i)=>addDays(sc.weekStart,i)).filter(z=>z>=t && z!==x.date);
+    return o+`<h3>${esc(x.name)}</h3><div class="note">${esc(fmtDate(x.date))}</div><div class="ropts" style="margin-top:12px">
+      ${dates.length?`<div class="ropt"><b>Move workout</b><small>Do it on another day this week.</small><div class="dchips" style="margin-top:8px">${dates.map(z=>`<button class="dchip" data-act="dmove" data-o="${esc(x.occ)}" data-d="${z}">${day(z)[0]}<small>${day(z)}</small></button>`).join('')}</div></div>`:''}
+      ${optRow(`data-act="drec" data-o="${esc(x.occ)}"`, 'Recovery day', ACT_DESC.recovery)}
+      ${optRow(`data-act="dskip" data-o="${esc(x.occ)}"`, 'Skip workout', ACT_DESC.skip)}</div>
+      <button class="btn ghost" style="margin-top:10px" data-act="dayclose">Cancel</button>`+cl;
+  }
   const editable=Programs.TEMPLATES[progCfg().template].freq[progCfg().lifts].w;   // workouts the editor can open
   const dates=[...Array(7)].map((_,i)=>addDays(sc.weekStart,i)).filter(x=>x>=t && x!==d);
   const body=items.map(x=>{
@@ -2469,8 +2485,9 @@ app.addEventListener('click',e=>{
     const sc=sched(st.daysh.date), x=sc.occs.find(y=>y.occ===b.dataset.o), y=sc.occs.find(z=>z.occ===b.dataset.p); if(!x||!y) return;
     setOcc(x.occ,{date:y.date},'manual',x.date); setOcc(y.occ,{date:x.date},'manual',x.date); st.daysh=null; st.auto=true; render(); toast('Swapped');
   }
-  else if(act==='drec'){ const o=b.dataset.o; setOcc(o,Programs.recoveryPatch(sched(st.daysh.date),o,st.changes),'manual',st.daysh.date); st.auto=true; render(); toast('Recovery day saved 🌿') }
-  else if(act==='dskip'){ const o=b.dataset.o; setOcc(o,Programs.skipPatch(sched(st.daysh.date),o),'manual',st.daysh.date); st.auto=true; render(); toast("Skipped. Your training volume isn't affected") }
+  else if(act==='drec'){ const o=b.dataset.o; setOcc(o,Programs.recoveryPatch(sched(st.daysh.date),o,st.changes),'manual',st.daysh.date); if(st.daysh.compact) st.daysh=null; st.auto=true; render(); toast('Recovery day saved 🌿') }
+  else if(act==='dskip'){ const o=b.dataset.o; setOcc(o,Programs.skipPatch(sched(st.daysh.date),o),'manual',st.daysh.date); if(st.daysh.compact) st.daysh=null; st.auto=true; render(); toast("Skipped. Your training volume isn't affected") }
+  else if(act==='occmenu'){ st.daysh={date:b.dataset.d, occ:b.dataset.o, compact:true}; render() }
   else if(act==='dset'){ setOcc(b.dataset.o,{[b.dataset.k]:true},'manual',st.daysh.date); st.auto=true; render(); toast(b.dataset.k==='reduced'?'Reduced: fewer sets, same targets':"Skipped. It won't count against your progress") }
   else if(act==='drestore'){ dropChanges([b.dataset.o]); st.auto=true; render(); toast('Back to the plan') }
   else if(act==='dadd'){
