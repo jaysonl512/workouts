@@ -113,6 +113,22 @@ final class LiftStore: ObservableObject {
         return NextItem(warmup: false, index: done, total: plannedCount(step), target: target)
     }
 
+    /// "45 lb × 8", "−50 lb assist × 10", "45 sec" (timed holds) or "8 reps" (no weight planned yet).
+    func targetText(_ step: Step, _ t: PlanSet) -> String {
+        if step.isTimed { return "\(t.r) sec" }
+        guard let w = t.w else { return "\(t.r) reps" }
+        if step.isAssisted { return w > 0 ? "−\(Fmt.weight(w)) assist × \(t.r)" : "Bodyweight × \(t.r)" }
+        return w > 0 ? "\(Fmt.weight(w)) lb × \(t.r)" : "\(t.r) reps"
+    }
+
+    /// What comes after the rest: the next set of this exercise, or the first set of the next one.
+    func afterRest() -> (label: String, target: String?)? {
+        guard let s = currentStep else { return nil }
+        let it = nextItem(for: s)
+        let label = nextUp ? "Next: \(s.name)" : it.warmup ? "Warm-up \(it.index + 1)" : "Set \(it.index + 1) of \(it.total)"
+        return (label, it.target.map { targetText(s, $0) })
+    }
+
     func skipWarmups(_ step: Step) {
         guard draft != nil else { return }
         draft!.skipWu = (draft!.skipWu ?? []) + [step.id]
@@ -187,9 +203,9 @@ final class LiftStore: ObservableObject {
             if pn < plannedCount(partner), isA ? pn < done : pn <= done {
                 draft!.index = p
                 nextUp = false
+                if isA { stopRest() } else { startRest(TimeInterval(step.slot.restSeconds)) }
                 persist()
                 upload(status: "in_progress")
-                if isA { stopRest() } else { startRest(TimeInterval(step.slot.restSeconds)) }
                 return
             }
         }
@@ -199,9 +215,9 @@ final class LiftStore: ObservableObject {
             draft!.index += 1
             nextUp = draft!.index < steps.count
         }
+        startRest(TimeInterval(step.slot.restSeconds))
         persist()
         upload(status: "in_progress")
-        startRest(TimeInterval(step.slot.restSeconds))
     }
 
     func undoLastSet() {
@@ -219,6 +235,7 @@ final class LiftStore: ObservableObject {
         draft!.swaps[slot] = id == preferred ? nil : id
         draft!.changedAt = Date()
         persist()
+        upload(status: "in_progress")
     }
 
     // MARK: Handoff with the phone
@@ -243,7 +260,7 @@ final class LiftStore: ObservableObject {
             }
             return
         }
-        guard row.status == "in_progress", !(row.data.entries ?? []).isEmpty else { return }
+        guard row.status == "in_progress", !(row.data.entries ?? []).isEmpty || !(row.data.swaps ?? [:]).isEmpty else { return }
         if let local = cur.changedAt {
             guard remoteAt > local else { return }
         } else {
@@ -264,7 +281,7 @@ final class LiftStore: ObservableObject {
         if let p = row.data.plans { draft!.plans = (draft!.plans ?? [:]).merging(p) { _, new in new } }
         draft!.diff = diff
         draft!.sets = sets
-        draft!.swaps = swaps
+        draft!.swaps = swaps.merging(row.data.swaps ?? [:]) { _, shared in shared }
         draft!.changedAt = remoteAt
         if let started = ISO.date(row.data.startedAt), started < draft!.startedAt { draft!.startedAt = started }
         if let n = row.data.notes { draft!.notes = n }
@@ -276,7 +293,12 @@ final class LiftStore: ObservableObject {
         let s = steps
         draft!.index = s.firstIndex { self.workingCount($0.id) < self.plannedCount($0) } ?? s.count
         nextUp = false
-        stopRest()
+        // The other device's rest timer carries over; otherwise no rest is running.
+        if let end = ISO.date(row.data.restEnd), end > Date() {
+            restTotal = row.data.restTotal ?? end.timeIntervalSinceNow
+            restEnd = end
+            armHaptic()
+        } else { stopRest() }
         sync.dropInProgress(draft!.id)
         persist()
         handoffNote = row.source == "web" ? "Updated from phone" : "Updated"
@@ -420,6 +442,9 @@ final class LiftStore: ObservableObject {
                           data: SessionData(entries: entries(), durationMin: durationMin, hk: hk, notes: d.notes, deload: d.deload,
                                             startedAt: ISO.string(d.startedAt), plans: status == "in_progress" ? d.plans : nil,
                                             uid: d.uid, occ: d.occ, only: status == "in_progress" ? d.only : nil, reduced: d.reduced,
+                                            swaps: status == "in_progress" && !d.swaps.isEmpty ? d.swaps : nil,
+                                            restEnd: status == "in_progress" ? restEnd.map { ISO.string($0) } : nil,
+                                            restTotal: status == "in_progress" && restEnd != nil ? restTotal : nil,
                                             updatedAt: stamp))
     }
 }

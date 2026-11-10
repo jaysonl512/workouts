@@ -169,6 +169,7 @@ table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:6px 4px;b
 .rest{display:flex;align-items:center;gap:14px;background:#241512;border:1px solid #4a2a1c;border-radius:16px;padding:10px 14px;margin:12px 0 0;animation:rise .3s var(--ease)}
 .rest .t{font-size:24px;font-weight:800;font-variant-numeric:tabular-nums}
 .rest .s{color:var(--mute);font-size:13px}
+.rnext{flex:1;min-width:0;text-align:right;padding-right:6px}.rnext small{display:block;color:var(--mute);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rnext b{display:block;font-size:16px;color:var(--acc2);white-space:nowrap}
 .rest button{margin-left:auto;background:none;border:1px solid #6b3a22;color:var(--acc2);border-radius:10px;padding:7px 12px;font-size:14px;font-weight:700}
 .ring circle{fill:none;stroke-width:4}
 .ring .bg{stroke:#3a2417}
@@ -502,7 +503,7 @@ const EFFORT = {easy:'Easy', medium:'Medium', hard:'Hard'};
 const effortSeg = (act,cur) => `<div class="segc">${Object.entries(EFFORT).map(([v,l])=>`<button class="${v===cur?'on':''}" data-act="${act}" data-v="${v}">${l}</button>`).join('')}</div>`;
 const kindOf = x => x.yoga ? 'yoga' : x.other ? 'other' : x.run ? 'run' : 'lift';
 const CHEERS = ['Nice one','Solid set','Strong','Locked in','Clean rep','Beast mode','Smooth'];
-const APP_VERSION='2026-11-09.1';
+const APP_VERSION='2026-11-10.1';
 
 
 /* ---------- helpers ---------- */
@@ -532,7 +533,8 @@ function defOf(id){
 const workSets = a => (a||[]).filter(x=>x && !x.wu);
 const wUnit = e => { const n=exName(e), c=cfgOf(e.id); return isAssist(n) ? 'lb assist' : c&&c.eq==='dumbbell'&&c.vf===2 ? 'lb each' : isPerArm(n) ? 'lb per arm' : 'lb' };
 /* "−60×12" for 60 lb of assistance, "BW×12" for unassisted pull-ups. */
-const fmtSet = (s,en) => en&&isAssist(exName(en)) ? (s.w ? '−'+s.w+'×' : 'BW×')+s.r : (s.w ? s.w+'×' : '') + s.r;
+const isTimedEx = en => !!(en && ((EXMAP[en.id]||{}).timed || en.timed));
+const fmtSet = (s,en) => isTimedEx(en) ? s.r+' s' : en&&isAssist(exName(en)) ? (s.w ? '−'+s.w+'×' : 'BW×')+s.r : (s.w ? s.w+'×' : '') + s.r;
 /* Body weight on a date from Apple Health (lb), else the one typed in Settings. */
 function bwOn(date){
   let v=null;
@@ -728,6 +730,8 @@ function fromSession(s){
   if(s.occ) d.occ=s.occ;
   if(s.only) d.only=s.only;
   if(s.reduced) d.reduced=true;
+  if(s.swaps) Object.assign(d.swaps, s.swaps);
+  if(s.restEnd){ d.restEnd=s.restEnd; d.restTotal=s.restTotal }
   d.plans={}; d.diff={};
   (s.entries||[]).forEach(e=>{
     d.ex[e.id]=e.sets.map(x=>({...x, w:x.w??0}));
@@ -758,7 +762,7 @@ function planOf(e){
 }
 const planN = e => { const p=planOf(e); return p && p.sets.length ? Math.min(p.sets.length, e.sets||p.sets.length) : e.sets };
 const targetAt = (p,k) => p && p.sets[k] ? {...p.sets[k], ...((p.edits||{})[k]||{})} : null;
-const fmtT = (t,e) => t.w==null ? `? × ${t.r}` : fmtSet({w:t.w, r:t.r}, e);
+const fmtT = (t,e) => isTimedEx(e) ? t.r+' s' : t.w==null ? `? × ${t.r}` : fmtSet({w:t.w, r:t.r}, e);
 /* What comes next: a warm-up (until the first working set, unless skipped), else working set k of the plan. */
 function nextItem(e){
   const d=getDraft(), a=d.ex[e.id]||[], p=planOf(e), ws=workSets(a), wu=a.filter(x=>x.wu).length;
@@ -936,7 +940,7 @@ function startWorkout(resume){
   let first=0;
   if(resume){ const i=steps.findIndex(e=>!e.run && !e.yoga && !e.other && workSets(d.ex[e.id]).length<planN(e)); first = i<0? steps.length : i }
   st.wk={step:first,dir:1,anim:true,editing:null,editT:null,just:null,rest:null,cur:null,prs:{}};
-  initCur(); document.body.classList.add('wk'); render(); toTop();
+  initCur(); resumeRest(d); document.body.classList.add('wk'); render(); toTop();
   pullLive();
 }
 function exitWorkout(){ clearRest(); st.wk=null; document.body.classList.remove('wk'); render(); toTop() }
@@ -954,12 +958,28 @@ function initCur(){
   if(it.t) wk.cur={w: it.t.w!=null ? it.t.w : (lw?lw.w:''), r:it.t.r};
   else { const src=lw || lastW; wk.cur={w:src?.w??0, r:src?.r??e.reps[0]} }
 }
+/* What comes after the rest: the next set of this exercise, or the first set of the next one (warm-up included). */
+function afterRest(steps, i){
+  let e=steps[i]; if(!e || e.run||e.yoga||e.other) return null;
+  let it=nextItem(e), label;
+  if(!it.wu && it.i>=it.n){ e=steps[i+1]; if(!e || e.run||e.yoga||e.other) return null; it=nextItem(e); label='Next: '+e.name.split(/ [\/(]/)[0] }
+  else label = it.wu ? `Warm-up ${it.i+1}` : `Set ${it.i+1} of ${it.n}`;
+  if(!it.t) return {label, text:'—'};
+  const t=it.t, text = isTimedEx(e) ? `${t.r} sec` : t.w==null ? `${t.r} reps` : isAssist(e.name) ? (t.w?`−${t.w} lb assist × ${t.r}`:`Bodyweight × ${t.r}`) : t.w ? `${t.w} ${wUnit(e)} × ${t.r}` : `${t.r} reps`;
+  return {label, text};
+}
 let restTimer=null;
 function clearRest(){ clearInterval(restTimer); restTimer=null; if(st.wk) st.wk.rest=null }
-function startRest(secs){
+function startRest(secs, end){
   clearInterval(restTimer);
-  st.wk.rest={end:Date.now()+secs*1000,total:secs};
+  st.wk.rest={end:end||Date.now()+secs*1000,total:secs};
   restTimer=setInterval(tickRest,250);
+  if(!end) queueLive();   // the other device shows the same timer
+}
+/* A rest timer started on the other device (or before leaving this screen) that is still running. */
+function resumeRest(d){
+  const end=Date.parse((d&&d.restEnd)||''); if(!st.wk || !(end>Date.now()+1000) || st.wk.rest) return;
+  startRest(+(d.restTotal)||Math.round((end-Date.now())/1000), end);
 }
 function tickRest(){
   const r=st.wk&&st.wk.rest; if(!r){clearInterval(restTimer);return}
@@ -985,7 +1005,7 @@ function ssPartner(i){
 function moveStep(i){ const wk=st.wk; wk.dir=i>wk.step?1:-1; wk.step=i; wk.anim=true; wk.editing=null; wk.editT=null; wk.just=null; initCur(); render(); toTop() }
 function logSet(){
   const wk=st.wk, e=stepsFor()[wk.step], d=getDraft(), a=(d.ex[e.id] ||= []);
-  const w=num(wk.cur.w)||0, r=num(wk.cur.r);
+  const w=isTimedEx(e) ? 0 : num(wk.cur.w)||0, r=num(wk.cur.r);   // timed holds log seconds only
   const btn=$('#logBtn');
   if(!r||r<=0){ btn.classList.remove('shake'); void btn.offsetWidth; btn.classList.add('shake'); return }
   if(wk.editT!=null){   // editing a future set's target: the original target stays in the plan too
@@ -1069,7 +1089,7 @@ let liveT=null;
 function queueLive(){ clearTimeout(liveT); liveT=setTimeout(()=>pushLive().catch(()=>{}),700) }
 async function pushLive(){
   const d=st.draft[sid()], S=sessDef(st.sess);
-  if(!d||!st.wk||!sbAuth()||isManual()||S.type!=='lift'||!hasDraftData(d)) return;
+  if(!d||!st.wk||!sbAuth()||isManual()||S.type!=='lift'||!(hasDraftData(d)||Object.keys(d.swaps||{}).length)) return;
   const t=await sbToken(), uid=t&&jwtSub(t); if(!uid) return;
   const rec={id:sid(), date:st.date, session:st.sess, name:sessLabel(), type:'lift', source:'web', entries:entriesOf(S,d),
     startedAt:new Date(d.startedAt||Date.now()).toISOString(), updatedAt:new Date(d.touchedAt||Date.now()).toISOString()};
@@ -1078,6 +1098,8 @@ async function pushLive(){
   if(d.uid) rec.uid=d.uid;
   if(d.occ) rec.occ=d.occ;
   if(d.only) rec.only=d.only;
+  if(Object.keys(d.swaps||{}).length) rec.swaps=d.swaps;
+  if(st.wk.rest && st.wk.rest.end>Date.now()){ rec.restEnd=new Date(st.wk.rest.end).toISOString(); rec.restTotal=st.wk.rest.total }
   if(d.reduced) rec.reduced=true;
   const row={...sessToRow(rec,uid), status:'in_progress'};
   // Update the row only while it is still in progress and holds this same workout (or one from an older version
@@ -1124,6 +1146,7 @@ async function pullLive(){
     }
     st.live[id]=x; adoptLive(id,x);
     const wk=st.wk;
+    if(x.restEnd && Date.parse(x.restEnd)>Date.now()){ clearRest(); resumeRest(x) }
     if(wk.editing==null){
       const steps=stepsFor(), dd=getDraft(), i=steps.findIndex(e=>(dd.ex[e.id]||[]).length<e.sets);
       const to=i<0?steps.length:i;
@@ -1404,7 +1427,7 @@ function viewWorkout(){
     else dots+=`<span class="dot wu skip">${esc(fmtT(t,e))}<small>skipped</small></span>`; });
   if(dots) dots+='<i class="dsep" aria-hidden="true"></i>';
   for(let k=0;k<Math.max(N,ws.length);k++){
-    if(k<ws.length){ const [x,i]=ws[k], tg = x.pr!=null ? {w:x.pw??null, r:x.pr} : x.tr!=null ? {w:x.tw??null, r:x.tr} : null, off = tg && (tg.w!==x.w || tg.r!==x.r);
+    if(k<ws.length){ const [x,i]=ws[k], tg = x.pr!=null ? {w:x.pw??null, r:x.pr} : x.tr!=null ? {w:x.tw??null, r:x.tr} : null, off = tg && ((!isTimedEx(e) && tg.w!==x.w) || tg.r!==x.r);
       dots+=`<button class="dot done ${wk.just===i?'pop':''} ${wk.editing===i?'now':''}" data-act="dot" data-i="${i}">${esc(fmtSet(x,e))}${off?`<small>plan ${esc(fmtT(tg,e))}</small>`:''}</button>`; }
     else { const t=targetAt(p,k), now=!it.wu && k===it.i && wk.editing==null && wk.editT==null, ed=p&&p.edits&&p.edits[k];
       dots+=`<button class="dot ${now?'now':''} ${wk.editT===k?'editt':''}" data-act="tdot" data-k="${k}">${t?esc(fmtT(t,e)):'Set '+(k+1)}<small>${ed?'edited':'set '+(k+1)}</small></button>`; }
@@ -1417,7 +1440,8 @@ function viewWorkout(){
   const scheme = c&&c.structure==='pyramid' ? `Pyramid ${p&&p.sets.length?p.sets.map(x=>x.r).join('·'):c.pattern.join('·')} reps`
     : c&&c.structure==='topback' ? `Top set ${c.top[0]}–${c.top[1]} + ${c.backSets} back-off${c.backSets>1?'s':''} ${c.back[0]}–${c.back[1]}`
     : `${e.sets} × ${e.reps[0]===e.reps[1]?e.reps[0]:e.reps[0]+'–'+e.reps[1]}`;
-  const tShow = t => t.w==null ? `pick a weight × ${t.r}${reps}` : (t.w===0&&!isAssist(e.name) ? `${t.r}${reps}` : `${t.w} ${u} × ${t.r}${t.w&&!isAssist(e.name)?'':reps}`);
+  const timed=isTimedEx(e);
+  const tShow = t => timed ? `${t.r} sec` : t.w==null ? `pick a weight × ${t.r}${reps}` : (t.w===0&&!isAssist(e.name) ? `${t.r}${reps}` : `${t.w} ${u} × ${t.r}${t.w&&!isAssist(e.name)?'':reps}`);
   let box='';
   if(wk.editT!=null){ const o=p&&p.sets[wk.editT]; box=`<div class="tline edit"><span>Set ${wk.editT+1} target</span><b>Planned ${o?esc(fmtT(o,e)):'—'}</b><button class="link" data-act="tdot" data-k="${wk.editT}">Cancel</button></div>` }
   else if(wk.editing!=null){ const x=a[wk.editing]; box=`<div class="tline edit"><span>Editing</span><b>${x.tr!=null?`Target ${esc(fmtT({w:x.tw??null,r:x.tr},e))}`:'Logged set'}</b><button class="link" data-act="togglewu">${x.wu?'Working set':'Warm-up'}</button></div>` }
@@ -1435,11 +1459,11 @@ function viewWorkout(){
     ${box}
     <div class="dots">${dots}</div>
     <div class="steppers">
-      ${stepper('w',isAssist(e.name)?'Assistance':'Weight',w,u)}
-      ${stepper('r',e.id==='plank'?'Seconds':'Reps',r,'')}
+      ${timed?'':stepper('w',isAssist(e.name)?'Assistance':'Weight',w,u)}
+      ${stepper('r',timed?'Seconds':'Reps',r,timed?'seconds':'')}
     </div>
     ${rest?`<div class="rest"><svg class="ring" width="44" height="44" viewBox="0 0 36 36"><circle class="bg" cx="18" cy="18" r="16"/><circle class="fg" id="restFg" cx="18" cy="18" r="16" stroke-dasharray="100.5" stroke-dashoffset="${(100.5*(1-left/rest.total)).toFixed(1)}"/></svg>
-      <div><div class="t" id="restT">${mmss(left)}</div><div class="s">Rest</div></div><button data-act="skiprest">Skip</button></div>`:''}
+      <div><div class="t" id="restT">${mmss(left)}</div><div class="s">Rest</div></div>${(n=>n?`<div class="rnext"><small>${esc(n.label)}</small><b>${esc(n.text)}</b></div>`:'')(afterRest(steps, wk.step))}<button data-act="skiprest">Skip</button></div>`:''}
     <div class="logwrap"><button class="btn log big" id="logBtn" data-act="log">${label}</button></div>
     <div class="nav3">
       <button class="btn ghost sm" data-act="back" ${wk.step===0?'disabled style="opacity:.3"':''}>‹ Back</button>

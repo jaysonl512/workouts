@@ -51,6 +51,8 @@ struct Step: Hashable {
     let name: String
     var isAlt: Bool { id != slot.id }
     var isAssisted: Bool { Load.isAssisted(name) }
+    /// Timed holds (plank and its plank / hold alternatives): seconds only, no weight.
+    var isTimed: Bool { slot.id == "plank" && name.range(of: "plank|hold", options: [.regularExpression, .caseInsensitive]) != nil }
     var isPerArm: Bool { Load.isPerArm(name) }
     /// Unit shown next to the weight.
     var weightUnit: String { isAssisted ? "lb assist" : isPerArm ? "lb / arm" : "lb" }

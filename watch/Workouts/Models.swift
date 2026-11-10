@@ -158,6 +158,11 @@ struct SessionData: Codable {
     var only: [OccEx]?
     /// Done as a reduced workout (fewer sets after a readiness check).
     var reduced: Bool?
+    /// While in progress: exercises swapped for an alternative (slot id -> alternative id), so a swap reaches the other
+    /// device before any set is logged, and the rest timer (when it ends and its full length).
+    var swaps: [String: String]?
+    var restEnd: String?
+    var restTotal: Double?
     var updatedAt: String
 }
 

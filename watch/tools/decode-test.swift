@@ -89,4 +89,17 @@ var live = row
 live.data.uid = "a1"; live.data.occ = "2026-11-09:upperB:1"; live.data.only = [OccEx(id: "inc-db", sets: 3)]; live.data.reduced = true
 let back = try JSONDecoder().decode(SessionRow.self, from: JSONEncoder().encode(live))
 check(back.data.uid == "a1" && back.data.occ == "2026-11-09:upperB:1" && back.data.only?.first?.sets == 3 && back.data.reduced == true, "uid, occurrence and reduced list survive a re-encode")
+// Handoff extras (build 17): a swap and the rest timer travel with the workout in progress.
+var hand = row
+hand.data.swaps = ["row": "row~barbell-row"]; hand.data.restEnd = "2026-11-12T17:01:30.000Z"; hand.data.restTotal = 90
+let hb = try JSONDecoder().decode(SessionRow.self, from: JSONEncoder().encode(hand))
+check(hb.data.swaps?["row"] == "row~barbell-row" && hb.data.restEnd == "2026-11-12T17:01:30.000Z" && hb.data.restTotal == 90, "swaps and the rest timer survive a re-encode")
+let phoneLive = try JSONDecoder().decode(SessionData.self, from: Data(#"{"updatedAt":"2026-11-12T17:00:00.000Z","swaps":{"squat":"squat~leg-press"},"restEnd":"2026-11-12T17:01:00.000Z","restTotal":120,"entries":[]}"#.utf8))
+check(phoneLive.swaps?["squat"] == "squat~leg-press" && phoneLive.restTotal == 120, "the phone's swap and rest timer decode on the Watch")
+// Timed holds: plank and its plank/hold alternatives log seconds only.
+let plank = Plan.session("lowerB")!.exercises.first { $0.id == "plank" }!
+check(Step(slot: plank, id: "plank", name: plank.name).isTimed, "plank is timed")
+check(Step(slot: plank, id: "plank~side-plank", name: "Side plank").isTimed && !Step(slot: plank, id: "plank~dead-bug", name: "Dead bug").isTimed, "plank alternatives: holds are timed, dead bugs are not")
+let squat = Plan.session("lowerA")!.exercises[0]
+check(!Step(slot: squat, id: "squat", name: squat.name).isTimed, "a lift is not timed")
 print("all Watch decode tests passed")

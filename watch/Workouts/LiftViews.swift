@@ -9,6 +9,8 @@ struct LiftFlowView: View {
         NavigationStack {
             if lift.finishedElsewhere != nil {
                 FinishedElsewhereView()
+            } else if let id = lift.rateFor {
+                RateView(exerciseId: id)
             } else if lift.restEnd != nil {
                 RestView()
             } else if lift.nextUp, let step = lift.currentStep {
@@ -88,7 +90,7 @@ struct ExerciseView: View {
         }
         .tabViewStyle(.page)
         .toolbar(.hidden, for: .navigationBar)
-        .onAppear { prefill(); focus = .weight }
+        .onAppear { prefill(); focus = step.isTimed ? .reps : .weight }
         .onChange(of: done.count) { _, _ in prefill() }
     }
 
@@ -103,11 +105,13 @@ struct ExerciseView: View {
             .minimumScaleFactor(0.6)
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            valueRow(.weight, text: Fmt.weight(weight), unit: lift.planFor(step.id)?.unit.map(Self.shortUnit) ?? step.weightUnit,
-                     minus: { weight = max(0, weight - step.slot.weightStep) },
-                     plus: { weight = min(1000, weight + step.slot.weightStep) })
-                .digitalCrownRotation(detent: $weight, from: 0, through: 1000, by: 0.25,
-                                      sensitivity: .low, isContinuous: false, isHapticFeedbackEnabled: true)
+            if !step.isTimed {
+                valueRow(.weight, text: Fmt.weight(weight), unit: lift.planFor(step.id)?.unit.map(Self.shortUnit) ?? step.weightUnit,
+                         minus: { weight = max(0, weight - step.slot.weightStep) },
+                         plus: { weight = min(1000, weight + step.slot.weightStep) })
+                    .digitalCrownRotation(detent: $weight, from: 0, through: 1000, by: 0.25,
+                                          sensitivity: .low, isContinuous: false, isHapticFeedbackEnabled: true)
+            }
 
             valueRow(.reps, text: "\(Int(reps))", unit: isPlank ? "sec" : "reps",
                      minus: { reps = max(0, reps - Double(step.slot.repStep)) },
@@ -115,7 +119,7 @@ struct ExerciseView: View {
                 .digitalCrownRotation(detent: $reps, from: 0, through: 300, by: Double(step.slot.repStep),
                                       sensitivity: .medium, isContinuous: false, isHapticFeedbackEnabled: true)
 
-            Button(item.warmup ? "Log Warm-up" : "Log Set") { lift.logSet(w: weight, r: Int(reps)) }
+            Button(item.warmup ? "Log Warm-up" : "Log Set") { lift.logSet(w: step.isTimed ? 0 : weight, r: Int(reps)) }
                 .buttonStyle(PrimaryButtonStyle(height: 38))
         }
         .padding(.horizontal, 2)
@@ -126,7 +130,7 @@ struct ExerciseView: View {
         let it = item, a = step.isAssisted, ss = isSuperset ? "Superset · " : ""
         if it.warmup, let t = it.target { return "Warm-up \(it.index + 1) of \(it.total) · \(Self.text(t, assisted: a))" }
         let n = "Set \(min(it.index + 1, max(it.total, it.index + 1))) of \(it.total)"
-        if let t = it.target { return "\(ss)\(n) · Target \(Self.text(t, assisted: a))\(stale)" }
+        if let t = it.target { return "\(ss)\(n) · Target \(step.isTimed ? "\(t.r) sec" : Self.text(t, assisted: a))\(stale)" }
         if it.index >= it.total { return "\(ss)Extra set · Done " + working.map { $0.text(assisted: a) }.joined(separator: " ") }
         guard let l = last, !l.isEmpty else { return "\(ss)\(n) · \(step.slot.repsText)\(isPlank ? " sec" : "")" }
         return "\(ss)\(n) · Last " + l.filter { !$0.isWarmup }.map { $0.text(assisted: a) }.joined(separator: " ")
@@ -259,14 +263,19 @@ struct RestView: View {
                     VStack(spacing: 0) {
                         Text(Fmt.clock(left.rounded(.up)))
                             .font(.system(size: 32, weight: .semibold, design: .rounded)).monospacedDigit()
-                        if let s = lift.currentStep {
-                            Text(lift.nextUp ? "Next: \(s.name)" : "Set \(lift.workingCount(s.id) + 1) next")
+                        if let n = lift.afterRest() {
+                            Text(n.label)
                                 .font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1)
                                 .frame(maxWidth: 90)
                         }
                     }
                 }
                 .frame(maxHeight: .infinity)
+                // The weight to grab next, so the timer never has to be skipped to see it.
+                if let t = lift.afterRest()?.target {
+                    Text(t).font(.system(size: 17, weight: .semibold, design: .rounded)).foregroundStyle(Color.brand)
+                        .lineLimit(1).minimumScaleFactor(0.6)
+                }
 
                 HStack(spacing: 4) {
                     Button("-15") { lift.adjustRest(-15) }.buttonStyle(PillButtonStyle())
@@ -293,8 +302,7 @@ struct NextUpView: View {
             }
             Text("\(lift.plannedCount(step)) sets").font(.system(size: 16)).foregroundStyle(.secondary)
             Spacer(minLength: 0)
-            RateRow()
-            Button("Start") { lift.rateFor = nil; lift.nextUp = false }.buttonStyle(PrimaryButtonStyle(color: .control))
+            Button("Start") { lift.nextUp = false }.buttonStyle(PrimaryButtonStyle(color: .control))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .navigationTitle("Next Up")
@@ -312,7 +320,6 @@ struct FinishView: View {
             Text("\(lift.totalSets)").font(.system(size: 40, weight: .semibold, design: .rounded))
             Text("sets logged").font(.footnote).foregroundStyle(.secondary)
             Spacer(minLength: 0)
-            RateRow()
             Button(saving ? "Saving…" : "Finish") {
                 saving = true
                 Task {
@@ -389,18 +396,23 @@ struct LiftSummaryDetail: View {
 }
 
 /// Optional "How was it?" for the exercise just finished: three small buttons, easy to ignore (Start skips it).
-struct RateRow: View {
+/// Right after the last set of an exercise: how did it feel? Optional; Skip moves on. The rest timer keeps
+/// counting underneath.
+struct RateView: View {
+    let exerciseId: String
     @EnvironmentObject var lift: LiftStore
 
     var body: some View {
-        if let id = lift.rateFor {
-            HStack(spacing: 4) {
-                ForEach([("easy", "Easy"), ("moderate", "OK"), ("hard", "Hard")], id: \.0) { v, label in
-                    Button(label) { lift.rate(id, v) }
-                        .buttonStyle(PillButtonStyle(color: lift.draft?.diff?[id] == v ? .brand : .control))
-                }
+        let name = lift.steps.first { $0.id == exerciseId }?.name ?? Plan.exerciseName(exerciseId) ?? "it"
+        VStack(spacing: 5) {
+            Text("How did \(name) feel?").font(.system(size: 15, weight: .semibold)).multilineTextAlignment(.center)
+                .lineLimit(2).minimumScaleFactor(0.7)
+            ForEach([("easy", "Easy"), ("moderate", "Moderate"), ("hard", "Hard")], id: \.0) { v, label in
+                Button(label) { lift.rate(exerciseId, v) }.buttonStyle(PrimaryButtonStyle(color: .control, height: 34))
             }
-            .font(.system(size: 13))
+            Button("Skip") { lift.rateFor = nil }.font(.system(size: 14)).foregroundStyle(.secondary).buttonStyle(.plain)
         }
+        .navigationTitle("Rate")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
