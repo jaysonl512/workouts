@@ -238,13 +238,10 @@ table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:6px 4px;b
 button.dayrow{width:100%;background:none;border-left:0;border-right:0;border-bottom:0;color:var(--text);font:inherit;text-align:left}
 .dayrow .dt small,.mute{color:var(--mute);font-weight:500}
 .pname{font-size:18px}
-/* Today redesign (2026-11-12): glow, program pill, open week strip, card with art, simple week list */
+/* Today redesign (2026-11-12, compact 2026-11-12.2): glow, open week strip, card with art, simple week list */
 header{position:relative}
-header::before{content:"";position:absolute;top:-180px;right:-170px;width:440px;height:440px;border-radius:50%;background:radial-gradient(circle,rgba(239,68,68,.38),rgba(239,68,68,.12) 45%,rgba(239,68,68,0) 70%);pointer-events:none;z-index:0}
+header::before{content:"";position:absolute;top:-170px;right:-170px;width:360px;height:360px;border-radius:50%;background:radial-gradient(circle,rgba(239,68,68,.38),rgba(239,68,68,.12) 45%,rgba(239,68,68,0) 70%);pointer-events:none;z-index:0}
 header>*{position:relative;z-index:1}
-.progpill{display:flex;align-items:center;gap:8px;max-width:62%;background:rgba(15,18,22,.72);border:1px solid #3a2a2d;border-radius:99px;padding:9px 14px;color:var(--text);font-size:15px;font-weight:700}
-.progpill svg{flex:none;width:20px;height:20px;fill:none;stroke:var(--acc);stroke-width:1.9;stroke-linejoin:round}
-.progpill span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.progpill i{font-style:normal;color:var(--mute);font-size:18px}
 .wstrip{display:flex;align-items:center;gap:6px;margin:8px 0 6px}
 .wstrip .days{flex:1}
 .wnav{flex:none;width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:#14181d;color:var(--text);font-size:18px;line-height:1;padding:0}
@@ -272,6 +269,36 @@ header>*{position:relative;z-index:1}
 .ws.go{border:0;color:var(--text);font-size:22px;font-weight:400}
 .ws.rec{border:0;font-size:16px}
 .addact{display:block;margin:6px auto 0;text-decoration:none;font-size:14px}
+/* compact */
+header{padding:calc(10px + env(safe-area-inset-top)) 16px 2px}
+header h1{font-size:26px}
+header span{font-size:13px;margin-top:2px;min-height:18px}
+.addbtn{width:36px;height:36px;font-size:26px}
+main{padding-top:2px}
+.wstrip{margin:4px 0 2px;gap:4px}
+.wnav{width:28px;height:28px;font-size:15px}
+.days{gap:2px}
+.days button{padding:4px 0 5px;gap:2px;border-radius:12px}
+.days small{font-size:10px}.days b{font-size:16px}.days i{width:6px;height:6px}
+.hero{padding:14px 16px;margin:8px 0;border-radius:18px;animation:none}
+.hero h2{font-size:22px;margin-bottom:2px}
+.hero .meta{font-size:14px;margin-bottom:10px}
+.htag{font-size:10.5px;padding:3px 8px;margin-bottom:6px;border-radius:7px}
+.hart{top:34px;width:78px;height:58px}
+.hmore{top:10px;right:10px;width:30px;height:30px;font-size:17px;border-radius:10px}
+.hero .chips{margin-bottom:10px;gap:5px}.hero .chips span{font-size:11px;padding:3px 8px}
+.rdy{padding:9px 10px;margin-bottom:10px;border-radius:12px}
+.rdy .segc button{padding:6px 4px;font-size:13px}
+.startb{padding:13px;font-size:17px;border-radius:14px;box-shadow:0 4px 14px rgba(239,68,68,.2)}
+.hero .btn.big{padding:13px;font-size:17px}
+.wkttl{margin:12px 4px 6px}.wkttl h3{font-size:19px}.wkttl span{font-size:13px}
+.wbar{height:5px;margin-bottom:2px}
+.wr2{padding:9px 10px;gap:12px}
+.wr2.sel{border-radius:12px}
+.wr2 .d{width:34px;font-size:14px}.wr2 .n b{font-size:15.5px}.wr2 .n small{font-size:11.5px}
+.ws{width:22px;height:22px;font-size:12px}.ws.go{font-size:19px}
+nav button{padding:8px 0 6px;gap:3px;font-size:11px}
+nav button svg{width:23px;height:23px}
 .subhd{display:flex;align-items:center;gap:10px;margin:4px 0 6px}.subhd b{font-size:18px}
 .pcardb{display:flex;width:100%;align-items:center;justify-content:space-between;gap:10px;text-align:left;color:var(--text);font:inherit;margin:6px 0}
 .pcardb small,.lrow small{display:block;color:var(--mute);font-size:13px;margin-top:2px}.pcardb small.nxt{color:var(--acc2)}
@@ -495,7 +522,7 @@ details[open]>summary .chev{transform:rotate(90deg)}
 </head>
 <body>
 <div id="shell"><div id="upd" class="upd" hidden><span>A new version is ready</span><button id="updBtn">Update</button></div><div id="scroll">
-<header><div class="hrow"><h1 id="ttl">Today</h1><button id="progPill" class="progpill" aria-label="Program" hidden><svg viewBox="0 0 24 24"><path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="m3 13 9 5 9-5"/></svg><span></span><i>›</i></button><button id="addBtn" class="addbtn" aria-label="Add a workout">+</button></div><span id="sub"></span></header>
+<header><div class="hrow"><h1 id="ttl">Today</h1><button id="addBtn" class="addbtn" aria-label="Add a workout">+</button></div><span id="sub"></span></header>
 <main id="app"></main>
 </div>
 <nav>
@@ -537,7 +564,7 @@ const EFFORT = {easy:'Easy', medium:'Medium', hard:'Hard'};
 const effortSeg = (act,cur) => `<div class="segc">${Object.entries(EFFORT).map(([v,l])=>`<button class="${v===cur?'on':''}" data-act="${act}" data-v="${v}">${l}</button>`).join('')}</div>`;
 const kindOf = x => x.yoga ? 'yoga' : x.other ? 'other' : x.run ? 'run' : 'lift';
 const CHEERS = ['Nice one','Solid set','Strong','Locked in','Clean rep','Beast mode','Smooth'];
-const APP_VERSION='2026-11-12.1';
+const APP_VERSION='2026-11-12.2';
 
 
 /* ---------- helpers ---------- */
@@ -1199,10 +1226,7 @@ function render(){
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===st.tab));
   const TT={today:'Today',history:'History',progress:'Progress',plan:'Plan'};
   $('#ttl').textContent = TT[st.tab];
-  // Today: the program pill (the + lives in the week list there); History and Progress keep the + button.
-  $('#addBtn').style.display = st.tab==='history'||st.tab==='progress' ? '' : 'none';
-  const pp=$('#progPill'); pp.hidden = st.tab!=='today';
-  if(st.tab==='today') pp.querySelector('span').textContent = Programs.TEMPLATES[Programs.programStatus(st.prog, todayStr()).current.template].name;
+  $('#addBtn').style.display = st.tab==='plan' ? 'none' : '';
   const uns = st.local.length ? st.local.length+' unsynced' : '';
   $('#sub').textContent = st.tab==='today' ? [new Date(st.date+'T12:00:00').toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'}),uns].filter(Boolean).join(' · ') : uns;
   const v = {today:viewToday, history:viewHistory, progress:viewProgress, plan:viewPlan}[st.tab];
@@ -1283,7 +1307,7 @@ function weekList(wp){
   return `<div class="wkttl"><h3>${cur?'This week':'That week'}</h3><span>${wp.doneN} of ${wp.goal} done${wp.rest?` · ${wp.rest} recovery`:''}</span></div>
     <div class="wbar"><i style="width:${pct}%"></i></div>
     <div class="wl2">${rows||'<div class="note" style="padding:10px">Nothing scheduled this week.</div>'}${extras?`<div class="wsub">Also this week</div>${extras}`:''}</div>
-    <button class="link addact" data-act="addact">+ Log something else</button>`;
+`;
 }
 /* Optional readiness check before a scheduled lift (programs.js readiness): never changes weights. */
 function readyCard(x){
@@ -2361,7 +2385,7 @@ function clearOcc(occ, keys){
 }
 /* ---------- events ---------- */
 document.getElementById('addBtn').addEventListener('click',openAdd);
-document.getElementById('progPill').addEventListener('click',()=>{ st.tab='plan'; st.pview='program'; st.daysh=null; render(); toTop() });
+
 document.querySelector('nav').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;st.tab=b.dataset.tab;if(st.tab==='plan'){st.pview='main';st.daysh=null;st.prefsh=null}render();toTop()});
 const app=$('#app');
 app.addEventListener('change',e=>{
@@ -2400,8 +2424,8 @@ app.addEventListener('click',e=>{
   const act=b.dataset.act, wk=st.wk;
   if(act==='day'){ st.date=b.dataset.d; st.auto=true; render() }
   else if(act==='wk'){ st.date=addDays(st.date,+b.dataset.n); st.auto=true; render() }
-  else if(act==='pick'){ st.auto=false; st.occ=b.dataset.o||null; st.sess=slotKey(b.dataset.k,st.date); render(); toTop() }
-  else if(act==='opensess'){ st.auto=false; st.date=b.dataset.d; st.sess=b.dataset.s; render(); toTop() }
+  else if(act==='pick'){ st.auto=false; st.occ=b.dataset.o||null; st.sess=slotKey(b.dataset.k,st.date); render() }
+  else if(act==='opensess'){ st.auto=false; st.date=b.dataset.d; st.sess=b.dataset.s; render() }
   else if(act==='again'){ st.auto=false; st.date=todayStr(); st.sess=b.dataset.s; render(); toTop(); toast('Repeating '+sessName(b.dataset.s)+' today') }
   else if(act==='effort'){ const d2=getDraft(); d2.effort = d2.effort===b.dataset.v ? '' : b.dataset.v; saveDraft(); buzz(10); render() }
   else if(act==='noteeffort'){ st.note.effort = st.note.effort===b.dataset.v ? '' : b.dataset.v; buzz(10); render() }
