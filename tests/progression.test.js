@@ -295,7 +295,8 @@ test('E1-E5 equipment increments', () => {
   assert.equal(P.up(machine10, 100), 110);
   assert.equal(P.snapDown(dead, 191.25), 190);
   assert.equal(cfg('fly').step, 2.5);
-  assert.equal(P.configFor(EXMAP[altId('bench', 'Dumbbell bench press')]).eq, 'dumbbell');
+  assert.equal(P.configFor(EXMAP.bench).eq, 'dumbbell');   // bench is dumbbell bench press (2026-11-12)
+  assert.equal(P.configFor(EXMAP[altId('bench', 'Barbell bench press')]).eq, 'barbell');
 });
 
 /* ---------- warm-ups and volume ---------- */
@@ -349,7 +350,7 @@ test('Y5 buildPlans covers every lift exercise and alternative', () => {
   const out = P.buildPlans({ sessions: [{ id: 'x', date: '2026-11-05', data: { entries: [{ id: 'inc-db', sets: nov5.sets }] } }], settings: {}, today: '2026-11-12', plan: { PLAN, ALTS, altId, EXMAP } });
   assert.deepEqual(Object.keys(out.sessions).sort(), ['lowerA', 'lowerB', 'upperA', 'upperB']);
   assert.deepEqual(pairs(out.sessions.upperB['inc-db'].sets), [[40, 12], [45, 10], [50, 8], [55, 6]]);
-  assert.ok(out.sessions.upperA[altId('bench', 'Dumbbell bench press')]);
+  assert.ok(out.sessions.upperA[altId('bench', 'Barbell bench press')]);
 });
 
 test('D1 same inputs, same output, and no clock is read', () => {

@@ -2,3 +2,4 @@ supabase/functions/plans/plan.js
 supabase/functions/plans/progression.js
 supabase/functions/plans/programs.js
 supabase/.temp/
+backups/

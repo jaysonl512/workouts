@@ -31,7 +31,7 @@ nav button{flex:1;position:relative;display:flex;flex-direction:column;align-ite
 nav button svg{width:27px;height:27px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;transition:transform .25s var(--ease)}
 nav button.on{color:var(--acc)}
 nav button.on svg{transform:translateY(-2px) scale(1.08)}
-nav button.on::before{content:"";position:absolute;top:0;width:34px;height:3px;border-radius:0 0 5px 5px;background:var(--acc)}
+nav button.on::before{content:none}
 .week{padding:12px 10px 14px}
 .wkhd{display:flex;align-items:center;justify-content:space-between;padding:0 6px 10px}
 .wkhd b{font-size:14px}
@@ -238,6 +238,40 @@ table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:6px 4px;b
 button.dayrow{width:100%;background:none;border-left:0;border-right:0;border-bottom:0;color:var(--text);font:inherit;text-align:left}
 .dayrow .dt small,.mute{color:var(--mute);font-weight:500}
 .pname{font-size:18px}
+/* Today redesign (2026-11-12): glow, program pill, open week strip, card with art, simple week list */
+header{position:relative}
+header::before{content:"";position:absolute;top:-180px;right:-170px;width:440px;height:440px;border-radius:50%;background:radial-gradient(circle,rgba(239,68,68,.38),rgba(239,68,68,.12) 45%,rgba(239,68,68,0) 70%);pointer-events:none;z-index:0}
+header>*{position:relative;z-index:1}
+.progpill{display:flex;align-items:center;gap:8px;max-width:62%;background:rgba(15,18,22,.72);border:1px solid #3a2a2d;border-radius:99px;padding:9px 14px;color:var(--text);font-size:15px;font-weight:700}
+.progpill svg{flex:none;width:20px;height:20px;fill:none;stroke:var(--acc);stroke-width:1.9;stroke-linejoin:round}
+.progpill span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.progpill i{font-style:normal;color:var(--mute);font-size:18px}
+.wstrip{display:flex;align-items:center;gap:6px;margin:8px 0 6px}
+.wstrip .days{flex:1}
+.wnav{flex:none;width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:#14181d;color:var(--text);font-size:18px;line-height:1;padding:0}
+.days button.sel{border-color:transparent;background:rgba(239,68,68,.26)}
+.days button.sel small,.days button.sel b{color:#fca5a5}
+.hero{overflow:hidden;background:linear-gradient(165deg,#2a1517,#171b20 62%);border-color:#4a2427}
+.hart{position:absolute;right:10px;top:44px;width:96px;height:72px;opacity:.85;pointer-events:none}
+.hero h2{position:relative;max-width:calc(100% - 92px)}.hero .meta{position:relative;font-size:15px}
+.hero .chips{position:relative}
+.htag{display:inline-block;font-size:12px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:#fca5a5;background:rgba(239,68,68,.18);border:1px solid rgba(239,68,68,.35);border-radius:9px;padding:4px 10px;margin-bottom:10px}
+.startb{display:flex;align-items:center;justify-content:center;gap:10px;border-radius:18px;background:linear-gradient(180deg,#f05252,#dc3b3b);box-shadow:0 8px 24px rgba(239,68,68,.25)}
+.startb span{font-weight:600}
+.rdy .segc button.on{background:rgba(239,68,68,.25);color:#fca5a5}
+.wkttl{display:flex;justify-content:space-between;align-items:baseline;margin:22px 4px 10px}
+.wkttl h3{margin:0;font-size:24px;letter-spacing:-.4px}.wkttl span{color:var(--mute);font-size:14px}
+.wbar{height:6px;border-radius:99px;background:#20262d;margin:0 4px 6px;overflow:hidden}.wbar i{display:block;height:100%;border-radius:99px;background:var(--acc)}
+.wl2{margin:0 0 4px}
+.wr2{display:flex;align-items:center;gap:14px;width:100%;background:none;border:0;border-bottom:1px solid #1f252c;color:var(--text);font:inherit;text-align:left;padding:14px 12px;border-radius:0}
+.wr2.sel{background:rgba(239,68,68,.16);border-radius:16px;border-bottom-color:transparent}
+.wr2 .d{width:40px;flex:none;color:var(--mute);font-size:15px}.wr2 .d.now{color:#fca5a5;font-weight:700}
+.wr2 .n{flex:1;min-width:0}.wr2 .n b{display:block;font-size:17px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wr2 .n small{display:block;color:var(--mute);font-size:12px}
+.ws{flex:none;width:26px;height:26px;border-radius:50%;border:2px solid #3a434e;display:flex;align-items:center;justify-content:center;font-style:normal;font-size:14px;font-weight:800}
+.ws.ok{background:#1f5131;border-color:#2f7a4a;color:#86efac}
+.ws.go{border:0;color:var(--text);font-size:22px;font-weight:400}
+.ws.rec{border:0;font-size:16px}
+.addact{display:block;margin:6px auto 0;text-decoration:none;font-size:14px}
 .subhd{display:flex;align-items:center;gap:10px;margin:4px 0 6px}.subhd b{font-size:18px}
 .pcardb{display:flex;width:100%;align-items:center;justify-content:space-between;gap:10px;text-align:left;color:var(--text);font:inherit;margin:6px 0}
 .pcardb small,.lrow small{display:block;color:var(--mute);font-size:13px;margin-top:2px}.pcardb small.nxt{color:var(--acc2)}
@@ -461,20 +495,20 @@ details[open]>summary .chev{transform:rotate(90deg)}
 </head>
 <body>
 <div id="shell"><div id="upd" class="upd" hidden><span>A new version is ready</span><button id="updBtn">Update</button></div><div id="scroll">
-<header><div class="hrow"><h1 id="ttl">Today</h1><button id="addBtn" class="addbtn" aria-label="Add a workout">+</button></div><span id="sub"></span></header>
+<header><div class="hrow"><h1 id="ttl">Today</h1><button id="progPill" class="progpill" aria-label="Program" hidden><svg viewBox="0 0 24 24"><path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="m3 13 9 5 9-5"/></svg><span></span><i>›</i></button><button id="addBtn" class="addbtn" aria-label="Add a workout">+</button></div><span id="sub"></span></header>
 <main id="app"></main>
 </div>
 <nav>
-  <button data-tab="today"><svg viewBox="0 0 24 24"><path d="M6.5 6.5v11M17.5 6.5v11M3.5 9v6M20.5 9v6M6.5 12h11"/></svg>Today</button>
+  <button data-tab="today"><svg viewBox="0 0 24 24"><path d="M3.5 11 12 4l8.5 7"/><path d="M5.5 9.5V20h4.5v-5.5h4V20h4.5V9.5"/></svg>Today</button>
   <button data-tab="history"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>History</button>
-  <button data-tab="progress"><svg viewBox="0 0 24 24"><path d="M4 4v16h16M8 15l4-4 3 3 5-6"/></svg>Progress</button>
-  <button data-tab="plan"><svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></svg>Plan</button>
+  <button data-tab="progress"><svg viewBox="0 0 24 24"><path d="M5 20V13M10 20V7M15 20v-9M20 20V4"/><path d="M3 20h18"/></svg>Progress</button>
+  <button data-tab="plan"><svg viewBox="0 0 24 24"><path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="m3 12.5 9 5 9-5"/><path d="m3 17 9 5 9-5"/></svg>Plan</button>
 </nav>
 </div>
 <div class="toast" id="toast"></div>
 <div class="undo" id="undo" hidden><span></span><button id="undoBtn">Undo</button></div>
 
-<script src="plan.js?v=2026-11-06.6"></script>
+<script src="plan.js?v=2026-11-12.1"></script>
 <script src="progression.js?v=2026-11-06.1"></script>
 <script src="programs.js?v=2026-11-06.10"></script>
 <script>
@@ -503,7 +537,7 @@ const EFFORT = {easy:'Easy', medium:'Medium', hard:'Hard'};
 const effortSeg = (act,cur) => `<div class="segc">${Object.entries(EFFORT).map(([v,l])=>`<button class="${v===cur?'on':''}" data-act="${act}" data-v="${v}">${l}</button>`).join('')}</div>`;
 const kindOf = x => x.yoga ? 'yoga' : x.other ? 'other' : x.run ? 'run' : 'lift';
 const CHEERS = ['Nice one','Solid set','Strong','Locked in','Clean rep','Beast mode','Smooth'];
-const APP_VERSION='2026-11-10.1';
+const APP_VERSION='2026-11-12.1';
 
 
 /* ---------- helpers ---------- */
@@ -1165,7 +1199,10 @@ function render(){
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===st.tab));
   const TT={today:'Today',history:'History',progress:'Progress',plan:'Plan'};
   $('#ttl').textContent = TT[st.tab];
-  $('#addBtn').style.display = st.tab==='plan' ? 'none' : '';
+  // Today: the program pill (the + lives in the week list there); History and Progress keep the + button.
+  $('#addBtn').style.display = st.tab==='history'||st.tab==='progress' ? '' : 'none';
+  const pp=$('#progPill'); pp.hidden = st.tab!=='today';
+  if(st.tab==='today') pp.querySelector('span').textContent = Programs.TEMPLATES[Programs.programStatus(st.prog, todayStr()).current.template].name;
   const uns = st.local.length ? st.local.length+' unsynced' : '';
   $('#sub').textContent = st.tab==='today' ? [new Date(st.date+'T12:00:00').toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'}),uns].filter(Boolean).join(' · ') : uns;
   const v = {today:viewToday, history:viewHistory, progress:viewProgress, plan:viewPlan}[st.tab];
@@ -1231,20 +1268,22 @@ function viewToday(){
 function weekList(wp){
   const sc=wp.sched, t=todayStr(), cur=sc.weekStart===monOf(t);
   const logged = st.sess && allSessions().find(s=>s.id===sid());
-  const next = wp.left.find(x=>x.status!=='missed') || wp.left[0];
   const day = d => Programs.DOW_NAME[Programs.dow(d)];
-  const doneRow = (s,on) => `<button class="wrow done ${on?'sel':''}" data-act="opensess" data-d="${s.date}" data-s="${esc(s.session)}"><i class="wck">✓</i><span><b>${esc(s.name)}</b><small>Done ${day(s.date)}</small></span></button>`;
+  const ICON = {done:'<i class="ws ok">✓</i>', open:'<i class="ws"></i>', sel:'<i class="ws go">›</i>', rec:'<i class="ws rec">🌿</i>'};
+  const row = (attrs, d, name, sub, icon, on) => `<button class="wr2 ${on?'sel':''}" ${attrs}><span class="d ${d===t?'now':''}">${day(d)}</span><span class="n"><b>${name}</b>${sub?`<small>${sub}</small>`:''}</span>${icon}</button>`;
+  const doneRow = (s,on,nm) => row(`data-act="opensess" data-d="${s.date}" data-s="${esc(s.session)}"`, s.date, esc(nm||s.name), '', ICON.done, on);
   const rows = sc.occs.filter(x=>x.status!=='skipped').map(x=>{
-    if(x.done) return doneRow(x.done, logged&&logged.id===x.done.id);
-    const n = x.type==='run' ? 0 : Programs.exList(sc.workouts[x.key], x.ex).length;
-    const sub = x.type==='run' ? (x.optional?'If you feel like it':'Distance and time') : `${n} exercises · about ${n*7} min`;
-    const tag = x.status==='skipped' ? '<em class="soft">Skipped</em>' : x.status==='recovery' ? '<em class="soft">Recovery day</em>'
-      : x.status==='missed' ? '<em class="soft">Missed</em>' : x.reduced ? '<em>Reduced</em>' : x.optional ? '<em class="soft">Optional</em>' : x===next&&cur ? '<em>Up next</em>' : '';
-    return `<button class="wrow ${!logged&&st.occ===x.occ?'sel':''}" data-act="pick" data-k="${esc(x.key)}" data-o="${esc(x.occ)}"><i class="wck"></i><span><b>${esc(x.name)}</b><small>${day(x.date)} · ${sub}</small></span>${tag}</button>`;
+    if(x.done) return doneRow(x.done, logged&&logged.id===x.done.id, x.name);
+    const on = !logged && st.occ===x.occ;
+    const sub = x.status==='recovery' ? 'Recovery day' : x.status==='missed' ? 'Missed' : x.reduced ? 'Reduced' : x.optional ? 'Optional' : '';
+    return row(`data-act="pick" data-k="${esc(x.key)}" data-o="${esc(x.occ)}"`, x.date, esc(x.name), sub, on ? ICON.sel : x.status==='recovery' ? ICON.rec : ICON.open, on);
   }).join('');
   const extras = sc.extras.map(s=>doneRow(s, logged&&logged.id===s.id)).join('');
-  return `<div class="schhd"><b>${cur?'This week':'That week'}</b><span>${wp.doneN} of ${wp.goal} done${wp.rest?` · ${wp.rest} recovery`:''}</span></div>
-    <div class="card wlist">${rows||'<div class="note" style="padding:10px">Nothing scheduled this week.</div>'}${extras?`<div class="wsub">Also this week</div>${extras}`:''}</div>`;
+  const pct = wp.goal ? Math.min(100, Math.round(wp.doneN/wp.goal*100)) : 0;
+  return `<div class="wkttl"><h3>${cur?'This week':'That week'}</h3><span>${wp.doneN} of ${wp.goal} done${wp.rest?` · ${wp.rest} recovery`:''}</span></div>
+    <div class="wbar"><i style="width:${pct}%"></i></div>
+    <div class="wl2">${rows||'<div class="note" style="padding:10px">Nothing scheduled this week.</div>'}${extras?`<div class="wsub">Also this week</div>${extras}`:''}</div>
+    <button class="link addact" data-act="addact">+ Log something else</button>`;
 }
 /* Optional readiness check before a scheduled lift (programs.js readiness): never changes weights. */
 function readyCard(x){
@@ -1326,14 +1365,19 @@ function todayHero(wp){
   const onWatch = S.type==='lift' && st.live[sid()]?.source==='watch' && st.date===t;
   const what = S.type==='run'?'Distance and time':S.type==='yoga'?'Class length':S.type==='other'?'Timed workout':steps.length+' exercises';
   const more = oc && !resume && !onWatch && !oc.done ? `<button class="hmore" data-act="occmenu" data-o="${esc(oc.occ)}" data-d="${oc.date}" aria-label="Skip, move or recovery day">⋯</button>` : '';
-  return h + `<div class="hero">${more}<h2>${esc(oc&&st.sess!=='other'?oc.name:sessLabel())}</h2>
+  const tag = S.type==='run' ? 'Run' : S.type==='lift' ? 'Lift' : S.type==='yoga' ? 'Yoga' : 'Workout';
+  const art = S.type==='run' ? HERO_RUN : S.type==='lift' ? HERO_LIFT : '';
+  return h + `<div class="hero">${art}${more}<span class="htag">${tag}</span><h2>${esc(oc&&st.sess!=='other'?oc.name:sessLabel())}</h2>
     <div class="meta">${what} · about ${mins} min${oc&&oc.date!==st.date?` · planned for ${Programs.DOW_NAME[Programs.dow(oc.date)]}`:''}</div>
-    ${S.type==='lift'?`<div class="chips">${steps.map(e=>`<span class="${done(e)?'ok':''}">${esc(e.name.split(/[\/(]/)[0].trim())}</span>`).join('')}</div>`:S.note?`<div class="note" style="margin-bottom:16px">${esc(S.note)}</div>`:''}
+    ${S.type==='lift'?`<div class="chips">${steps.map(e=>`<span class="${done(e)?'ok':''}">${esc(e.name.split(/[\/(]/)[0].trim())}</span>`).join('')}</div>`:S.note&&S.type!=='run'?`<div class="note" style="margin-bottom:16px">${esc(S.note)}</div>`:''}
     ${onWatch?`<div class="note" style="text-align:center;margin-bottom:10px">⌚ In progress on your Watch. Resume here to keep going on your phone.</div>`:''}
     ${!resume && !onWatch ? readyCard(oc) : ''}
     ${st.date>t ? `<div class="note" style="text-align:center">Coming up. You can log it on the day.</div>`
-      : `<button class="btn big ${isManual()?'':'pulse'}" data-act="start" data-resume="${resume?1:0}">${onWatch?'Resume workout':resume?(isManual()?'Continue adding':'Resume workout'):(isManual()?'Add workout manually':S.type==='run'?'Start run':'Start workout')}</button>`}</div>`;
+      : `<button class="btn big startb" data-act="start" data-resume="${resume?1:0}">${onWatch?'Resume workout':resume?(isManual()?'Continue adding':'Resume workout'):(isManual()?'Add workout manually':S.type==='run'?'Start run':'Start workout')} <span aria-hidden="true">→</span></button>`}</div>`;
 }
+/* Decorative art for the Today card (a route for runs, a dumbbell for lifts). */
+const HERO_RUN = `<svg class="hart" viewBox="0 0 120 90" aria-hidden="true"><path d="M8 84c4-22 18-32 36-36s30-8 38-24" fill="none" stroke="#ef4444" stroke-width="3.5" stroke-linecap="round"/><path d="M60 80c10-6 22-6 30-14s10-20 22-26" fill="none" stroke="#ef4444" stroke-opacity=".45" stroke-width="2.5" stroke-dasharray="6 7" stroke-linecap="round"/><path d="M84 6a10 10 0 0 0-10 10c0 8 10 18 10 18s10-10 10-18A10 10 0 0 0 84 6Z" fill="#ef4444"/><circle cx="84" cy="16" r="3.6" fill="#2a1416"/></svg>`;
+const HERO_LIFT = `<svg class="hart" viewBox="0 0 120 90" aria-hidden="true"><g fill="none" stroke="#ef4444" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><rect x="16" y="28" width="12" height="34" rx="3"/><rect x="92" y="28" width="12" height="34" rx="3"/><rect x="6" y="36" width="10" height="18" rx="2.5" stroke-opacity=".6"/><rect x="104" y="36" width="10" height="18" rx="2.5" stroke-opacity=".6"/><path d="M28 45h64"/></g></svg>`;
 /* After a Watch workout: the next time the web app opens, ask how it went and for a note (once per workout). */
 function checkNotePrompt(){
   if(st.note||st.wk) return;
@@ -1402,7 +1446,7 @@ function weekStrip(){
     return `<button data-act="day" data-d="${ds}" class="${logged.has(ds)?'done':''} ${ds===st.date?'sel':''} ${ds===t?'today':''}" aria-label="${ds}"><small>${L}</small><b>${n}</b><i></i></button>`;
   }).join('');
   const m1=new Date(mon+'T12:00:00').toLocaleDateString(undefined,{month:'short',day:'numeric'}), m2=new Date(addDays(mon,6)+'T12:00:00').toLocaleDateString(undefined,{month:'short',day:'numeric'});
-  return `<div class="card week"><div class="wkhd"><button data-act="wk" data-n="-7" aria-label="Previous week">‹</button><b>${m1} – ${m2}</b><button data-act="wk" data-n="7" aria-label="Next week">›</button></div><div class="days">${cells}</div></div>`;
+  return `<div class="wstrip" title="${m1} – ${m2}"><button class="wnav" data-act="wk" data-n="-7" aria-label="Previous week">‹</button><div class="days">${cells}</div><button class="wnav" data-act="wk" data-n="7" aria-label="Next week">›</button></div>`;
 }
 
 function viewWorkout(){
@@ -2317,6 +2361,7 @@ function clearOcc(occ, keys){
 }
 /* ---------- events ---------- */
 document.getElementById('addBtn').addEventListener('click',openAdd);
+document.getElementById('progPill').addEventListener('click',()=>{ st.tab='plan'; st.pview='program'; st.daysh=null; render(); toTop() });
 document.querySelector('nav').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;st.tab=b.dataset.tab;if(st.tab==='plan'){st.pview='main';st.daysh=null;st.prefsh=null}render();toTop()});
 const app=$('#app');
 app.addEventListener('change',e=>{
@@ -2511,6 +2556,7 @@ app.addEventListener('click',e=>{
   }
   else if(act==='drec'){ const o=b.dataset.o; setOcc(o,Programs.recoveryPatch(sched(st.daysh.date),o,st.changes),'manual',st.daysh.date); if(st.daysh.compact) st.daysh=null; st.auto=true; render(); toast('Recovery day saved 🌿') }
   else if(act==='dskip'){ const o=b.dataset.o; setOcc(o,Programs.skipPatch(sched(st.daysh.date),o),'manual',st.daysh.date); if(st.daysh.compact) st.daysh=null; st.auto=true; render(); toast("Skipped. Your training volume isn't affected") }
+  else if(act==='addact'){ openAdd() }
   else if(act==='occmenu'){ st.daysh={date:b.dataset.d, occ:b.dataset.o, compact:true}; render() }
   else if(act==='dset'){ setOcc(b.dataset.o,{[b.dataset.k]:true},'manual',st.daysh.date); st.auto=true; render(); toast(b.dataset.k==='reduced'?'Reduced: fewer sets, same targets':"Skipped. It won't count against your progress") }
   else if(act==='drestore'){ dropChanges([b.dataset.o]); st.auto=true; render(); toast('Back to the plan') }

@@ -9,7 +9,7 @@ const PLAN = {
   week: {1:'upperA',2:'run',3:'lowerA',4:'upperB',5:'lowerB',6:'run',0:'rest'},
   sessions: {
     upperA:{name:'Upper A · heavy',type:'lift',ex:[
-      {id:'bench',eq:'barbell',prog:{s:'pyramid',pattern:[10,8,6,5],gap:5},name:'Bench press',sets:4,reps:[5,8],rest:'2 min',note:'Main lift'},
+      {id:'bench',eq:'dumbbell',prog:{s:'pyramid',pattern:[10,8,6,5],gap:5},name:'Dumbbell bench press',sets:4,reps:[5,8],rest:'2 min',note:'Main lift'},
       {id:'row',eq:'machine',name:'Chest-supported row',sets:4,reps:[6,10],rest:'90 sec'},
       {id:'ohp-db',eq:'dumbbell',name:'Seated dumbbell shoulder press',sets:3,reps:[8,10],rest:'75 sec'},
       {id:'pulldown',eq:'cable',name:'Lat pulldown',sets:3,reps:[8,12],rest:'75 sec'},
@@ -48,7 +48,7 @@ const PLAN = {
 const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
 const altId = (slot,name) => slot+'~'+slug(name);
 const ALTS = {
-  bench:['Dumbbell bench press','Machine chest press','Smith machine bench'],
+  bench:['Barbell bench press','Machine chest press','Smith machine bench'],
   row:['Barbell row','Seated cable row','T-bar row','One-arm dumbbell row'],
   'ohp-db':['Machine shoulder press','Arnold press','Barbell overhead press'],
   pulldown:['Pull-ups','Assisted pull-ups','Close-grip pulldown'],

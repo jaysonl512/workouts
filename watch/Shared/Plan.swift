@@ -6,8 +6,8 @@ enum Plan {
 
     static let sessions: [String: PlanSession] = [
         "upperA": PlanSession(key: "upperA", name: "Upper A · heavy", type: .lift, note: nil, exercises: [
-            PlanExercise(id: "bench", name: "Bench press", sets: 4, reps: 5...8, rest: "2 min", restSeconds: 120, note: "Main lift", small: false, superset: nil, alts: [
-                PlanAlt(id: "bench~dumbbell-bench-press", name: "Dumbbell bench press"),
+            PlanExercise(id: "bench", name: "Dumbbell bench press", sets: 4, reps: 5...8, rest: "2 min", restSeconds: 120, note: "Main lift", small: false, superset: nil, alts: [
+                PlanAlt(id: "bench~barbell-bench-press", name: "Barbell bench press"),
                 PlanAlt(id: "bench~machine-chest-press", name: "Machine chest press"),
                 PlanAlt(id: "bench~smith-machine-bench", name: "Smith machine bench")
             ]),
