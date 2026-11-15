@@ -14,6 +14,13 @@ enum AppGroup {
         set { defaults.set(try? JSONEncoder().encode(newValue), forKey: "week") }
     }
 
+    /// The program's scheduled workouts (two weeks, from the "plans" Edge Function), so the complication counts the
+    /// same week as the app's "This week". Nil until the app has fetched a plan.
+    static var occs: [ServedOcc]? {
+        get { (defaults.data(forKey: "occs")).flatMap { try? JSONDecoder().decode([ServedOcc].self, from: $0) } }
+        set { defaults.set(try? JSONEncoder().encode(newValue), forKey: "occs") }
+    }
+
     /// Where the gym is, set from the app ("Set gym to here"). Used as a Smart Stack hint.
     static var gym: CLLocationCoordinate2D? {
         get {

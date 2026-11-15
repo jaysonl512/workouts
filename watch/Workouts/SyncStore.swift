@@ -209,7 +209,14 @@ final class PlanCache: ObservableObject {
     private let url = SyncStore.dir.appendingPathComponent("plans.json")
 
     init() {
-        if let d = try? Data(contentsOf: url), let p = try? JSONDecoder().decode(PlansResponse.self, from: d) { plans = p; Plan.served = p.workouts }
+        if let d = try? Data(contentsOf: url), let p = try? JSONDecoder().decode(PlansResponse.self, from: d) { plans = p; Plan.served = p.workouts; publishOccs(p.occs) }
+    }
+
+    /// Hands the scheduled workouts to the watch-face complication when they change.
+    private func publishOccs(_ occs: [ServedOcc]?) {
+        guard AppGroup.occs != occs else { return }
+        AppGroup.occs = occs
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
     func refresh() async {
@@ -219,6 +226,7 @@ final class PlanCache: ObservableObject {
         guard let p = try? await Supabase.shared.plans(today: Day.string()) else { return }
         plans = p
         Plan.served = p.workouts
+        publishOccs(p.occs)
         if let d = try? JSONEncoder().encode(p) { try? d.write(to: url, options: .atomic) }
     }
 

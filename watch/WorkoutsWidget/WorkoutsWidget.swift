@@ -22,13 +22,14 @@ struct WorkoutsWidget: Widget {
 struct Entry: TimelineEntry {
     let date: Date
     let done: Int
-    /// Next planned workout today, or nil on a rest day / when the week is done.
+    /// The week's goal: the program's scheduled workouts minus optional runs, recovery days and skips (5 on the built-in plan).
+    let goal: Int
+    /// Name of the next workout to do, or nil on a rest day / when the week is done.
     let next: String?
-    let restDay: Bool
 }
 
 struct Provider: AppIntentTimelineProvider {
-    func placeholder(in context: Context) -> Entry { Entry(date: Date(), done: 2, next: "lowerA", restDay: false) }
+    func placeholder(in context: Context) -> Entry { Entry(date: Date(), done: 2, goal: 4, next: "Push A") }
 
     func snapshot(for configuration: WorkoutsWidgetIntent, in context: Context) async -> Entry { entry(at: Date()) }
 
@@ -47,21 +48,25 @@ struct Provider: AppIntentTimelineProvider {
         [AppIntentRecommendation(intent: WorkoutsWidgetIntent(), description: "Session")]
     }
 
+    /// Same count as the app's "This week": the program's schedule when one is cached for that week, else the built-in plan.
     private func entry(at date: Date) -> Entry {
+        if let sch = Schedule(occs: AppGroup.occs, rows: AppGroup.week, now: date) {
+            return Entry(date: date, done: sch.doneCount, goal: sch.goal, next: sch.next.map { Self.short($0.occ.name) })
+        }
         let week = WeekPlan(rows: AppGroup.week, now: date)
-        return Entry(date: date, done: week.doneCount, next: week.next, restDay: Plan.todayKey(date) == "rest")
+        return Entry(date: date, done: week.doneCount, goal: 5, next: week.next.map { Self.short(Plan.name($0)) })
     }
+
+    private static func short(_ name: String) -> String { name.components(separatedBy: " · ").first ?? name }
 }
 
 struct WidgetView: View {
     let entry: Entry
     @Environment(\.widgetFamily) private var family
 
-    private var progress: Double { min(1, Double(entry.done) / 5) }
-    private var nextName: String {
-        guard let k = entry.next else { return entry.done >= 5 ? "Week done" : "Rest day" }
-        return Plan.name(k).components(separatedBy: " · ").first ?? Plan.name(k)
-    }
+    private var progress: Double { entry.goal > 0 ? min(1, Double(entry.done) / Double(entry.goal)) : 0 }
+    private var count: String { "\(entry.done)/\(entry.goal)" }
+    private var nextName: String { entry.next ?? (entry.goal > 0 && entry.done >= entry.goal ? "Week done" : "Rest day") }
 
     var body: some View {
         switch family {
@@ -69,7 +74,7 @@ struct WidgetView: View {
             Gauge(value: progress) {
                 Image(systemName: "dumbbell.fill")
             } currentValueLabel: {
-                Text("\(entry.done)/5")
+                Text(count)
             }
             .gaugeStyle(.accessoryCircularCapacity)
             .widgetAccentable()
@@ -78,18 +83,18 @@ struct WidgetView: View {
                 .font(.title3)
                 .widgetAccentable()
                 .widgetLabel {
-                    Gauge(value: progress) { Text("\(entry.done)/5") }
+                    Gauge(value: progress) { Text(count) }
                 }
         case .accessoryInline:
-            Label(entry.next == nil ? "\(entry.done)/5 · \(nextName)" : "\(nextName) · \(entry.done)/5", systemImage: "dumbbell.fill")
+            Label(entry.next == nil ? "\(count) · \(nextName)" : "\(nextName) · \(count)", systemImage: "dumbbell.fill")
         default:
             VStack(alignment: .leading, spacing: 1) {
                 Label(entry.next == nil ? "This week" : "Up next", systemImage: "dumbbell.fill")
                     .font(.system(size: 13, weight: .semibold)).foregroundStyle(Color.brand).widgetAccentable()
-                Text(entry.next.map(Plan.name) ?? nextName).font(.system(size: 16, weight: .semibold)).lineLimit(1)
+                Text(nextName).font(.system(size: 16, weight: .semibold)).lineLimit(1)
                 HStack(spacing: 6) {
                     Gauge(value: progress) { EmptyView() }.gaugeStyle(.accessoryLinearCapacity).widgetAccentable()
-                    Text("\(entry.done) of 5").font(.system(size: 13)).monospacedDigit()
+                    Text("\(entry.done) of \(entry.goal)").font(.system(size: 13)).monospacedDigit()
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
