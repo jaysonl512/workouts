@@ -2,6 +2,7 @@ import CoreLocation
 import CoreMotion
 import Foundation
 import HealthKit
+import WatchKit
 
 /// HKWorkoutSession + HKLiveWorkoutBuilder for lifts (strength, indoor) and runs (outdoor, GPS route).
 @MainActor
@@ -112,6 +113,7 @@ final class WorkoutManager: NSObject, ObservableObject {
         attach(s, b, type: s.workoutConfiguration.activityType)
         startDate = b.startDate ?? s.startDate
         paused = s.state == .paused
+        remindWhilePaused()
         indoor = s.workoutConfiguration.locationType != .outdoor
         if activity == .running && !indoor {
             routeBuilder = HKWorkoutRouteBuilder(healthStore: store, device: nil)
@@ -135,6 +137,23 @@ final class WorkoutManager: NSObject, ObservableObject {
 
     func pause() { session?.pause() }
     func resume() { session?.resume() }
+
+    private var pauseReminder: Task<Void, Never>?
+    /// A paused workout taps your wrist after 2 minutes, then every 5, so a pause you did not mean is noticed
+    /// before it eats the session. Stops on resume or end.
+    private func remindWhilePaused() {
+        pauseReminder?.cancel()
+        guard paused, active else { return }
+        pauseReminder = Task {
+            var wait: Double = 120
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(wait))
+                if Task.isCancelled || !paused || !active { return }
+                WKInterfaceDevice.current().play(.retry)
+                wait = 300
+            }
+        }
+    }
 
     /// Ends the session and saves the workout (and route, for runs) to Health.
     func end() async -> Result {
@@ -238,7 +257,10 @@ final class WorkoutManager: NSObject, ObservableObject {
 
 extension WorkoutManager: HKWorkoutSessionDelegate {
     nonisolated func workoutSession(_ workoutSession: HKWorkoutSession, didChangeTo toState: HKWorkoutSessionState, from fromState: HKWorkoutSessionState, date: Date) {
-        Task { @MainActor in self.paused = toState == .paused }
+        Task { @MainActor in
+            self.paused = toState == .paused
+            self.remindWhilePaused()
+        }
     }
 
     nonisolated func workoutSession(_ workoutSession: HKWorkoutSession, didFailWithError error: Error) {

@@ -2,7 +2,7 @@
    the Watch its targets, and watch/tools/gen-plan.mjs (which generates watch/Shared/Plan.swift).
    Each exercise: id, name, sets, reps [low, high], rest, eq (equipment: barbell | dumbbell | machine | cable |
    assisted | bodyweight), and optionally prog (its default set structure, see progression.js), small (2.5 lb steps
-   on machines and cables), superset, timed (reps are seconds). Weights are per dumbbell and per arm.
+   on machines and cables), superset, timed (reps are seconds), noW (reps only, no weight: hanging raises). Weights are per dumbbell and per arm.
    Alternatives get their equipment from their name and use straight sets unless changed in settings. */
 /* ---------- Plan (mirrors the training plan doc) ---------- */
 const PLAN = {
@@ -36,7 +36,7 @@ const PLAN = {
       {id:'hip-thrust',eq:'barbell',name:'Hip thrust',sets:3,reps:[8,12],rest:'75 sec'},
       {id:'leg-ext',eq:'machine',name:'Leg extension',sets:3,reps:[12,15],rest:'1 min',small:1},
       {id:'calf-seat',eq:'machine',name:'Seated calf raise',sets:3,reps:[12,15],rest:'1 min',small:1},
-      {id:'knee-raise',eq:'bodyweight',name:'Hanging knee raise',sets:3,reps:[10,15],rest:'1 min'},
+      {id:'knee-raise',eq:'bodyweight',noW:1,name:'Hanging knee raise',sets:3,reps:[10,15],rest:'1 min'},
       {id:'plank',eq:'bodyweight',timed:1,name:'Plank (seconds in the reps box)',sets:3,reps:[45,60],rest:'50 sec'}]},
     run:{name:'Run',type:'run',note:'Weeks 1-2: 20-25 min easy. Weeks 3-4: 30 min. Weeks 5-8: build to 40-45 min, add a weekly interval session (6 x 2 min hard / 2 min easy).'},
     yoga:{name:'Hot yoga',type:'yoga',note:'Log the class length. How it felt goes on the next screen.'},
@@ -72,7 +72,7 @@ const ALTS = {
   'hip-thrust':['Glute bridge','Cable pull-through','Back extension'],
   'leg-ext':['Sissy squat','Single-leg extension'],
   'calf-seat':['Standing calf raise','Leg press calf raise'],
-  'knee-raise':['Cable crunch','Ab wheel','Decline sit-up'],
+  'knee-raise':['Hanging leg raise','Cable crunch','Ab wheel','Decline sit-up'],
   plank:['Side plank','Dead bug','Hollow hold']
 };
 /* Exercises that only appear in program templates (programs.js), not in the original four workouts. */
@@ -96,7 +96,7 @@ const MUSCLES = {
 const EXMAP = {};
 [...Object.values(PLAN.sessions), {ex:EXTRA}].forEach(S=>(S.ex||[]).forEach(e=>{
   EXMAP[e.id]={...e,slot:e.id};
-  (ALTS[e.id]||[]).forEach(n=>{ const id=altId(e.id,n); EXMAP[id]={...e,id,name:n,slot:e.id,note:undefined,alt:true,eq:undefined,prog:undefined,timed:e.timed&&/plank|hold/i.test(n)?1:undefined} });
+  (ALTS[e.id]||[]).forEach(n=>{ const id=altId(e.id,n); EXMAP[id]={...e,id,name:n,slot:e.id,note:undefined,alt:true,eq:undefined,prog:undefined,timed:e.timed&&/plank|hold/i.test(n)?1:undefined,noW:e.noW&&/hanging|leg raise|ab wheel/i.test(n)?1:undefined} });
 }));
 
 if(typeof module!=='undefined' && module.exports) module.exports={PLAN,ALTS,slug,altId,EXMAP,MUSCLES,EXTRA};

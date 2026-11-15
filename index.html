@@ -535,9 +535,9 @@ details[open]>summary .chev{transform:rotate(90deg)}
 <div class="toast" id="toast"></div>
 <div class="undo" id="undo" hidden><span></span><button id="undoBtn">Undo</button></div>
 
-<script src="plan.js?v=2026-11-12.1"></script>
-<script src="progression.js?v=2026-11-06.1"></script>
-<script src="programs.js?v=2026-11-06.10"></script>
+<script src="plan.js?v=2026-11-15.1"></script>
+<script src="progression.js?v=2026-11-15.1"></script>
+<script src="programs.js?v=2026-11-15.1"></script>
 <script>
 const SESS_KEYS = ['upperA','run','lowerA','upperB','lowerB','run2','yoga','rest'];
 const sessBase = k => Programs.baseKey(k);
@@ -564,7 +564,7 @@ const EFFORT = {easy:'Easy', medium:'Medium', hard:'Hard'};
 const effortSeg = (act,cur) => `<div class="segc">${Object.entries(EFFORT).map(([v,l])=>`<button class="${v===cur?'on':''}" data-act="${act}" data-v="${v}">${l}</button>`).join('')}</div>`;
 const kindOf = x => x.yoga ? 'yoga' : x.other ? 'other' : x.run ? 'run' : 'lift';
 const CHEERS = ['Nice one','Solid set','Strong','Locked in','Clean rep','Beast mode','Smooth'];
-const APP_VERSION='2026-11-12.2';
+const APP_VERSION='2026-11-15.1';
 
 
 /* ---------- helpers ---------- */
@@ -595,6 +595,8 @@ const workSets = a => (a||[]).filter(x=>x && !x.wu);
 const wUnit = e => { const n=exName(e), c=cfgOf(e.id); return isAssist(n) ? 'lb assist' : c&&c.eq==='dumbbell'&&c.vf===2 ? 'lb each' : isPerArm(n) ? 'lb per arm' : 'lb' };
 /* "−60×12" for 60 lb of assistance, "BW×12" for unassisted pull-ups. */
 const isTimedEx = en => !!(en && ((EXMAP[en.id]||{}).timed || en.timed));
+/* Reps only, no weight (hanging knee / leg raise): like timed holds, the weight box is hidden and 0 is logged. */
+const isNoW = en => !!(en && ((EXMAP[en.id]||{}).noW || en.noW));
 const fmtSet = (s,en) => isTimedEx(en) ? s.r+' s' : en&&isAssist(exName(en)) ? (s.w ? '−'+s.w+'×' : 'BW×')+s.r : (s.w ? s.w+'×' : '') + s.r;
 /* Body weight on a date from Apple Health (lb), else the one typed in Settings. */
 function bwOn(date){
@@ -670,7 +672,7 @@ let schedMemo = {};
 const bumpProg = () => { st.pv++; schedMemo={} };
 /* Everything one week shows (programs.js weekSchedule), cached until data changes. */
 function sched(date){
-  const all=allSessions(), d=date||st.date, ws=Programs.weekStartOf(d, Programs.configOn(st.prog,d).weekStart);
+  const all=allSessions(), d=date||st.date, ws=Programs.weekOf(st.prog, d).ws;
   const key=[st.pv, all.length, all.reduce((m,x)=>Math.max(m,verOf(x)),0), ws, todayStr()].join('|');
   if(!schedMemo[key]){
     if(Object.keys(schedMemo).length>24) schedMemo={};
@@ -809,14 +811,17 @@ const hasDraftData = d => d.run.dist!==''||d.run.min!==''||Object.values(d.ex).s
 
 /* ---------- smart targets, deload, weekly stats ---------- */
 const roundTo = (v,q) => Math.round(v/q)*q;
-const monOf = ds => Programs.weekStartOf(ds, Programs.configOn(st.prog, ds).weekStart);   // start of the week (Monday unless changed)
+const monOf = ds => Programs.weekOf(st.prog, ds).ws;   // start of the week (Monday unless changed; see Programs.weekOf)
+const weekEndOf = ds => Programs.weekOf(st.prog, ds).we;
 /* Plans come from progression.js, the same rules the Watch gets from the Edge Function. An exercise's plan is made
    once, when the workout first needs it, and kept in the draft: planned targets never shift during a workout. */
 function planOf(e){
   const d=getDraft(); d.plans ||= {};
   if(!d.plans[e.id]){
     const c=cfgOf(e.id); if(!c) return null;
-    d.plans[e.id]=Progression.planFor(c, Progression.historyFor(allSessions(), e.id, {excludeId:sid(), today:st.date}), st.date, {deload:!!d.deload});
+    // Its place in the whole workout (the same as the Watch's plans): later than last time starts a step lighter.
+    const S=sessDef(st.sess), slot=(EXMAP[e.id]||{}).slot||e.id, i=(S.ex||[]).findIndex(x=>x.id===slot);
+    d.plans[e.id]=Progression.planFor(c, Progression.historyFor(allSessions(), e.id, {excludeId:sid(), today:st.date}), st.date, {deload:!!d.deload, pos:i<0?null:i});
     SS('wt.draft.v1', st.draft);
   }
   return d.plans[e.id];
@@ -848,7 +853,7 @@ function deloadInfo(){
   return {streak, recommended: streak>=5 && !(co&&co.normal)};
 }
 function weekStats(mon){
-  const end=addDays(mon,6); const o={sessions:0,lifts:0,runs:0,volume:0,km:0,min:0,extra:[],extraMin:0};
+  const end=weekEndOf(mon); const o={sessions:0,lifts:0,runs:0,volume:0,km:0,min:0,extra:[],extraMin:0};
   allSessions().forEach(s=>{
     if(s.date<mon||s.date>end) return;
     if(s.yoga||s.other){o.extra.push(s.name);o.extraMin+=(s.yoga||s.other).minutes||0;return}
@@ -1066,7 +1071,7 @@ function ssPartner(i){
 function moveStep(i){ const wk=st.wk; wk.dir=i>wk.step?1:-1; wk.step=i; wk.anim=true; wk.editing=null; wk.editT=null; wk.just=null; initCur(); render(); toTop() }
 function logSet(){
   const wk=st.wk, e=stepsFor()[wk.step], d=getDraft(), a=(d.ex[e.id] ||= []);
-  const w=isTimedEx(e) ? 0 : num(wk.cur.w)||0, r=num(wk.cur.r);   // timed holds log seconds only
+  const w=isTimedEx(e)||isNoW(e) ? 0 : num(wk.cur.w)||0, r=num(wk.cur.r);   // timed holds log seconds only, hanging raises reps only
   const btn=$('#logBtn');
   if(!r||r<=0){ btn.classList.remove('shake'); void btn.offsetWidth; btn.classList.add('shake'); return }
   if(wk.editT!=null){   // editing a future set's target: the original target stays in the plan too
@@ -1463,13 +1468,13 @@ const isManual = () => st.date<todayStr();
 
 const addDays = (ds,n) => { const d=new Date(ds+'T12:00:00'); d.setDate(d.getDate()+n); return d.toLocaleDateString('en-CA') };
 function weekStrip(){
-  const mon=monOf(st.date);
+  const mon=monOf(st.date), end=weekEndOf(st.date);
   const logged=new Set(allSessions().map(s=>s.date)), t=todayStr();
-  const cells=[...Array(7)].map((_,i)=>{
+  const cells=[...Array(Programs.daysBetween(mon,end)+1)].map((_,i)=>{
     const ds=addDays(mon,i), n=+ds.slice(8), L=Programs.DOW_NAME[Programs.dow(ds)][0];
     return `<button data-act="day" data-d="${ds}" class="${logged.has(ds)?'done':''} ${ds===st.date?'sel':''} ${ds===t?'today':''}" aria-label="${ds}"><small>${L}</small><b>${n}</b><i></i></button>`;
   }).join('');
-  const m1=new Date(mon+'T12:00:00').toLocaleDateString(undefined,{month:'short',day:'numeric'}), m2=new Date(addDays(mon,6)+'T12:00:00').toLocaleDateString(undefined,{month:'short',day:'numeric'});
+  const m1=new Date(mon+'T12:00:00').toLocaleDateString(undefined,{month:'short',day:'numeric'}), m2=new Date(end+'T12:00:00').toLocaleDateString(undefined,{month:'short',day:'numeric'});
   return `<div class="wstrip" title="${m1} – ${m2}"><button class="wnav" data-act="wk" data-n="-7" aria-label="Previous week">‹</button><div class="days">${cells}</div><button class="wnav" data-act="wk" data-n="7" aria-label="Next week">›</button></div>`;
 }
 
@@ -1508,8 +1513,8 @@ function viewWorkout(){
   const scheme = c&&c.structure==='pyramid' ? `Pyramid ${p&&p.sets.length?p.sets.map(x=>x.r).join('·'):c.pattern.join('·')} reps`
     : c&&c.structure==='topback' ? `Top set ${c.top[0]}–${c.top[1]} + ${c.backSets} back-off${c.backSets>1?'s':''} ${c.back[0]}–${c.back[1]}`
     : `${e.sets} × ${e.reps[0]===e.reps[1]?e.reps[0]:e.reps[0]+'–'+e.reps[1]}`;
-  const timed=isTimedEx(e);
-  const tShow = t => timed ? `${t.r} sec` : t.w==null ? `pick a weight × ${t.r}${reps}` : (t.w===0&&!isAssist(e.name) ? `${t.r}${reps}` : `${t.w} ${u} × ${t.r}${t.w&&!isAssist(e.name)?'':reps}`);
+  const timed=isTimedEx(e), noW=isNoW(e);
+  const tShow = t => timed ? `${t.r} sec` : noW ? `${t.r} reps` : t.w==null ? `pick a weight × ${t.r}${reps}` : (t.w===0&&!isAssist(e.name) ? `${t.r}${reps}` : `${t.w} ${u} × ${t.r}${t.w&&!isAssist(e.name)?'':reps}`);
   let box='';
   if(wk.editT!=null){ const o=p&&p.sets[wk.editT]; box=`<div class="tline edit"><span>Set ${wk.editT+1} target</span><b>Planned ${o?esc(fmtT(o,e)):'—'}</b><button class="link" data-act="tdot" data-k="${wk.editT}">Cancel</button></div>` }
   else if(wk.editing!=null){ const x=a[wk.editing]; box=`<div class="tline edit"><span>Editing</span><b>${x.tr!=null?`Target ${esc(fmtT({w:x.tw??null,r:x.tr},e))}`:'Logged set'}</b><button class="link" data-act="togglewu">${x.wu?'Working set':'Warm-up'}</button></div>` }
@@ -1527,7 +1532,7 @@ function viewWorkout(){
     ${box}
     <div class="dots">${dots}</div>
     <div class="steppers">
-      ${timed?'':stepper('w',isAssist(e.name)?'Assistance':'Weight',w,u)}
+      ${timed||noW?'':stepper('w',isAssist(e.name)?'Assistance':'Weight',w,u)}
       ${stepper('r',timed?'Seconds':'Reps',r,timed?'seconds':'')}
     </div>
     ${rest?`<div class="rest"><svg class="ring" width="44" height="44" viewBox="0 0 36 36"><circle class="bg" cx="18" cy="18" r="16"/><circle class="fg" id="restFg" cx="18" cy="18" r="16" stroke-dasharray="100.5" stroke-dashoffset="${(100.5*(1-left/rest.total)).toFixed(1)}"/></svg>
@@ -2172,7 +2177,7 @@ function planCtx(){
 }
 function planMain(){
   const {t, sc, ps, cur, CT, T, starts, runsTxt, day, cloudNote}=planCtx();
-  const rows=[...Array(7)].map((_,i)=>{
+  const rows=[...Array(Programs.daysBetween(sc.weekStart,sc.weekEnd)+1)].map((_,i)=>{
     const d=addDays(sc.weekStart,i), items=sc.occs.filter(x=>x.date===d);
     const label = items.length ? items.map(x=>(x.status==='skipped'?`<s class="mute">${esc(x.name)}</s>`:esc(x.name))+(x.optional?' <small>optional</small>':'')).join(' · ') : '<span class="mute">Rest</span>';
     const lift=items.find(x=>x.type==='lift'), main=lift||items[0];
@@ -2188,7 +2193,7 @@ function planMain(){
     <button class="card pcardb" data-act="pview" data-v="program"><span><b class="pname">${esc(CT.name)}</b><small>${cur.lifts} lifts · ${runsTxt(cur)} · ${Programs.LEVELS[cur.level]}</small>
       ${ps.upcoming?`<small class="nxt">Next: ${esc(T.name)} from ${esc(day(starts))}, ${esc(shortDate(starts))}</small>`:''}${ps.adapted?`<small>Adapted this week</small>`:''}</span><span class="chev">›</span></button>
     ${cloudNote}
-    <div class="schhd"><b>This week</b><span>${esc(shortDate(sc.weekStart))} – ${esc(shortDate(addDays(sc.weekStart,6)))}</span></div>
+    <div class="schhd"><b>This week</b><span>${esc(shortDate(sc.weekStart))} – ${esc(shortDate(sc.weekEnd))}</span></div>
     <div class="card" style="padding:4px 6px">${rows}</div>${warns}`;
 }
 function planProgram(){
@@ -2264,6 +2269,17 @@ function editCfg(fn, msg){
   setProgram({config:Programs.normalize(c), past:(st.prog&&st.prog.past)||[]});
   render(); if(msg) toast(msg);
 }
+/* A new week-start day applies from the end of this week: this week keeps its days (and the workouts done in it),
+   and the next one starts the day after, as a short bridge week if needed (Programs.weekOf). A program waiting to
+   start next week just takes the new day. */
+function setWeekStart(v){
+  const t=todayStr(), c=progCfg();
+  if(c.weekStart===v) return;
+  if(c.startedOn && c.startedOn>t){ editCfg(x=>{ x.weekStart=v }, 'Week start saved'); return }
+  const we=weekEndOf(t), past=((st.prog&&st.prog.past)||[]).filter(p=>p.until<t);
+  setProgram({config:Programs.normalize({...c, weekStart:v, startedOn:addDays(we,1), adaptWeek:undefined}), past:[...past, {config:c, until:we}]});
+  render(); toast(`Week start saved. It starts after this week (${shortDate(we)})`);
+}
 function chgSheet(){
   const g=st.chg, [o,cl]=sheetOpen(g,'chgclose'), t=todayStr();
   if(g.step==='pick'){
@@ -2286,7 +2302,7 @@ function chgSheet(){
       <button class="btn ghost" style="margin-top:8px" data-act="chgback">Back</button>`+cl;
   }
   // preview
-  const r=Programs.planSwitch({prog:st.prog, next:g.cfg, changes:st.changes, sessions:allSessions(), today:t, settings:st.settings, sore:g.sore||null, mode:g.mode||'next', keep:g.keep});
+  const r=Programs.planSwitch({prog:st.prog, next:g.cfg, changes:st.changes, sessions:allSessions(), today:t, settings:st.settings, sore:g.sore||null, mode:g.mode||'next', keep:g.keep, startToday:!!g.today});
   g.r=r;
   const day=d=>Programs.DOW_NAME[Programs.dow(d)];
   const done=sched(t).occs.filter(x=>x.status==='done');
@@ -2305,13 +2321,16 @@ function chgSheet(){
     <div class="note">Working sets: ${r.before.sets} done, ${r.after.sets} with the rest of this week. ${r.gaps.length?r.gaps.map(x=>`${cap(x.muscle)} finish ${x.short} short`).join(', ')+'. That\'s fine: no catching up crammed into the last days.':'Every main muscle is covered.'}</div>`;
   const next=r.nextWeek.filter(x=>!x.optional).map(x=>`${day(x.date)} ${esc(x.name)}`).join(' · ');
   const warn=r.warnings.filter(w=>!w.soft).map(w=>`<div class="warn">⚠ ${esc(w.text)}</div>`).join('');
-  const nextD=r.mode==='next' ? r.startsOn : addDays(r.weekStart,7);
+  const nextD=r.mode==='next' ? r.startsOn : addDays(Programs.weekOf(st.prog, r.weekStart).we,1);
   const intro = r.mode==='next' ? `This week stays exactly as planned${r.held.length?', recovery days included':''}. ${esc(T.name)} starts ${esc(day(nextD))}, ${esc(shortDate(nextD))}.`
     : `${done.length?`Kept as done: ${esc(done.map(x=>x.name+' ('+day(x.done.date)+')').join(', '))}. Their sets count toward the new program.`:'Nothing done yet this week.'}${r.held.length?' Recovery days and skips stay as they are.':''}`;
+  // Today is not one of the new program's lifting days: it can still start today, if you choose to.
+  const canToday=r.mode==='adapt' && !g.cfg.days.includes(Programs.dow(t)) && !allSessions().some(s=>s.date===t && s.type==='lift');
+  const todayRow=canToday?`<label class="f" style="margin-top:14px">Start today?</label>${seg('chgtoday',g.today?'yes':'',[['','Next lifting day'],['yes','Start today']])}<div class="note">Today isn't a lifting day in ${esc(T.name)}. Start today fits one of its workouts in today${g.today&&!r.added.some(x=>x.date===t&&x.type==='lift')?`. Nothing fits today: ${esc((r.days.find(d=>d.date===t)||{}).note||'see below')}`:''}.</div>`:'';
   const runNotes=r.mode==='adapt' ? r.days.flatMap(d=>d.after.filter(x=>x.note).map(x=>`<small class="sub">${day(d.date)}: ${esc(x.note)}.</small>`)).join('') : '';
   return o+`<h3>Switch to ${esc(T.name)}</h3>
     ${seg('chgmode',r.mode,[['next','Start next week'],['adapt','Adapt this week']])}
-    <div class="note" style="margin-top:10px">${intro}</div>
+    <div class="note" style="margin-top:10px">${intro}</div>${todayRow}
     ${r.mode==='adapt'&&conf?`<label class="f" style="margin-top:14px">Workouts you scheduled or changed yourself</label>${conf}`:''}
     <label class="f" style="margin-top:14px">Rest of this week</label><div class="pv" style="margin-top:0">${dayRows}</div>${runNotes}${warn}${vol}
     ${r.mode==='adapt'?`<label class="f" style="margin-top:14px">Anything sore right now?</label>${seg('chgsore',g.sore||'',[['','No'],['legs','Legs'],['upper','Upper body']])}`:''}
@@ -2324,7 +2343,7 @@ function daySheet(){
   if(g.compact){
     // From the ⋯ menu on Today's workout: the three choices only, same actions as the Plan tab.
     const x=items[0]; if(!x){ st.daysh=null; return '' }
-    const dates=[...Array(7)].map((_,i)=>addDays(sc.weekStart,i)).filter(z=>z>=t && z!==x.date);
+    const dates=[...Array(Programs.daysBetween(sc.weekStart,sc.weekEnd)+1)].map((_,i)=>addDays(sc.weekStart,i)).filter(z=>z>=t && z!==x.date);
     return o+`<h3>${esc(x.name)}</h3><div class="note">${esc(fmtDate(x.date))}</div><div class="ropts" style="margin-top:12px">
       ${dates.length?`<div class="ropt"><b>Move workout</b><small>Do it on another day this week.</small><div class="dchips" style="margin-top:8px">${dates.map(z=>`<button class="dchip" data-act="dmove" data-o="${esc(x.occ)}" data-d="${z}">${day(z)[0]}<small>${day(z)}</small></button>`).join('')}</div></div>`:''}
       ${optRow(`data-act="drec" data-o="${esc(x.occ)}"`, 'Recovery day', ACT_DESC.recovery)}
@@ -2332,7 +2351,7 @@ function daySheet(){
       <button class="btn ghost" style="margin-top:10px" data-act="dayclose">Cancel</button>`+cl;
   }
   const editable=Programs.TEMPLATES[progCfg().template].freq[progCfg().lifts].w;   // workouts the editor can open
-  const dates=[...Array(7)].map((_,i)=>addDays(sc.weekStart,i)).filter(x=>x>=t && x!==d);
+  const dates=[...Array(Programs.daysBetween(sc.weekStart,sc.weekEnd)+1)].map((_,i)=>addDays(sc.weekStart,i)).filter(x=>x>=t && x!==d);
   const body=items.map(x=>{
     if(x.status==='done') return `<div class="card"><b>${esc(x.name)}</b><div class="note">Done ${day(x.done.date)} ✓</div></div>`;
     const changed=!!changeOf(x.occ), others=sc.occs.filter(y=>y!==x && y.status!=='done' && y.date>=t && y.date!==d);
@@ -2398,7 +2417,7 @@ app.addEventListener('change',e=>{
   else if(t.dataset.padd && t.value){ const w=t.dataset.padd, id=t.value; st.openW=w; editCfg(c=>{ const ed=c.edits[w] ||= {}; ed.add=[...(ed.add||[]).filter(a=>a.id!==id), {id, sets:EXMAP[id].sets||3}]; if(ed.remove) ed.remove=ed.remove.filter(x=>x!==id) }, 'Added '+EXMAP[id].name) }
   else if(t.dataset.prun){ const dw=+t.dataset.prun; editCfg(c=>{ const r=c.runs.find(x=>x.dow===dw); if(r) r.kind=t.value }) }
   else if(t.dataset.prunadd && t.value!==''){ editCfg(c=>{ c.runs.push({dow:+t.value, kind:'easy', optional:true}) }, 'Run added') }
-  else if(t.id==='pweek'){ editCfg(c=>{ c.weekStart=+t.value }, 'Week start saved') }
+  else if(t.id==='pweek') setWeekStart(+t.value);
   else if(t.id==='bw'){ const v=num(t.value); if(v&&v>=50&&v<=600) SS('wt.bw',v); else { try{localStorage.removeItem('wt.bw')}catch(e){} t.value='' } toast(v?'Body weight saved':'Body weight cleared') }
 });
 function fldObj(f){ return (f==='dist'||f==='min') ? getDraft().run : st.wk.cur }
@@ -2423,7 +2442,11 @@ app.addEventListener('click',e=>{
   const b=e.target.closest('[data-act]'); if(!b) return;
   const act=b.dataset.act, wk=st.wk;
   if(act==='day'){ st.date=b.dataset.d; st.auto=true; render() }
-  else if(act==='wk'){ st.date=addDays(st.date,+b.dataset.n); st.auto=true; render() }
+  else if(act==='wk'){
+    // One schedule week at a time (a short bridge week after a week-start change included), same weekday if it has one.
+    const ws = +b.dataset.n>0 ? addDays(weekEndOf(st.date),1) : monOf(addDays(monOf(st.date),-1)), we=weekEndOf(ws);
+    let d=ws; while(d<we && Programs.dow(d)!==Programs.dow(st.date)) d=addDays(d,1);
+    st.date = Programs.dow(d)===Programs.dow(st.date) ? d : ws; st.auto=true; render() }
   else if(act==='pick'){ st.auto=false; st.occ=b.dataset.o||null; st.sess=slotKey(b.dataset.k,st.date); render() }
   else if(act==='opensess'){ st.auto=false; st.date=b.dataset.d; st.sess=b.dataset.s; render() }
   else if(act==='again'){ st.auto=false; st.date=todayStr(); st.sess=b.dataset.s; render(); toTop(); toast('Repeating '+sessName(b.dataset.s)+' today') }
@@ -2548,6 +2571,7 @@ app.addEventListener('click',e=>{
   else if(act.startsWith('chgkeep:')){ st.chg.keep[act.slice(8)] = b.dataset.v==='keep'; render() }
   else if(act==='chgsore'){ st.chg.sore=b.dataset.v; render() }
   else if(act==='chgmode'){ st.chg.mode=b.dataset.v; st.chg.keep={}; render() }
+  else if(act==='chgtoday'){ st.chg.today=b.dataset.v==='yes'; render() }
   else if(act==='adaptnow'){
     // The program already chosen for next week, applied to this week instead (previewed before anything changes).
     const cfg=JSON.parse(JSON.stringify(progCfg())); delete cfg.startedOn; delete cfg.adaptWeek;

@@ -362,3 +362,26 @@ test('D1 same inputs, same output, and no clock is read', () => {
     assert.deepEqual(a, b);
   } finally { globalThis.Date = RealDate; Date.now = realNow }
 });
+
+/* ---------- order in the workout ---------- */
+test('O1 later in the workout than last time starts one step lighter; earlier or same changes nothing', () => {
+  const c = cfg('ohp-db');
+  const first = P.planFor(c, [], '2026-11-02');
+  const done = { ...logged({ ...first, sets: first.sets.map(s => ({ ...s, w: 40 })), state: { ...first.state, W: 40, planned: first.state.planned.map(s => ({ ...s, w: 40 })) } }, '2026-11-02', first.sets.map(s => s.r)), pos: 0 };
+  const same = P.planFor(c, [done], '2026-11-09', { pos: 1 });
+  const later = P.planFor(c, [done], '2026-11-09', { pos: 3 });
+  assert.equal(later.state.W, P.easier(c, same.state.W));
+  assert.match(later.why, /Later in the workout than last time \(exercise 4, was 1\)/);
+  assert.deepEqual(P.planFor(c, [{ ...done, pos: 3 }], '2026-11-09', { pos: 0 }).state.W, P.planFor(c, [{ ...done, pos: 3 }], '2026-11-09').state.W);
+  // no position known (older callers): unchanged
+  assert.deepEqual(P.planFor(c, [done], '2026-11-09').sets, same.sets);
+  // bodyweight reps-only moves have no weight to lower
+  const k = cfg('knee-raise'), kp = P.planFor(k, [{ date: '2026-11-02', sets: [{ w: 0, r: 12 }, { w: 0, r: 12 }], pos: 0 }], '2026-11-09', { pos: 4 });
+  assert.ok(!/Later in the workout/.test(kp.why));
+});
+
+test('O2 historyFor records where an exercise came in, counting only exercises with working sets', () => {
+  const s = { id: 'x', date: '2026-11-02', entries: [{ id: 'bench', sets: [{ w: 50, r: 8 }] }, { id: 'row', sets: [{ w: 20, r: 8, wu: true }] }, { id: 'ohp-db', sets: [{ w: 40, r: 8 }] }] };
+  assert.equal(P.historyFor([s], 'ohp-db')[0].pos, 1);
+  assert.equal(P.historyFor([s], 'bench')[0].pos, 0);
+});

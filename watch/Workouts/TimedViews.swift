@@ -5,6 +5,7 @@ struct TimedView: View {
     @EnvironmentObject var timed: TimedStore
     @EnvironmentObject var workout: WorkoutManager
     @State private var confirmEnd = false
+    @State private var confirmPause = false
     @State private var ending = false
 
     var body: some View {
@@ -14,8 +15,9 @@ struct TimedView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Label(w.name, systemImage: w.symbol).font(.system(size: 15, weight: .semibold)).foregroundStyle(Color.brand)
                         .lineLimit(1)
-                    Text(Fmt.clock(t)).font(.system(size: 34, weight: .semibold, design: .rounded)).monospacedDigit()
-                        .foregroundStyle(workout.paused ? Color.secondary : Color.white)
+                    Text(workout.paused ? "Paused \(Fmt.clock(t))" : Fmt.clock(t))
+                        .font(.system(size: workout.paused ? 26 : 34, weight: .semibold, design: .rounded)).monospacedDigit()
+                        .foregroundStyle(workout.paused ? Color.yellow : Color.white)
                     Text(workout.heartRate > 0 ? "\(Int(workout.heartRate)) bpm" : "-- bpm").font(.title3).monospacedDigit()
                         .foregroundStyle(.red)
                     if w.tracksDistance {
@@ -24,12 +26,16 @@ struct TimedView: View {
                         Text("\(Int(workout.activeKcal)) kcal").font(.title3).monospacedDigit()
                     }
                     HStack(spacing: 4) {
-                        Button(workout.paused ? "Resume" : "Pause") { workout.paused ? workout.resume() : workout.pause() }
+                        // Pausing asks first: a mat, a sleeve or a bent wrist can press the screen mid-pose.
+                        Button(workout.paused ? "Resume" : "Pause") { workout.paused ? workout.resume() : (confirmPause = true) }
                             .buttonStyle(PillButtonStyle(color: workout.paused ? .brand : .control))
                         Button("End") { confirmEnd = true }.buttonStyle(PillButtonStyle(color: .red)).disabled(ending)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .confirmationDialog("Pause \(w.name)?", isPresented: $confirmPause) {
+                Button("Pause") { workout.pause() }
             }
             .confirmationDialog("End \(w.name)?", isPresented: $confirmEnd) {
                 Button("End and save") {

@@ -22,7 +22,11 @@
    - Met with every set done harder than planned by the same amount and every planned rep reached: the plan
      adopts that weight (same rep targets). Any other heavier set just counts as meeting its target.
    - Time off since the exercise was last done: up to 21 days normal; 22-42 repeat the last plan; 43-84 one
-     step easier; over 84 about 90% of the weight (at least one step easier). Reps reset after a step down. */
+     step easier; over 84 about 90% of the weight (at least one step easier). Reps reset after a step down.
+   - Order in the workout (opts.pos, 0 = first exercise): you are more tired later in a workout. When today puts a
+     loaded exercise at least 2 places later than last time (say 1st then 4th), the weight starts one step lighter.
+     That becomes the new baseline, so normal progression carries on from there. Moving earlier never adds weight
+     by itself: meeting the targets does that. */
 (function(){
 'use strict';
 
@@ -275,6 +279,14 @@ function planFor(c, history, today, opts){
       const r = c.structure==='topback' ? advanceTopBack(c,p,logged,last.diff==='hard') : advanceMain(c,p,logged,last.diff==='hard');
       st=r.st; why=r.why; result=r.result;
     } else { st=calibrate(c, logged, false); why='Based on what you lifted last time' }
+    // Later in the workout than last time: one step lighter (unless the rules above already stepped it down).
+    const later = o.pos!=null && last.pos!=null ? o.pos-last.pos : 0;
+    const stepped = p && p.W!=null && Math.abs(p.W-st.W)>EPS && asHard(c, p.W, st.W);
+    if(later>=2 && st.W!=null && !isBW(c,st.W) && !stepped){
+      const w=easier(c,st.W);
+      if(w!==st.W){ st.W=w; if(c.structure==='topback'){ st.Tb=c.back[0]; st.missB=0 }
+        why=`${why}. Later in the workout than last time (exercise ${o.pos+1}, was ${last.pos+1}): one step lighter` }
+    }
   }
   delete st.planned;
   const sets=plannedSets(c,st);
@@ -296,7 +308,11 @@ function historyFor(sessions, exId, opts){
   (sessions||[]).map(s=>s.data ? {...s.data, id:s.id, date:s.date} : s)
     .filter(s=>s.id!==o.excludeId && (!o.today || s.date<=o.today))
     .sort((a,b)=> a.date<b.date?1 : a.date>b.date?-1 : 0)
-    .forEach(s=>{ const e=(s.entries||[]).find(x=>x.id===exId); if(e && e.sets && e.sets.length) out.push({date:s.date, sets:e.sets, prog:e.prog, diff:e.diff, deload:!!s.deload}) });
+    .forEach(s=>{
+      // pos: where it came in that workout, counting only exercises with logged working sets (entries are in plan order).
+      const done=(s.entries||[]).filter(x=>working(x.sets).length), e=(s.entries||[]).find(x=>x.id===exId);
+      if(e && e.sets && e.sets.length){ const i=done.indexOf(e); out.push({date:s.date, sets:e.sets, prog:e.prog, diff:e.diff, deload:!!s.deload, pos: i<0 ? null : i}) }
+    });
   return out;
 }
 /* A logged set with every field kept (actual w/r, original pw/pr, shown tw/tr, wu), numbers cleaned. */
@@ -319,10 +335,10 @@ function buildPlans(input){
   Object.entries(plan.PLAN.sessions).forEach(([key,S])=>{
     if(S.type!=='lift') return;
     const ex={};
-    S.ex.forEach(e=>{
+    S.ex.forEach((e,pos)=>{
       [e.id, ...(plan.ALTS[e.id]||[]).map(n=>plan.altId(e.id,n))].forEach(id=>{
         const c=configFor(plan.EXMAP[id], (settings||{})[id]);
-        ex[id]=planFor(c, historyFor(sessions, id, {today}), today);
+        ex[id]=planFor(c, historyFor(sessions, id, {today}), today, {pos});
       });
     });
     out.sessions[key]=ex;

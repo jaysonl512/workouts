@@ -134,6 +134,7 @@ enum Plan {
                 PlanAlt(id: "calf-seat~leg-press-calf-raise", name: "Leg press calf raise")
             ]),
             PlanExercise(id: "knee-raise", name: "Hanging knee raise", sets: 3, reps: 10...15, rest: "1 min", restSeconds: 60, note: nil, small: false, superset: nil, alts: [
+                PlanAlt(id: "knee-raise~hanging-leg-raise", name: "Hanging leg raise"),
                 PlanAlt(id: "knee-raise~cable-crunch", name: "Cable crunch"),
                 PlanAlt(id: "knee-raise~ab-wheel", name: "Ab wheel"),
                 PlanAlt(id: "knee-raise~decline-sit-up", name: "Decline sit-up")

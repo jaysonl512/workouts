@@ -116,6 +116,7 @@ final class LiftStore: ObservableObject {
     /// "45 lb × 8", "−50 lb assist × 10", "45 sec" (timed holds) or "8 reps" (no weight planned yet).
     func targetText(_ step: Step, _ t: PlanSet) -> String {
         if step.isTimed { return "\(t.r) sec" }
+        if step.isRepsOnly { return "\(t.r) reps" }
         guard let w = t.w else { return "\(t.r) reps" }
         if step.isAssisted { return w > 0 ? "−\(Fmt.weight(w)) assist × \(t.r)" : "Bodyweight × \(t.r)" }
         return w > 0 ? "\(Fmt.weight(w)) lb × \(t.r)" : "\(t.r) reps"
@@ -167,6 +168,18 @@ final class LiftStore: ObservableObject {
         upload(status: "in_progress")
     }
 
+    /// The first exercise after `index` (wrapping round to the start) that still has working sets to do, or
+    /// steps.count when everything is done. Exercises done out of order never end the workout early.
+    func nextOpen(after index: Int) -> Int {
+        let s = steps
+        guard !s.isEmpty else { return 0 }
+        for k in 1...s.count {
+            let i = (index + k) % s.count
+            if workingCount(s[i].id) < plannedCount(s[i]) { return i }
+        }
+        return s.count
+    }
+
     func go(to index: Int) {
         guard draft != nil else { return }
         draft!.index = max(0, min(index, steps.count))
@@ -212,10 +225,11 @@ final class LiftStore: ObservableObject {
         if done >= plannedCount(step) {
             rateFor = step.id
             if let p = supersetPartner(of: draft!.index), p > draft!.index { draft!.index = p }   // both halves done
-            draft!.index += 1
+            draft!.index = nextOpen(after: draft!.index)
             nextUp = draft!.index < steps.count
         }
-        startRest(TimeInterval(step.slot.restSeconds))
+        // No rest after the workout's last set: straight to the rating and Finish.
+        if draft!.index < steps.count { startRest(TimeInterval(step.slot.restSeconds)) } else { stopRest() }
         persist()
         upload(status: "in_progress")
     }
@@ -290,9 +304,13 @@ final class LiftStore: ObservableObject {
         if let o = row.data.occ { draft!.occ = o }
         if let o = row.data.only { draft!.only = o }
         if row.data.reduced == true { draft!.reduced = true }
-        let s = steps
-        draft!.index = s.firstIndex { self.workingCount($0.id) < self.plannedCount($0) } ?? s.count
-        nextUp = false
+        // Stay on the exercise in hand while it still has sets to do (exercises can be done out of order);
+        // otherwise go to the next unfinished one.
+        let s = steps, i = draft!.index
+        if !(s.indices.contains(i) && workingCount(s[i].id) < plannedCount(s[i])) {
+            draft!.index = s.indices.contains(i) ? nextOpen(after: i) : (s.firstIndex { self.workingCount($0.id) < self.plannedCount($0) } ?? s.count)
+            nextUp = false
+        }
         // The other device's rest timer carries over; otherwise no rest is running.
         if let end = ISO.date(row.data.restEnd), end > Date() {
             restTotal = row.data.restTotal ?? end.timeIntervalSinceNow
@@ -390,6 +408,13 @@ final class LiftStore: ObservableObject {
         restEnd = nil
     }
 
+    /// Skip on the rest screen. Like the timer running out, it goes straight to the next set: the rest screen
+    /// already showed what comes next, so there is no Next Up screen after it.
+    func skipRest() {
+        stopRest()
+        nextUp = false
+    }
+
     private func armHaptic() {
         restTask?.cancel()
         guard let end = restEnd else { return }
@@ -402,6 +427,7 @@ final class LiftStore: ObservableObject {
     private func restDone() {
         WKInterfaceDevice.current().play(.notification)
         stopRest()
+        nextUp = false
     }
 
     // MARK: Persistence and sync

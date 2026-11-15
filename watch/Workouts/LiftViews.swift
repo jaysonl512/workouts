@@ -90,7 +90,7 @@ struct ExerciseView: View {
         }
         .tabViewStyle(.page)
         .toolbar(.hidden, for: .navigationBar)
-        .onAppear { prefill(); focus = step.isTimed ? .reps : .weight }
+        .onAppear { prefill(); focus = step.noWeight ? .reps : .weight }
         .onChange(of: done.count) { _, _ in prefill() }
     }
 
@@ -105,7 +105,7 @@ struct ExerciseView: View {
             .minimumScaleFactor(0.6)
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            if !step.isTimed {
+            if !step.noWeight {
                 valueRow(.weight, text: Fmt.weight(weight), unit: lift.planFor(step.id)?.unit.map(Self.shortUnit) ?? step.weightUnit,
                          minus: { weight = max(0, weight - step.slot.weightStep) },
                          plus: { weight = min(1000, weight + step.slot.weightStep) })
@@ -119,7 +119,7 @@ struct ExerciseView: View {
                 .digitalCrownRotation(detent: $reps, from: 0, through: 300, by: Double(step.slot.repStep),
                                       sensitivity: .medium, isContinuous: false, isHapticFeedbackEnabled: true)
 
-            Button(item.warmup ? "Log Warm-up" : "Log Set") { lift.logSet(w: step.isTimed ? 0 : weight, r: Int(reps)) }
+            Button(item.warmup ? "Log Warm-up" : "Log Set") { lift.logSet(w: step.noWeight ? 0 : weight, r: Int(reps)) }
                 .buttonStyle(PrimaryButtonStyle(height: 38))
         }
         .padding(.horizontal, 2)
@@ -279,7 +279,7 @@ struct RestView: View {
 
                 HStack(spacing: 4) {
                     Button("-15") { lift.adjustRest(-15) }.buttonStyle(PillButtonStyle())
-                    Button("Skip") { lift.stopRest() }.buttonStyle(PillButtonStyle(color: .brand))
+                    Button("Skip") { lift.skipRest() }.buttonStyle(PillButtonStyle(color: .brand))
                     Button("+15") { lift.adjustRest(15) }.buttonStyle(PillButtonStyle())
                 }
             }

@@ -581,3 +581,41 @@ test('Q4 weeks before the first logged workout never count as missed', () => {
   assert.equal(P.scheduleAdvice(prog, { sessions: [lift('upperA', MON), lift('lowerA', TUE)], changes: [] }, NEXT), null);
   assert.equal(P.scheduleAdvice(prog, { sessions: [], changes: [] }, NEXT), null);
 });
+
+/* ---------- week-start changes and starting today ---------- */
+test('B1 a new week-start day never moves finished workouts out of their week (bridge week)', () => {
+  const old = { ...P.configFor('strengthRun', 3, P.defaultConfig()) };                 // weeks start Monday
+  const ppl = { ...P.configFor('ppl', 4, P.defaultConfig()), weekStart: 0, startedOn: '2026-11-16' };   // Sunday
+  const prog = { config: ppl, past: [{ config: old, until: '2026-11-15' }] };
+  const SUN = '2026-11-15';
+  assert.deepEqual(P.weekOf(prog, SUN), { ws: '2026-11-09', we: SUN }, 'Sunday stays in the Monday week it began in');
+  assert.deepEqual(P.weekOf(prog, '2026-11-18'), { ws: '2026-11-16', we: '2026-11-21' }, 'a 6-day bridge week');
+  assert.deepEqual(P.weekOf(prog, '2026-11-22'), { ws: '2026-11-22', we: '2026-11-28' });
+  const sessions = [lift('srA', '2026-11-10', { occ: '2026-11-09:srA:1' }), lift('srB', '2026-11-12', { occ: '2026-11-09:srB:1' }), lift('srC', SUN, { occ: '2026-11-09:srC:1' })];
+  const s = P.weekSchedule({ prog, changes: [], sessions, today: SUN });
+  assert.equal(P.goalOf(s).filter(x => x.status === 'done').length, 3);
+  const b = P.weekSchedule({ prog, changes: [], sessions, today: '2026-11-16' });
+  assert.equal(b.weekStart, '2026-11-16'); assert.equal(b.weekEnd, '2026-11-21');
+  assert.deepEqual(b.occs.filter(x => x.type === 'lift').map(x => [x.date, x.key]), [['2026-11-16', 'pushA'], ['2026-11-17', 'pullA'], ['2026-11-19', 'legsA'], ['2026-11-20', 'upper']]);
+  const sv = P.serve({ prog, changes: [], sessions, settings: {}, today: SUN });
+  assert.equal(sv.weekStart, '2026-11-09'); assert.ok(sv.occs.some(x => x.occ === '2026-11-16:pushA:1'));
+  // a week-start change alone is the same program, not an upcoming one
+  const same = { config: { ...old, weekStart: 0, startedOn: '2026-11-16' }, past: [{ config: old, until: SUN }] };
+  assert.equal(P.programStatus(same, '2026-11-12').upcoming, null);
+});
+
+test('T1 switching on a day that is not a lifting day in the new program can start today, if asked', () => {
+  const old = P.configFor('strengthRun', 3, P.defaultConfig()), SUN = '2026-11-15';
+  const prog = { config: { ...old, startedOn: '2026-11-09' }, past: [] };
+  const sessions = [lift('srA', '2026-11-09', { occ: '2026-11-09:srA:1' }), lift('srB', '2026-11-11', { occ: '2026-11-09:srB:1' })];
+  const next = P.configFor('ppl', 4, P.defaultConfig());
+  const a = P.planSwitch({ mode: 'adapt', prog, next, changes: [], sessions, today: SUN, settings: {} });
+  assert.equal(a.added.filter(x => x.type === 'lift').length, 0);
+  const b = P.planSwitch({ mode: 'adapt', startToday: true, prog, next, changes: [], sessions, today: SUN, settings: {} });
+  const today = b.added.find(x => x.type === 'lift');
+  assert.equal(today.date, SUN);
+  // it never crowds the first workout of next week (Monday Push A)
+  assert.notEqual(today.key, 'pushA');
+  const s = P.weekSchedule({ prog: b.prog, changes: b.rows, sessions, today: SUN });
+  assert.equal(s.occs.find(x => x.date === SUN && x.type === 'lift').status, 'today');
+});

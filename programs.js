@@ -122,6 +122,21 @@ function configOn(prog, date){
   for(const p of past) if(date<=p.until) return normalize(p.config);
   return prog && prog.config ? normalize(prog.config) : {...defaultConfig(), implicit:true};
 }
+/* The week a date belongs to: {ws, we}. Normally 7 days from the program's week-start day. When a program (or a
+   week-start setting) changes the week-start day, the first week under the new one starts on its first day and runs
+   to its next week-start day (a short bridge week), so no day ever belongs to two weeks and finished workouts keep
+   counting in the week they were done. */
+function weekOf(prog, date){
+  const c=configOn(prog, date), nat=weekStartOf(date, c.weekStart);
+  let from=null, until=null;
+  for(const p of ((prog&&prog.past)||[]).filter(p=>p&&p.until).sort((a,b)=>a.until<b.until?-1:1)){
+    if(date<=p.until){ until=p.until; break } from=addDays(p.until,1);
+  }
+  const ws = from && nat<from ? from : nat;
+  let we=addDays(nat,6); if(until && we>until) we=until;
+  return {ws, we};
+}
+const nextWeekOf = (prog, ws) => addDays(weekOf(prog, ws).we, 1);
 
 /* ---------- sessions and volume ---------- */
 const baseKey = k => /^run\d*$/.test(k||'') ? 'run' : String(k||'').replace(/~\d+$/,'');
@@ -168,7 +183,7 @@ const checkinsOf = changes => (changes||[]).filter(c=>c && String(c.id).startsWi
    through the lifts it leaves undone. The same rules apply wherever a choice was made. A week without lifting
    changes nothing. */
 function weekQualifies(prog, o, w, level){
-  const we=addDays(w,6), ss=sessList(o.sessions).filter(s=>s.date>=w && s.date<=we);
+  const we=weekOf(prog, w).we, ss=sessList(o.sessions).filter(s=>s.date>=w && s.date<=we);
   const lifts=ss.filter(s=>s.type==='lift' && (s.entries||[]).length);
   if(!lifts.length) return null;
   const chk=checkinsOf(o.changes).filter(c=>c.date>=w && c.date<=we);
@@ -189,8 +204,8 @@ function volumeFor(prog, o, ws){
   if(c.implicit) return {level:lv, stage:'reg', qualifying:0, fresh:{}, held:false};
   let stage = lv==='higher' ? 'hi' : 'reg', q=0;
   if(lv==='returning'){
-    const since=weekStartOf(c.levelSince||ws, c.weekStart), hold=c.rampHold ? weekStartOf(c.rampHold, c.weekStart) : null;
-    for(let w=since; w<ws; w=addDays(w,7)){ if(hold && w>=hold) break; if(weekQualifies(prog,o,w,lv)) q++ }
+    const since=weekOf(prog, c.levelSince||ws).ws, hold=c.rampHold ? weekOf(prog, c.rampHold).ws : null;
+    for(let w=since; w<ws; w=nextWeekOf(prog,w)){ if(hold && w>=hold) break; if(weekQualifies(prog,o,w,lv)) q++ }
     stage = q>=4 ? 'reg' : q>=2 ? 'r2' : 'r1';
   }
   const fresh={};
@@ -201,8 +216,8 @@ function volumeFor(prog, o, ws){
     if(daysBetween(dates[dates.length-1], ws)>21){ fresh[g]=true; return }
     let i=dates.length-1; while(i>0 && daysBetween(dates[i-1],dates[i])<=21) i--;
     if(i===0){ fresh[g]=false; return }                                     // trained steadily since the first session
-    let n=0; for(let w=weekStartOf(dates[i], c.weekStart); w<ws; w=addDays(w,7)){
-      if(dates.some(d=>d>=w && d<=addDays(w,6)) && weekQualifies(prog,o,w,lv)) n++ }
+    let n=0; for(let w=weekOf(prog, dates[i]).ws; w<ws; w=nextWeekOf(prog,w)){
+      const we=weekOf(prog,w).we; if(dates.some(d=>d>=w && d<=we) && weekQualifies(prog,o,w,lv)) n++ }
     fresh[g]=n<2;
   });
   return {level:lv, stage, qualifying:q, fresh, held:!!c.rampHold};
@@ -262,13 +277,17 @@ function classicWorkouts(){
 /* ---------- the week ---------- */
 const orderDays = (days, start) => days.slice().sort((a,b)=>((a-start+7)%7)-((b-start+7)%7));
 /* The program's own week: workouts on your lifting days (in order, from the chosen rotation) and runs. */
-function baseWeek(cfg, ws, workouts){
-  const c=normalize(cfg), f=TEMPLATES[c.template].freq[c.lifts], days=orderDays(c.days, c.weekStart), n=f.w.length;
+function baseWeek(cfg, ws, workouts, weekEnd){
+  const c=normalize(cfg), f=TEMPLATES[c.template].freq[c.lifts], n=f.w.length;
+  // A bridge week (see weekOf) keeps only its own days; its first lifting day still gets the rotation's first workout.
+  const nat=weekStartOf(ws, c.weekStart), we=weekEnd||addDays(ws,6), on=d=>addDays(nat,(d-c.weekStart+7)%7);
+  const inWeek=d=>on(d)>=ws && on(d)<=we;
+  const days=orderDays(c.days, c.weekStart).filter(inWeek);
   const occs=[];
-  days.forEach((d,i)=>{ const key=f.w[(i+(c.rotation||0))%n], date=addDays(ws, (d-c.weekStart+7)%7);
+  days.forEach((d,i)=>{ const key=f.w[(i+(c.rotation||0))%n], date=on(d);
     occs.push({occ:`${ws}:${key}:1`, key, date, type:'lift', name:(workouts&&workouts[key]?workouts[key].name:W[key].name), auto:true}) });
-  orderDays((c.runs||[]).map(r=>r.dow), c.weekStart).forEach((d,i)=>{
-    const r=c.runs.find(x=>x.dow===d), key=i===0?'run':'run'+(i+1), date=addDays(ws,(d-c.weekStart+7)%7);
+  orderDays((c.runs||[]).map(r=>r.dow), c.weekStart).filter(inWeek).forEach((d,i)=>{
+    const r=c.runs.find(x=>x.dow===d), key=i===0?'run':'run'+(i+1), date=on(d);
     occs.push({occ:`${ws}:${key}:1`, key, date, type:'run', name:RUN_KINDS[r.kind]||'Run', runKind:r.kind||'easy', optional:!!r.optional, auto:true});
   });
   return occs.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:a.type==='lift'?-1:1);
@@ -290,10 +309,10 @@ function reduceWorkout(workout, only){
    sessions they match, extras, warnings, and actual sets and credits.
    o = {prog, changes, sessions, today, weekStart?, date?, settings?} */
 function weekSchedule(o){
-  const c0=configOn(o.prog, o.date||o.today), ws=o.weekStart || weekStartOf(o.date||o.today, c0.weekStart), we=addDays(ws,6);
+  const {ws, we}=weekOf(o.prog, o.weekStart || o.date || o.today);
   const cfg=configOn(o.prog, ws), vol=volumeFor(o.prog, o, ws), workouts=workoutsFor(cfg, vol, o.settings);
   const all={...classicWorkouts(), ...workoutsFor(cfg, vol, o.settings)};
-  let occs=baseWeek(cfg, ws, workouts);
+  let occs=baseWeek(cfg, ws, workouts, we);
   changeList(o.changes, ws).forEach(({id, change:ch})=>{
     if(ch.add){ if(occs.some(x=>x.occ===id)) return;
       occs.push({occ:id, key:ch.key, date:ch.date, type:ch.type||(baseKey(ch.key)==='run'?'run':'lift'), name:ch.easier ? (RUN_KINDS[ch.runKind]||'Run')+' (shorter)' : ch.name||(all[ch.key]?all[ch.key].name:ch.key),
@@ -328,7 +347,7 @@ function weekSchedule(o){
   });
   occs.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:a.type==='lift'?-1:1);
   const done=ss.filter(s=>s.type==='lift');
-  const sched={weekStart:ws, config:cfg, volume:vol, workouts:all, occs, extras, actual:volumeOf(done)};
+  const sched={weekStart:ws, weekEnd:we, config:cfg, volume:vol, workouts:all, occs, extras, actual:volumeOf(done)};
   sched.warnings=warningsFor(sched, cfg.level);
   // A long run or intervals on the day of, or the day after, a "very sore legs" check-in.
   checkinsOf(o.changes).filter(c=>c.readiness==='very' && (c.area||'legs')!=='upper').forEach(c=>{
@@ -443,12 +462,13 @@ function recoveryAdvice(changes, today){
    missed workouts are scheduling, so they count as planned-but-not-done); recovery days are left out, since those are
    about recovery, not the schedule. Suggests a lifting-day count near what you have actually been doing. */
 function scheduleAdvice(prog, o, today){
-  const cur=configOn(prog, today), ws=weekStartOf(today, cur.weekStart), weeks=[];
+  const cur=configOn(prog, today), weeks=[];
   // Only full weeks after the first logged workout count (weeks before using the app are not "missed").
   const first=sessList(o.sessions).map(x=>x.date).sort()[0]; if(!first) return null;
-  const from = weekStartOf(first, cur.weekStart)===first ? first : addDays(weekStartOf(first, cur.weekStart),7);
+  const from = weekOf(prog, first).ws===first ? first : nextWeekOf(prog, first);
+  let w=weekOf(prog, today).ws;
   for(let i=1;i<=4;i++){
-    const w=addDays(ws,-7*i); if(w<from) break;
+    w=weekOf(prog, addDays(w,-1)).ws; if(w<from) break;
     const s=weekSchedule({...o, prog, today, weekStart:w});
     const planned=s.occs.filter(x=>!x.optional && x.status!=='recovery'), done=planned.filter(x=>x.status==='done');
     if(!planned.length) continue;
@@ -482,7 +502,7 @@ function readiness(sched, occId, answer, today, area){
   return {...base, moveTo, recommend: answer==='sore' ? 'start' : moveTo ? 'move' : 'reduce'};
 }
 function moveTarget(sched, occId, today, checkins){
-  const x=sched.occs.find(y=>y.occ===occId), we=addDays(sched.weekStart,6); if(!x) return null;
+  const x=sched.occs.find(y=>y.occ===occId), we=sched.weekEnd||addDays(sched.weekStart,6); if(!x) return null;
   const level=sched.config.level, before=new Set(sched.warnings.map(w=>w.text));
   for(let d=addDays(today,1); d<=we; d=addDays(d,1)){
     if(sched.occs.some(y=>y!==x && y.type===x.type && y.date===d && y.status!=='skipped' && y.status!=='recovery' && !(y.optional&&!y.done))) continue;
@@ -516,7 +536,7 @@ function moveTarget(sched, occId, today, checkins){
    at most ceil(lifts a week x days left / 7) workouts are added, and finishing the week below target is fine.
    The new program's normal schedule starts next week unless startNow. */
 function planSwitch(o){
-  const today=o.today, oldCfg=configOn(o.prog, today), ws=weekStartOf(today, oldCfg.weekStart), we=addDays(ws,6);
+  const today=o.today, oldCfg=configOn(o.prog, today), {ws, we}=weekOf(o.prog, today);
   const next=normalize({...o.next, levelSince: o.next.level==='returning' && (oldCfg.level!=='returning' || !o.next.levelSince) ? today : o.next.levelSince});
   const mode = o.startNow ? 'now' : o.mode || 'next';
   const old=weekSchedule({...o, weekStart:ws});
@@ -549,19 +569,22 @@ function planSwitch(o){
   const order=TEMPLATES[next.template].freq[next.lifts].w;
   const target=emptyCredits(); order.forEach(k=>{ const v=plannedVolume(workouts[k]).credits; MUSCLE_LIST.forEach(m=>target[m]=r1(target[m]+v[m])) });
   const credit={...before.credits};
-  const items=itemsOf({...old, occs:old.occs.filter(x=>x.done || kept.includes(x))});
+  // Next week's first workouts count too, so a workout added at the end of this week never crowds them.
+  const items=[...itemsOf({...old, occs:old.occs.filter(x=>x.done || kept.includes(x))}), ...itemsOf(nextWeek)];
   kept.filter(x=>x.type==='lift').forEach(x=>{ const v=plannedVolume(old.workouts[x.key], x.ex).credits; MUSCLE_LIST.forEach(m=>credit[m]=r1(credit[m]+v[m])) });
   const gapOf = m => MAJOR.includes(m) && credit[m] < 0.8*target[m] && target[m]-credit[m] >= 3;
   const covered = m => MAJOR.includes(m) ? !gapOf(m) : credit[m] >= target[m];
   const checkins=[...checkinsOf(o.changes), ...(o.sore?[{date:today, readiness:'very', area:o.sore}]:[])];
   const liftToday=doneS.some(s=>s.date===today);
   const cap=Math.max(0, Math.ceil(order.length*(daysBetween(today,we)+1)/7) - kept.filter(x=>x.type==='lift').length);
-  const newDays=orderDays(next.days, oldCfg.weekStart).map(d=>addDays(ws,(d-oldCfg.weekStart+7)%7)).filter(d=>d>=today && d<=we).sort();
+  const left=[]; for(let d=today; d<=we; d=addDays(d,1)) left.push(d);
+  // "Start today" (o.startToday) adds today even when it is not one of the new program's lifting days.
+  const newDays=left.filter(d=>(o.startToday && d===today) || next.days.includes(dow(d)));
   const added=[], dayNotes={};
   // The new program's runs on the days left come first (their days are fixed), so hard runs shape the lifting days.
   const usedRuns=new Set([...sessList(o.sessions).filter(s=>s.date>=ws && s.date<=we && s.type==='run').map(s=>s.session), ...kept.map(x=>x.key)]);
-  orderDays((next.runs||[]).map(r=>r.dow), oldCfg.weekStart).forEach(dw=>{
-    const d=addDays(ws,(dw-oldCfg.weekStart+7)%7), r=next.runs.find(x=>x.dow===dw); if(d<today) return;
+  left.filter(d=>(next.runs||[]).some(r=>r.dow===dow(d))).forEach(d=>{
+    const r=next.runs.find(x=>x.dow===dow(d));
     if(sessList(o.sessions).some(s=>s.date===d && s.type==='run')) return;
     let i=1; while(usedRuns.has(i===1?'run':'run'+i)) i++;
     const key=i===1?'run':'run'+i; usedRuns.add(key);
@@ -616,7 +639,7 @@ function planSwitch(o){
 /* Before / after for each remaining day of the week, for the switch preview. */
 function previewDays(old, neu, ws, today, notes, added){
   const out=[];
-  for(let d=today; d<=addDays(ws,6); d=addDays(d,1)){
+  for(let d=today; d<=(old.weekEnd||addDays(ws,6)); d=addDays(d,1)){
     const b=old.occs.filter(x=>x.date===d && x.status!=='done'), a=neu.occs.filter(x=>x.date===d && x.status!=='done');
     const done=old.occs.filter(x=>x.date===d && x.status==='done');
     out.push({date:d, done:done.map(x=>x.name), before:b.map(x=>({occ:x.occ, name:x.name, type:x.type, optional:!!x.optional, status:x.status})),
@@ -629,7 +652,10 @@ function previewDays(old, neu, ws, today, notes, added){
 /* Which program governs this week, and which (if any) is waiting to start. An adapted week belongs to the new
    program; a program chosen to start next week is "upcoming" until its start date, then simply current. */
 function programStatus(prog, today){
-  const cur=configOn(prog, today), ws=weekStartOf(today, cur.weekStart), latest=prog&&prog.config ? normalize(prog.config) : null;
+  const cur=configOn(prog, today), ws=weekOf(prog, today).ws, latest=prog&&prog.config ? normalize(prog.config) : null;
+  // A change of week-start day alone also waits for next week, but it is the same program, not an upcoming one.
+  const strip=c=>JSON.stringify({...c, weekStart:0, startedOn:0, adaptWeek:0, rotation:0, levelSince:0});
+  if(latest && latest.startedOn && latest.startedOn>today && strip(latest)===strip(cur)) return {current:cur, adapted:false, upcoming:null, startsOn:null};
   if(latest && latest.startedOn && latest.startedOn>today){
     if(latest.adaptWeek===ws) return {current:latest, adapted:true, from:cur, upcoming:null, startsOn:null};
     return {current:cur, adapted:false, upcoming:latest, startsOn:latest.startedOn};
@@ -649,11 +675,11 @@ function plansFor(Progression, workouts, input){
   const out={};
   Object.values(workouts).forEach(wk=>{
     const ex={};
-    wk.ex.forEach(e=>{
+    wk.ex.forEach((e,pos)=>{
       [e.id, ...(ALTS[e.id]||[]).map(n=>altId(e.id,n))].forEach(id=>{
         const def = id===e.id ? e : {...EXMAP[id], sets:e.sets, reps:e.reps};
         const c=Progression.configFor(def, (input.settings||{})[id]);
-        ex[id]=Progression.planFor(c, Progression.historyFor(input.sessions, id, {today:input.today}), input.today);
+        ex[id]=Progression.planFor(c, Progression.historyFor(input.sessions, id, {today:input.today}), input.today, {pos});
       });
     });
     out[wk.key]=ex;
@@ -662,8 +688,8 @@ function plansFor(Progression, workouts, input){
 }
 /* Program, workouts and this week plus next week's occurrences, as the Watch caches them. */
 function serve(o){
-  const c=configOn(o.prog, o.today), ws=weekStartOf(o.today, c.weekStart);
-  const a=weekSchedule({...o, weekStart:ws}), b=weekSchedule({...o, weekStart:addDays(ws,7)});
+  const ws=weekOf(o.prog, o.today).ws;
+  const a=weekSchedule({...o, weekStart:ws}), b=weekSchedule({...o, weekStart:addDays(a.weekEnd,1)});
   const workouts={...b.workouts, ...a.workouts};   // this week's set counts for workouts in both weeks
   const wire={};
   Object.values(workouts).forEach(w=>{ wire[w.key]={name:w.name, type:'lift', exercises:w.ex.map(e=>({id:e.id, name:e.name, sets:e.sets, low:e.reps[0], high:e.reps[1], rest:e.rest, restSeconds:restSecs(e.rest),
@@ -712,7 +738,7 @@ function bestRotation(cfg){
 }
 
 const P = {MUSCLE_LIST, MAJOR, GROUPS, SPACE, DEMANDING, LEG_CAP, LEVELS, RUN_KINDS, TEMPLATES, WORKOUTS:W, DOW_NAME,
-  defaultConfig, normalize, configFor, configOn, addDays, dow, daysBetween, weekStartOf, baseKey, sessList,
+  defaultConfig, normalize, configFor, configOn, addDays, dow, daysBetween, weekStartOf, weekOf, nextWeekOf, baseKey, sessList,
   volumeOf, plannedVolume, groupLoads, exList, volumeFor, weekQualifies, workoutsFor, classicWorkouts, baseWeek,
   reduceWorkout, weekSchedule, warningsFor, itemsOf, blockedOn, readiness, moveTarget, planSwitch, plansFor, serve,
   bestRotation, restSecs, musclesOf, slotOf, rekey, watchPayload, programStatus, goalOf, recoveryPatch, skipPatch, recoveryAdvice, scheduleAdvice, AREA_GROUPS};

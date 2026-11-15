@@ -53,6 +53,10 @@ struct Step: Hashable {
     var isAssisted: Bool { Load.isAssisted(name) }
     /// Timed holds (plank and its plank / hold alternatives): seconds only, no weight.
     var isTimed: Bool { slot.id == "plank" && name.range(of: "plank|hold", options: [.regularExpression, .caseInsensitive]) != nil }
+    /// Reps only, no weight: hanging knee / leg raises and the ab wheel (plan.js noW).
+    var isRepsOnly: Bool { slot.id == "knee-raise" && name.range(of: "hanging|leg raise|ab wheel", options: [.regularExpression, .caseInsensitive]) != nil }
+    /// No weight row: timed holds and reps-only moves.
+    var noWeight: Bool { isTimed || isRepsOnly }
     var isPerArm: Bool { Load.isPerArm(name) }
     /// Unit shown next to the weight.
     var weightUnit: String { isAssisted ? "lb assist" : isPerArm ? "lb / arm" : "lb" }
