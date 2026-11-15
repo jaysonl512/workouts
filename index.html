@@ -199,8 +199,8 @@ table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:6px 4px;b
 .hdr .btn{flex:none;margin-top:4px}
 .sug{margin-top:10px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);border-radius:12px;padding:9px 12px;font-size:15px}
 .sug small{display:block;color:var(--mute);font-size:12px;margin-top:1px}
-.sheetbg{position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:50;display:flex;align-items:flex-end;animation:fade .2s}
-.sheet{background:#161b21;border-radius:24px 24px 0 0;width:100%;max-width:640px;margin:0 auto;padding:18px 16px calc(18px + env(safe-area-inset-bottom));max-height:82vh;overflow:auto;animation:up .3s var(--ease)}
+.sheetbg{position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:50;display:flex;align-items:flex-end;animation:fade .2s;overscroll-behavior:contain;touch-action:pan-y}
+.sheet{background:#161b21;border-radius:24px 24px 0 0;width:100%;max-width:640px;margin:0 auto;padding:18px 16px calc(18px + env(safe-area-inset-bottom));max-height:88vh;max-height:calc(100dvh - 48px);overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;animation:up .3s var(--ease)}
 .sheet h3{margin:0 0 4px;font-size:19px}
 .sheet .note{margin-bottom:12px}
 .opt{display:flex;width:100%;justify-content:space-between;align-items:center;gap:8px;background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:8px;font-size:16px;font-weight:600;text-align:left}
@@ -531,6 +531,7 @@ details[open]>summary .chev{transform:rotate(90deg)}
   <button data-tab="progress"><svg viewBox="0 0 24 24"><path d="M5 20V13M10 20V7M15 20v-9M20 20V4"/><path d="M3 20h18"/></svg>Progress</button>
   <button data-tab="plan"><svg viewBox="0 0 24 24"><path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="m3 12.5 9 5 9-5"/><path d="m3 17 9 5 9-5"/></svg>Plan</button>
 </nav>
+<div id="layer"></div>
 </div>
 <div class="toast" id="toast"></div>
 <div class="undo" id="undo" hidden><span></span><button id="undoBtn">Undo</button></div>
@@ -564,7 +565,7 @@ const EFFORT = {easy:'Easy', medium:'Medium', hard:'Hard'};
 const effortSeg = (act,cur) => `<div class="segc">${Object.entries(EFFORT).map(([v,l])=>`<button class="${v===cur?'on':''}" data-act="${act}" data-v="${v}">${l}</button>`).join('')}</div>`;
 const kindOf = x => x.yoga ? 'yoga' : x.other ? 'other' : x.run ? 'run' : 'lift';
 const CHEERS = ['Nice one','Solid set','Strong','Locked in','Clean rep','Beast mode','Smooth'];
-const APP_VERSION='2026-11-15.1';
+const APP_VERSION='2026-11-15.2';
 
 
 /* ---------- helpers ---------- */
@@ -1239,7 +1240,12 @@ function render(){
   const note = st.note && st.tab==='today' && !inWk && !st.add && !st.recap ? noteSheet() : '';
   const hs = st.hm && st.tab==='progress' ? healthSheet() : '';
   const ps = st.tab==='plan' ? (st.chg ? chgSheet() : st.daysh ? daySheet() : st.prefsh ? prefSheet() : '') : st.tab==='today' && !inWk && st.daysh && st.daysh.compact ? daySheet() : '';
+  // Sheets and the recap live in #layer, outside the scrolling page: on iPhone a fixed sheet inside #scroll lets a
+  // swipe scroll the page behind it, and the tab bar covers its bottom. Its scroll position survives a re-render.
+  const layer=$('#layer'), prevSheet=layer.querySelector('.sheet'), keepTop=prevSheet?prevSheet.scrollTop:0;
   $('#app').innerHTML = v() + (st.add&&!inWk ? addSheet() : '') + (st.recap ? recapView() : '') + note + hs + ps;
+  layer.replaceChildren(...$('#app').querySelectorAll('.sheetbg,.recapbg'));
+  const newSheet=layer.querySelector('.sheet'); if(prevSheet && newSheet) newSheet.scrollTop=keepTop;
   if(st.wk){ st.wk.anim=false; st.wk.just=null;
     const cur=document.querySelector('.dots .dot.now,.dots .dot.editt'), row=cur&&cur.parentElement;
     if(cur) row.scrollLeft=Math.max(0, cur.offsetLeft-row.clientWidth/2+cur.offsetWidth/2); }
@@ -2406,8 +2412,8 @@ function clearOcc(occ, keys){
 document.getElementById('addBtn').addEventListener('click',openAdd);
 
 document.querySelector('nav').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;st.tab=b.dataset.tab;if(st.tab==='plan'){st.pview='main';st.daysh=null;st.prefsh=null}render();toTop()});
-const app=$('#app');
-app.addEventListener('change',e=>{
+const app=$('#app'), ui=$('#shell');   // ui: the page and the sheet layer (#layer) share these handlers
+ui.addEventListener('change',e=>{
   const t=e.target;
   if(t.id==='date'){st.date=t.value||todayStr();st.auto=true;render()}
   else if(t.id==='sess'){st.sess=t.value;render()}
@@ -2426,7 +2432,7 @@ function paceUpdate(){
   const p=(num(d.run.dist)&&num(d.run.min))?d.run.min/d.run.dist:null;
   el.textContent=p?`${Math.floor(p)}:${String(Math.round((p%1)*60)).padStart(2,'0')} /km`:'—';
 }
-app.addEventListener('input',e=>{
+ui.addEventListener('input',e=>{
   const t=e.target;
   if(t.id==='notes'){getDraft().notes=t.value;saveDraft()}
   else if(t.id==='addLabel'&&st.add){st.add.label=t.value}
@@ -2438,7 +2444,7 @@ app.addEventListener('input',e=>{
   }
 });
 app.addEventListener('focusin',e=>{ if(e.target.dataset&&e.target.dataset.fld) e.target.select() });
-app.addEventListener('click',e=>{
+ui.addEventListener('click',e=>{
   const b=e.target.closest('[data-act]'); if(!b) return;
   const act=b.dataset.act, wk=st.wk;
   if(act==='day'){ st.date=b.dataset.d; st.auto=true; render() }
