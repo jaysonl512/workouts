@@ -565,7 +565,7 @@ const EFFORT = {easy:'Easy', medium:'Medium', hard:'Hard'};
 const effortSeg = (act,cur) => `<div class="segc">${Object.entries(EFFORT).map(([v,l])=>`<button class="${v===cur?'on':''}" data-act="${act}" data-v="${v}">${l}</button>`).join('')}</div>`;
 const kindOf = x => x.yoga ? 'yoga' : x.other ? 'other' : x.run ? 'run' : 'lift';
 const CHEERS = ['Nice one','Solid set','Strong','Locked in','Clean rep','Beast mode','Smooth'];
-const APP_VERSION='2026-11-15.2';
+const APP_VERSION='2026-11-16.1';
 
 
 /* ---------- helpers ---------- */
@@ -1329,12 +1329,13 @@ function readyCard(x){
   const chk=changeOf('chk:'+todayStr()), ans=chk&&chk.readiness;
   if(!ans) return `<div class="rdy col"><span>How are you feeling? <small>Optional</small></span>${seg('rdy','',[['ready','Ready'],['sore','A little sore'],['very','Very sore']])}</div>`;
   if(ans==='ready') return '';
+  const head = ans==='very' ? 'Not recovered' : 'A little sore';
+  if(chk.choice==='start') return `<div class="rdy"><div><b>${head}</b><div class="note">Continuing as planned. Warm up well, and start when you're ready.</div></div><button class="link" data-act="rdyclear">Change</button></div>`;
   const sc=sched(st.date), r=Programs.readiness(sc, x.occ, ans, todayStr(), chk.area), dname=d=>Programs.DOW_NAME[Programs.dow(d)];
   const label={start:'Continue as planned', easier:'Shorter, easy run', move:r.moveTo?'Move to '+dname(r.moveTo):'', reduce:'Reduce volume', recovery:'Recovery day', skip:'Skip workout'};
   const desc={...ACT_DESC, move:r.moveTo?`Do it on ${dname(r.moveTo)}, clear of your sore muscles.`:''};
-  const btn=a=> a==='move'&&!r.moveTo ? '' : optRow(a==='start'?'data-act="start" data-resume="0"':`data-act="rdyact" data-a="${a}" data-o="${esc(x.occ)}"`, label[a], desc[a], r.recommend===a);
+  const btn=a=> a==='move'&&!r.moveTo ? '' : optRow(`data-act="rdyact" data-a="${a}" data-o="${esc(x.occ)}"`, label[a], desc[a], r.recommend===a);
   const order=[r.recommend, ...r.actions.filter(a=>a!==r.recommend)].filter(a=>a && r.actions.includes(a));
-  const head = ans==='very' ? 'Not recovered' : 'A little sore';
   let msg;
   if(r.run) msg = (chk.area||'legs')==='upper' ? 'Sore upper body is no reason to skip a run.'
     : r.hard ? `A ${x.runKind==='long'?'long run':'hard interval session'} on sore legs adds more fatigue. A shorter, easy run keeps you moving.`
@@ -2544,6 +2545,7 @@ ui.addEventListener('click',e=>{
   else if(act==='rdyclear'){ dropChanges(['chk:'+todayStr()]); render() }
   else if(act==='rdyact'){
     const t=todayStr(), o=b.dataset.o, a=b.dataset.a, chk=changeOf('chk:'+t)||{};
+    if(a==='start'){ putChanges([{id:'chk:'+t, change:{...chk, choice:'start'}}]); buzz(10); render(); return }
     if(a==='move'){ const r=Programs.readiness(sched(t), o, chk.readiness||'very', t, chk.area); if(!r||!r.moveTo) return toast('No clear day left this week');
       setOcc(o,{date:r.moveTo},'readiness'); toast('Moved to '+fmtDate(r.moveTo)) }
     else if(a==='reduce'){ setOcc(o,{reduced:true},'readiness'); toast('Fewer sets today, same targets') }
