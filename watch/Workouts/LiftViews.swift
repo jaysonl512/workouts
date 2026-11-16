@@ -98,8 +98,15 @@ struct ExerciseView: View {
         VStack(spacing: 5) {
             VStack(alignment: .leading, spacing: 0) {
                 Text(step.name).font(.system(size: 19, weight: .semibold)).foregroundStyle(Color.brand)
-                Text(subtitle)
-                    .font(.system(size: 12)).foregroundStyle(.secondary)
+                if let sg = lift.suggestion(for: step) {
+                    // After a set 2+ reps short: tap to make the lighter weight this set's target.
+                    Text("\(item.warmup ? "" : "Set \(item.index + 1) · ")Lighter? \(Self.text(sg, assisted: step.isAssisted)) · tap")
+                        .font(.system(size: 12, weight: .semibold)).foregroundStyle(.yellow)
+                        .onTapGesture { lift.useSuggestion(step); prefill() }
+                } else {
+                    Text(subtitle)
+                        .font(.system(size: 12)).foregroundStyle(.secondary)
+                }
             }
             .lineLimit(1)
             .minimumScaleFactor(0.6)
@@ -271,8 +278,17 @@ struct RestView: View {
                     }
                 }
                 .frame(maxHeight: .infinity)
-                // The weight to grab next, so the timer never has to be skipped to see it.
-                if let t = lift.afterRest()?.target {
+                // The weight to grab next, so the timer never has to be skipped to see it. After a set 2+ reps
+                // short it offers a lighter one: tap to use it, or ignore it to keep the planned weight.
+                if let n = lift.afterRest(), let s = lift.currentStep, let sg = n.lighter {
+                    Button { lift.useSuggestion(s) } label: {
+                        Text("Lighter? \(lift.targetText(s, sg))").font(.system(size: 15, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.yellow).lineLimit(1).minimumScaleFactor(0.6)
+                            .padding(.horizontal, 10).padding(.vertical, 3)
+                            .background(Capsule().stroke(Color.yellow.opacity(0.7), lineWidth: 1.5))
+                    }
+                    .buttonStyle(.plain)
+                } else if let t = lift.afterRest()?.target {
                     Text(t).font(.system(size: 17, weight: .semibold, design: .rounded)).foregroundStyle(Color.brand)
                         .lineLimit(1).minimumScaleFactor(0.6)
                 }

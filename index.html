@@ -143,6 +143,8 @@ table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:6px 4px;b
 .wub b,.tline b{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .wub .link,.tline .link{padding:4px 6px;color:var(--acc2);text-decoration:none;font-weight:700}
 .tline em{font-style:normal;font-size:11px;font-weight:700;color:#fbbf24}
+.sugg{display:flex;align-items:center;gap:8px;margin-top:6px;padding:7px 8px 7px 12px;border-radius:12px;font-size:13px;line-height:1.3;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.45)}
+.sugg span{flex:1}.sugg b{color:#fbbf24;white-space:nowrap}.sugg .btn{flex:none}.sugg .link{flex:none;font-size:13px}
 .twhy{font-size:12px;color:var(--mute);margin:4px 2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dots{flex-wrap:nowrap;overflow-x:auto;gap:6px;margin:10px -16px;padding:2px 16px 4px;scrollbar-width:none;-webkit-overflow-scrolling:touch;scroll-behavior:smooth}
 .dots::-webkit-scrollbar{display:none}
@@ -536,9 +538,9 @@ details[open]>summary .chev{transform:rotate(90deg)}
 <div class="toast" id="toast"></div>
 <div class="undo" id="undo" hidden><span></span><button id="undoBtn">Undo</button></div>
 
-<script src="plan.js?v=2026-11-16.2"></script>
-<script src="progression.js?v=2026-11-16.2"></script>
-<script src="programs.js?v=2026-11-16.2"></script>
+<script src="plan.js?v=2026-11-16.3"></script>
+<script src="progression.js?v=2026-11-16.3"></script>
+<script src="programs.js?v=2026-11-16.3"></script>
 <script>
 const SESS_KEYS = ['upperA','run','lowerA','upperB','lowerB','run2','yoga','rest'];
 const sessBase = k => Programs.baseKey(k);
@@ -565,7 +567,7 @@ const EFFORT = {easy:'Easy', medium:'Medium', hard:'Hard'};
 const effortSeg = (act,cur) => `<div class="segc">${Object.entries(EFFORT).map(([v,l])=>`<button class="${v===cur?'on':''}" data-act="${act}" data-v="${v}">${l}</button>`).join('')}</div>`;
 const kindOf = x => x.yoga ? 'yoga' : x.other ? 'other' : x.run ? 'run' : 'lift';
 const CHEERS = ['Nice one','Solid set','Strong','Locked in','Clean rep','Beast mode','Smooth'];
-const APP_VERSION='2026-11-16.2';
+const APP_VERSION='2026-11-16.3';
 
 
 /* ---------- helpers ---------- */
@@ -837,6 +839,15 @@ function nextItem(e){
   if(!ws.length && !(d.skipWu||{})[e.id] && wu<wl.length) return {wu:true, i:wu, n:wl.length, t:wl[wu], orig:wl[wu]};
   return {wu:false, i:ws.length, n:planN(e), t:targetAt(p,ws.length), orig:p&&p.sets[ws.length]};
 }
+/* After a working set 2+ reps short: a lighter next set (progression.js nextSet). Offered with one tap, never applied
+   by itself; taking it edits that set's target, so the session is still judged on the original plan. */
+function suggOf(e){
+  if(!e || e.run || e.yoga || e.other) return null;
+  const d=getDraft(), ws=workSets(d.ex[e.id]), p=planOf(e), it=nextItem(e);
+  if(it.wu || !ws.length || !it.t || it.i>=it.n || (p&&p.edits&&p.edits[it.i]) || (d.sugNo||{})[e.id+':'+it.i]) return null;
+  const last=ws[ws.length-1], s=Progression.nextSet(cfgOf(e.id), last, it.t);
+  return s && {...s, k:it.i, got:last.r, want:last.tr!=null?last.tr:last.pr};
+}
 function deloadInfo(){
   const weeks=new Map();
   allSessions().filter(s=>s.entries).forEach(s=>{
@@ -1032,7 +1043,8 @@ function afterRest(steps, i){
   if(!it.wu && it.i>=it.n){ e=steps[i+1]; if(!e || e.run||e.yoga||e.other) return null; it=nextItem(e); label='Next: '+e.name.split(/ [\/(]/)[0] }
   else label = it.wu ? `Warm-up ${it.i+1}` : `Set ${it.i+1} of ${it.n}`;
   if(!it.t) return {label, text:'—'};
-  const t=it.t, text = isTimedEx(e) ? `${t.r} sec` : t.w==null ? `${t.r} reps` : isAssist(e.name) ? (t.w?`−${t.w} lb assist × ${t.r}`:`Bodyweight × ${t.r}`) : t.w ? `${t.w} ${wUnit(e)} × ${t.r}` : `${t.r} reps`;
+  const sg = e===steps[i] ? suggOf(e) : null; if(sg) label+=' · lighter?';
+  const t=sg ? {w:sg.w, r:sg.r} : it.t, text = isTimedEx(e) ? `${t.r} sec` : t.w==null ? `${t.r} reps` : isAssist(e.name) ? (t.w?`−${t.w} lb assist × ${t.r}`:`Bodyweight × ${t.r}`) : t.w ? `${t.w} ${wUnit(e)} × ${t.r}` : `${t.r} reps`;
   return {label, text};
 }
 let restTimer=null;
@@ -1527,7 +1539,9 @@ function viewWorkout(){
   else if(wk.editing!=null){ const x=a[wk.editing]; box=`<div class="tline edit"><span>Editing</span><b>${x.tr!=null?`Target ${esc(fmtT({w:x.tw??null,r:x.tr},e))}`:'Logged set'}</b><button class="link" data-act="togglewu">${x.wu?'Working set':'Warm-up'}</button></div>` }
   else if(it.wu) box=`<div class="wub"><span>Warm-up ${it.i+1} of ${it.n}</span><b>${esc(tShow(it.t))}</b><button class="link" data-act="skipwu">Skip</button></div>`;
   else if(it.t){ const ed=p&&p.edits&&p.edits[it.i];
-    box=`<div class="tline"><span>Set ${it.i+1} of ${N}</span><b>${esc(tShow(it.t))}</b>${ed?'<em>edited</em>':''}</div>${!ws.length&&p&&p.why?`<div class="twhy">${esc(p.why)}</div>`:''}` }
+    const sg=suggOf(e);
+    box=`<div class="tline"><span>Set ${it.i+1} of ${N}</span><b>${esc(tShow(it.t))}</b>${ed?'<em>edited</em>':''}</div>${!ws.length&&p&&p.why?`<div class="twhy">${esc(p.why)}</div>`:''}`
+      + (sg?`<div class="sugg"><span>You got ${sg.got} of ${sg.want}. Try <b>${esc(tShow(sg))}</b> for this set?</span><button class="btn xs" data-act="sugyes">Use ${sg.w}</button><button class="link" data-act="sugno">Keep</button></div>`:'') }
   const note=(e.note||'').replace(/^Main lift\.?\s*/i,'').trim();
   const fullLast = l => `<div class="lastfull"><small>${esc(fmtDate(l.date))}</small>${l.sets.map((x,k)=>`<div><span>${x.wu?'Warm-up':'Set '+(workSets(l.sets.slice(0,k+1)).length)}</span><b>${esc(fmtSet(x,e))}</b>${x.pr!=null&&(x.pw!==x.w||x.pr!==x.r)?`<small>plan ${esc(fmtT({w:x.pw??null,r:x.pr},e))}</small>`:'<small></small>'}</div>`).join('')}</div>`;
   const rated=(d.diff||{})[e.id];
@@ -2507,6 +2521,10 @@ ui.addEventListener('click',e=>{
     a.pop(); saveDraft(); clearRest(); wk.editing=null; initCur(); render();
   }
   else if(act==='skiprest'){ clearRest(); render() }
+  else if(act==='sugyes'||act==='sugno'){ const e=stepsFor()[st.wk.step], sg=suggOf(e); if(!sg) return render();
+    if(act==='sugyes'){ const p=planOf(e); p.edits ||= {}; p.edits[sg.k]={w:sg.w, r:sg.r}; toast('Next set: '+sg.w) }
+    else { const d=getDraft(); (d.sugNo ||= {})[e.id+':'+sg.k]=1 }
+    saveDraft(); initCur(); render() }
   else if(act==='mood'){ getDraft().energy=+b.dataset.v; saveDraft(); buzz(10); render() }
   else if(act==='swapopen'){ wk.sheet=true; render() }
   else if(act==='sheetclose'){ if(e.target.closest('[data-stop]') && !b.classList.contains('btn')) return; wk.sheet=false; render() }

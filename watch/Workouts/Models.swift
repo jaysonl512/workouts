@@ -12,9 +12,11 @@ struct LoggedSet: Codable, Hashable {
     var tr: Int?
     var wu: Bool?
 
-    init(w: Double, r: Int, target: PlanSet? = nil, warmup: Bool = false) {
+    /// `target` is the target shown, `original` the planned one when the target was changed during the workout.
+    init(w: Double, r: Int, target: PlanSet? = nil, original: PlanSet? = nil, warmup: Bool = false) {
         self.w = w; self.r = r
-        if let t = target { pw = t.w; pr = t.r; tw = t.w; tr = t.r }
+        if let t = target { tw = t.w; tr = t.r }
+        if let o = original ?? target { pw = o.w; pr = o.r }
         if warmup { wu = true }
     }
 
@@ -85,6 +87,9 @@ struct PlanSet: Codable, Hashable {
 /// The plan for one exercise: warm-ups, working-set targets and the state to save with the workout.
 struct ExercisePlan: Codable, Hashable {
     var structure: String
+    /// Equipment and weight step (0 = dumbbell rack: 2.5 lb to 25, then 5), for a lighter next set (progression.js nextSet).
+    var eq: String?
+    var step: Double?
     var unit: String?
     var vf: Double?
     var warmups: [PlanSet]
@@ -92,6 +97,9 @@ struct ExercisePlan: Codable, Hashable {
     var state: JSONValue?
     var basedOn: String?
     var why: String?
+    /// Targets changed during the workout (set index as a string -> new target), here or on the phone.
+    /// The original target stays in `sets`, so the session is still judged on it.
+    var edits: [String: PlanSet]?
 }
 
 /// The cached response: plans for every lift (and every alternative), so lifts can start offline. Since build 14

@@ -78,10 +78,14 @@ const ALTS = {
 /* Exercises that only appear in program templates (programs.js), not in the original four workouts. */
 const EXTRA = [
   {id:'lat-raise',eq:'dumbbell',name:'Lateral raise',sets:3,reps:[12,15],rest:'1 min',small:1},
-  {id:'chest-press',eq:'machine',name:'Machine chest press',sets:3,reps:[8,12],rest:'90 sec'}
+  {id:'chest-press',eq:'machine',name:'Machine chest press',sets:3,reps:[8,12],rest:'90 sec'},
+  {id:'cable-crunch',eq:'cable',name:'Cable crunch',sets:3,reps:[10,15],rest:'1 min'},
+  {id:'ab-wheel',eq:'bodyweight',noW:1,name:'Ab wheel rollout',sets:3,reps:[8,12],rest:'1 min'}
 ];
 ALTS['lat-raise'] = ['Cable lateral raise','Machine lateral raise'];
 ALTS['chest-press'] = ['Plate-loaded chest press','Smith machine bench press','Dips'];
+ALTS['cable-crunch'] = ['Machine crunch','Weighted decline sit-up'];
+ALTS['ab-wheel'] = ['Hanging leg raise','Dead bug'];
 /* Muscles each exercise trains, for weekly volume (programs.js): 1 = a main muscle, 0.5 = a supporting one.
    One working set of bench press counts 1 chest + 0.5 triceps + 0.5 shoulders. Alternatives count as the
    exercise they replace. Muscles: chest back shoulders triceps biceps quads glutes hamstrings calves core. */
@@ -93,12 +97,12 @@ const MUSCLES = {
   squat:{quads:1,glutes:.5}, 'front-sq':{quads:1,glutes:.5}, lunge:{quads:1,glutes:.5}, 'leg-ext':{quads:1},
   rdl:{hamstrings:1,glutes:.5}, 'leg-curl':{hamstrings:1}, deadlift:{hamstrings:1,glutes:1,back:.5},
   'hip-thrust':{glutes:1,hamstrings:.5}, 'calf-st':{calves:1}, 'calf-seat':{calves:1},
-  'knee-raise':{core:1}, plank:{core:1}
+  'knee-raise':{core:1}, plank:{core:1}, 'cable-crunch':{core:1}, 'ab-wheel':{core:1}
 };
 const EXMAP = {};
 [...Object.values(PLAN.sessions), {ex:EXTRA}].forEach(S=>(S.ex||[]).forEach(e=>{
   EXMAP[e.id]={...e,slot:e.id};
-  (ALTS[e.id]||[]).forEach(n=>{ const id=altId(e.id,n); EXMAP[id]={...e,id,name:n,slot:e.id,note:undefined,alt:true,eq:undefined,prog:undefined,timed:e.timed&&/plank|hold/i.test(n)?1:undefined,noW:e.noW&&/hanging|leg raise|ab wheel/i.test(n)?1:undefined} });
+  (ALTS[e.id]||[]).forEach(n=>{ const id=altId(e.id,n); EXMAP[id]={...e,id,name:n,slot:e.id,note:undefined,alt:true,eq:undefined,prog:undefined,timed:e.timed&&/plank|hold/i.test(n)?1:undefined,noW:e.noW&&/hanging|leg raise|ab wheel|dead bug/i.test(n)?1:undefined} });
 }));
 
 if(typeof module!=='undefined' && module.exports) module.exports={PLAN,ALTS,slug,altId,EXMAP,MUSCLES,EXTRA};

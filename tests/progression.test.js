@@ -385,3 +385,28 @@ test('O2 historyFor records where an exercise came in, counting only exercises w
   assert.equal(P.historyFor([s], 'ohp-db')[0].pos, 1);
   assert.equal(P.historyFor([s], 'bench')[0].pos, 0);
 });
+
+/* ---------- a lighter next set after a short one (offered during the workout) ---------- */
+test('N1 two or more reps short suggests a lighter next set; one short or on target suggests nothing', () => {
+  const bench = cfg('bench'), press = cfg('chest-press');
+  // 70 x 3 against 6: about 64 for 6, rounded down to the dumbbell rack
+  assert.deepEqual(P.nextSet(bench, { w: 70, r: 3, tr: 6 }, { w: 70, r: 6 }), { w: 60, r: 6, short: 3 });
+  assert.equal(P.nextSet(bench, { w: 70, r: 5, tr: 6 }, { w: 70, r: 6 }), null);
+  assert.equal(P.nextSet(bench, { w: 70, r: 6, tr: 6 }, { w: 70, r: 6 }), null);
+  // a pyramid ramp set short by 3: the next, heavier set comes down below the current weight
+  assert.deepEqual(P.nextSet(bench, { w: 60, r: 5, tr: 8 }, { w: 65, r: 6 }), { w: 55, r: 6, short: 3 });
+  // machines round to their step
+  assert.deepEqual(P.nextSet(press, { w: 160, r: 8, tr: 11 }, { w: 160, r: 11 }), { w: 145, r: 11, short: 3 });
+  // judged against the target shown (tr), falling back to the original (pr)
+  assert.deepEqual(P.nextSet(bench, { w: 70, r: 3, pr: 6 }, { w: 70, r: 6 }), { w: 60, r: 6, short: 3 });
+});
+
+test('N2 assisted adds assistance; timed, reps-only, body weight, warm-ups and unplanned weights get nothing', () => {
+  const pull = cfg('pullup');
+  assert.deepEqual(P.nextSet(pull, { w: 50, r: 7, tr: 10 }, { w: 50, r: 10 }), { w: 55, r: 10, short: 3 });
+  assert.deepEqual(P.nextSet(pull, { w: 50, r: 5, tr: 10 }, { w: 50, r: 10 }), { w: 60, r: 10, short: 5 });
+  assert.equal(P.nextSet(cfg('plank'), { w: 0, r: 20, tr: 45 }, { w: null, r: 45 }), null);
+  assert.equal(P.nextSet(cfg('ab-wheel'), { w: 0, r: 5, tr: 10 }, { w: 0, r: 10 }), null);
+  assert.equal(P.nextSet(cfg('bench'), { w: 45, r: 1, tr: 4, wu: true }, { w: 55, r: 10 }), null);
+  assert.equal(P.nextSet(cfg('bench'), { w: 70, r: 3, tr: 6 }, { w: null, r: 6 }), null);
+});

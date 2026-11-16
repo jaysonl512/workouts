@@ -296,7 +296,7 @@ function planFor(c, history, today, opts){
     shown=sets.map(x=>({...x, w: assisted(c) ? up(c,up(c,x.w)) : snapDown(c, x.w*0.6)}));
     why='Deload week: about 60% of your usual weight';
   }
-  return {id:c.id, structure:c.structure, eq:c.eq, vf:c.vf, timed:c.timed,
+  return {id:c.id, structure:c.structure, eq:c.eq, step:c.step, vf:c.vf, timed:c.timed,
     unit: assisted(c) ? 'lb assist' : c.vf===2 && c.eq!=='dumbbell' ? 'lb per arm' : c.eq==='dumbbell' ? 'lb per dumbbell' : 'lb',
     warmups: o.deload ? [] : warmupSets(c, shown), sets: shown, state: st, basedOn, why, last: result};
 }
@@ -346,7 +346,23 @@ function buildPlans(input){
   return out;
 }
 
-const P = {configFor, guessEquip, planFor, historyFor, buildPlans, cleanSet, setVolume, judge, working,
+/* During a workout: a working set that came in 2+ reps short of the target shown suggests a lighter next set. The
+   app offers it (one tap), it never changes the plan by itself, and the session is still judged on the original
+   targets, so taking it costs nothing. Loaded: the weight you could do for the next set's reps, estimated from the
+   set just done (Epley, w x (1 + r/30)), rounded down to an available weight. Assisted: one more step of
+   assistance, two when 4+ reps short. Timed, reps-only and body-weight sets get nothing. Missing by 1 is normal
+   fatigue: nothing. Returns {w, r, short} for the next set, or null. */
+function nextSet(c, done, next){
+  if(!c || c.timed || !done || done.wu || !next || next.w==null || !(done.r>0)) return null;
+  const want = done.tr!=null ? done.tr : done.pr; if(want==null) return null;
+  const short = want - done.r; if(short<2) return null;
+  if(assisted(c)){ let w=up(c, Math.max(+done.w||0, next.w)); if(short>=4) w=up(c,w); return {w, r:next.r, short} }
+  if(isBW(c, done.w) || isBW(c, next.w)) return null;
+  const w = snapDown(c, done.w*(1+done.r/30)/(1+next.r/30));
+  return w>0 && w<next.w-EPS ? {w, r:next.r, short} : null;
+}
+
+const P = {configFor, nextSet, guessEquip, planFor, historyFor, buildPlans, cleanSet, setVolume, judge, working,
   snapDown, snapUp, up, down, harder, easier, asHard, isAssistName, isPerArmName, daysBetween};
 if(typeof module!=='undefined' && module.exports) module.exports=P;
 globalThis.Progression=P;

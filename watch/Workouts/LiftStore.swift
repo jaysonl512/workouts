@@ -39,6 +39,8 @@ final class LiftStore: ObservableObject {
         let index: Int
         let total: Int
         let target: PlanSet?
+        /// The planned target when `target` was changed during the workout.
+        var original: PlanSet? = nil
     }
 
     struct Summary {
@@ -109,8 +111,40 @@ final class LiftStore: ObservableObject {
         if let wl = p?.warmups, done == 0, !skipped, wuDone < wl.count {
             return NextItem(warmup: true, index: wuDone, total: wl.count, target: wl[wuDone])
         }
-        let target = p.flatMap { done < $0.sets.count ? $0.sets[done] : nil }
-        return NextItem(warmup: false, index: done, total: plannedCount(step), target: target)
+        let original = p.flatMap { done < $0.sets.count ? $0.sets[done] : nil }
+        let target = p?.edits?[String(done)].map { PlanSet(w: $0.w, r: $0.r, k: original?.k) } ?? original
+        return NextItem(warmup: false, index: done, total: plannedCount(step), target: target, original: original)
+    }
+
+    /// After a working set 2+ reps short of its target, a lighter target for the next set: the same rule as the web
+    /// app (progression.js nextSet). Offered, never applied by itself. Nil when nothing should change.
+    func suggestion(for step: Step) -> PlanSet? {
+        guard let p = planFor(step.id), !step.noWeight else { return nil }
+        let it = nextItem(for: step)
+        guard !it.warmup, it.index < it.total, let t = it.target, let tw = t.w, p.edits?[String(it.index)] == nil,
+              let last = sets(for: step.id).last(where: { !$0.isWarmup }), last.r > 0,
+              let want = last.tr ?? last.pr, want - last.r >= 2 else { return nil }
+        let eq = p.eq ?? "", inc = p.step ?? (eq == "dumbbell" ? 0 : step.slot.weightStep)
+        if eq == "assisted" {
+            var w = Weights.up(max(last.w, tw), eq: eq, step: inc)
+            if want - last.r >= 4 { w = Weights.up(w, eq: eq, step: inc) }
+            return PlanSet(w: w, r: t.r, k: t.k)
+        }
+        guard last.w > 0, tw > 0 else { return nil }
+        let w = Weights.snapDown(last.w * (1 + Double(last.r) / 30) / (1 + Double(t.r) / 30), eq: eq, step: inc)
+        return w > 0 && w < tw - 1e-9 ? PlanSet(w: w, r: t.r, k: t.k) : nil
+    }
+
+    /// Takes the suggestion: it becomes the next set's target (the planned one is kept for judging the session).
+    func useSuggestion(_ step: Step) {
+        guard let s = suggestion(for: step), var p = planFor(step.id) else { return }
+        var e = p.edits ?? [:]
+        e[String(nextItem(for: step).index)] = PlanSet(w: s.w, r: s.r)
+        p.edits = e
+        draft!.plans?[step.id] = p
+        draft!.changedAt = Date()
+        persist()
+        upload(status: "in_progress")
     }
 
     /// "45 lb × 8", "−50 lb assist × 10", "45 sec" (timed holds) or "8 reps" (no weight planned yet).
@@ -123,11 +157,12 @@ final class LiftStore: ObservableObject {
     }
 
     /// What comes after the rest: the next set of this exercise, or the first set of the next one.
-    func afterRest() -> (label: String, target: String?)? {
+    /// `lighter` is a suggested lighter target for the next set of this exercise (see suggestion(for:)).
+    func afterRest() -> (label: String, target: String?, lighter: PlanSet?)? {
         guard let s = currentStep else { return nil }
         let it = nextItem(for: s)
         let label = nextUp ? "Next: \(s.name)" : it.warmup ? "Warm-up \(it.index + 1)" : "Set \(it.index + 1) of \(it.total)"
-        return (label, it.target.map { targetText(s, $0) })
+        return (label, it.target.map { targetText(s, $0) }, nextUp ? nil : suggestion(for: s))
     }
 
     func skipWarmups(_ step: Step) {
@@ -200,8 +235,8 @@ final class LiftStore: ObservableObject {
         guard let step = currentStep else { return }
         let item = nextItem(for: step)
         draft!.changedAt = Date()
-        // The set keeps its planned target next to what was done. Plans never change during the workout.
-        draft!.sets[step.id, default: []].append(LoggedSet(w: w, r: r, target: item.target, warmup: item.warmup))
+        // The set keeps its planned target next to what was done (and the target shown, if it was changed).
+        draft!.sets[step.id, default: []].append(LoggedSet(w: w, r: r, target: item.target, original: item.original, warmup: item.warmup))
         if item.warmup {
             persist()
             upload(status: "in_progress")
@@ -472,5 +507,21 @@ final class LiftStore: ObservableObject {
                                             restEnd: status == "in_progress" ? restEnd.map { ISO.string($0) } : nil,
                                             restTotal: status == "in_progress" && restEnd != nil ? restTotal : nil,
                                             updatedAt: stamp))
+    }
+}
+
+/// Available weights, as progression.js has them: step 0 is a dumbbell rack (2.5 lb up to 25, then 5 lb).
+enum Weights {
+    private static let eps = 1e-9
+    static func snapDown(_ x: Double, eq: String, step: Double) -> Double {
+        if x <= 0 { return 0 }
+        if eq == "dumbbell" && step == 0 { return x < 25 ? (x / 2.5 + eps).rounded(.down) * 2.5 : (x / 5 + eps).rounded(.down) * 5 }
+        let s = step > 0 ? step : 5
+        return (x / s + eps).rounded(.down) * s
+    }
+    static func up(_ w: Double, eq: String, step: Double) -> Double {
+        if eq == "dumbbell" && step == 0 { return w < 25 - eps ? min(25, (w / 2.5 + eps).rounded(.down) * 2.5 + 2.5) : (w / 5 + eps).rounded(.down) * 5 + 5 }
+        let s = step > 0 ? step : 5
+        return (w / s + eps).rounded(.down) * s + s
     }
 }
