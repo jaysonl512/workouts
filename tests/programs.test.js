@@ -624,3 +624,54 @@ test('T1 switching on a day that is not a lifting day in the new program can sta
   const s = P.weekSchedule({ prog: b.prog, changes: b.rows, sessions, today: SUN });
   assert.equal(s.occs.find(x => x.date === SUN && x.type === 'lift').status, 'today');
 });
+
+/* ---------- blocks and exercise rotation ---------- */
+const rotProg = (extra = {}) => ({ config: { ...P.configFor('ppl', 4), startedOn: '2026-11-16', ...extra } });
+const exOf = (prog, date, key) => P.weekSchedule({ prog, changes: [], sessions: [], today: date, weekStart: date }).workouts[key].ex.map(e => e.use || e.id);
+
+test('B2 blocks are 5 schedule weeks from the start date; nothing saved means no blocks', () => {
+  const prog = rotProg();
+  assert.deepEqual(P.blockOf(prog, '2026-11-16'), { n: 0, week: 0, len: 5, start: '2026-11-16', next: '2026-12-21' });
+  assert.equal(P.blockOf(prog, '2026-12-17').week, 4);
+  assert.deepEqual(P.blockOf(prog, '2026-12-21'), { n: 1, week: 0, len: 5, start: '2026-12-21', next: '2027-01-25' });
+  assert.equal(P.blockOf({ config: null }, '2026-11-16'), null);
+});
+
+test('B3 main lifts never rotate; accessories change each block, secondary compounds every 2 blocks (Balanced)', () => {
+  const prog = rotProg(), b0 = exOf(prog, '2026-11-16', 'pushA'), b1 = exOf(prog, '2026-12-21', 'pushA'), b2 = exOf(prog, '2027-01-25', 'pushA');
+  assert.deepEqual(b0, ['bench', 'ohp-db', 'fly', 'lat-raise', 'pushdown']);
+  assert.equal(b1[0], 'bench'); assert.equal(b2[0], 'bench');                    // main lift fixed
+  assert.equal(b1[1], 'ohp-db'); assert.equal(b2[1], 'ohp-db~arnold-press');      // tier 2: every 2 blocks
+  assert.equal(b1[2], 'fly~pec-deck'); assert.equal(b2[2], 'fly~cable-crossover'); // tier 3: every block
+  // the same week of the same block always gives the same workout (Watch, server and web agree)
+  assert.deepEqual(exOf(prog, '2026-12-24', 'pushA'), b1);
+});
+
+test('B4 a slot trained twice a week gets a different exercise each time (A/B), with no duplicate names', () => {
+  const prog = rotProg();
+  const push = exOf(prog, '2026-11-16', 'pushA'), upper = exOf(prog, '2026-11-16', 'upper');
+  assert.equal(push[3], 'lat-raise');
+  assert.equal(upper.find(x => x.startsWith('lat-raise')), 'lat-raise~cable-lateral-raise');
+  for (const k of ['pushA', 'pullA', 'legsA', 'upper']) for (const d of ['2026-11-16', '2026-12-21', '2027-01-25', '2027-03-01']) {
+    const names = exOf(prog, d, k).map(id => W.EXMAP[id].name);
+    assert.equal(new Set(names).size, names.length, `${k} ${d}: ${names}`);
+  }
+  // and no exercise appears on two days of the same week
+  for (const d of ['2026-11-16', '2026-12-21', '2027-01-25', '2027-03-01']) {
+    const all = ['pushA', 'pullA', 'legsA', 'upper'].flatMap(k => exOf(prog, d, k)).map(id => W.EXMAP[id].name);
+    assert.equal(new Set(all).size, all.length, `${d}: ${all}`);
+  }
+});
+
+test('B5 Consistent never rotates; Varied rotates secondary compounds every block; preferences and avoids win', () => {
+  assert.deepEqual(exOf(rotProg({ variety: 'consistent' }), '2027-01-25', 'pushA'), ['bench', 'ohp-db', 'fly', 'lat-raise', 'pushdown']);
+  assert.equal(exOf(rotProg({ variety: 'varied' }), '2026-12-21', 'pushA')[1], 'ohp-db~arnold-press');
+  const pref = rotProg({ prefs: { use: { pushdown: 'pushdown~seated-triceps-press-machine' }, avoid: ['fly~pec-deck'] } });
+  const b1 = exOf(pref, '2026-12-21', 'pushA');
+  assert.ok(b1.includes('pushdown~seated-triceps-press-machine'));   // your preferred swap stays
+  assert.equal(b1[2], 'fly~cable-crossover');                         // avoided pick skipped
+  // a rotated exercise is marked, so the app can say why it changed
+  const w = P.weekSchedule({ prog: rotProg(), changes: [], sessions: [], today: '2026-12-21', weekStart: '2026-12-21' }).workouts.pushA;
+  assert.equal(w.ex.find(e => e.id === 'fly').rot, true);
+  assert.equal(w.ex.find(e => e.id === 'bench').rot, undefined);
+});

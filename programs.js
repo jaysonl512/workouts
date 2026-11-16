@@ -23,7 +23,7 @@
 (function(){
 'use strict';
 const WP = globalThis.WorkoutPlan || (typeof require!=='undefined' ? require('./plan.js') : null);
-const { PLAN, ALTS, altId, EXMAP, MUSCLES } = WP;
+const { PLAN, ALTS, altId, EXMAP, MUSCLES, ROTATE } = WP;
 
 /* ---------- constants ---------- */
 const MUSCLE_LIST = ['chest','back','shoulders','triceps','biceps','quads','glutes','hamstrings','calves','core'];
@@ -34,6 +34,8 @@ const SPACE = {legs:3, push:2, pull:2};               // days between two demand
 const DEMANDING = {returning:9, regular:12, higher:12};
 const LEG_CAP = {returning:24, regular:40, higher:48};   // weekly leg credits (quads + glutes + hamstrings)
 const LEVELS = {returning:'Returning', regular:'Regular', higher:'Higher volume'};
+const VARIETY = {consistent:'Consistent', balanced:'Balanced', varied:'Varied'};
+const BLOCK_WEEKS = 5;
 const RUN_KINDS = {easy:'Easy run', long:'Long run', intervals:'Intervals'};
 const DAY = 86400000;
 const r1 = x => Math.round(x*10)/10;
@@ -96,7 +98,8 @@ const TEMPLATES = {
 
 function defaultConfig(){
   return {v:1, template:'current', lifts:4, days:[1,3,4,5], runs:runsOf([[2,'easy'],[6,'long',1]]), rotation:0,
-    level:'regular', levelSince:null, rampHold:null, weekStart:1, readiness:true, edits:{}, prefs:{use:{},avoid:[]}, startedOn:null};
+    level:'regular', levelSince:null, rampHold:null, weekStart:1, readiness:true, edits:{}, prefs:{use:{},avoid:[]}, startedOn:null,
+    variety:'balanced'};
 }
 function normalize(c){
   const d=defaultConfig(), o={...d, ...(c||{})};
@@ -109,6 +112,7 @@ function normalize(c){
   o.prefs={use:{...((o.prefs||{}).use||{})}, avoid:[...((o.prefs||{}).avoid||[])]};
   o.edits=o.edits||{};
   if(!LEVELS[o.level]) o.level='regular';
+  if(!VARIETY[o.variety]) o.variety='balanced';
   return o;
 }
 /* A new program's settings, keeping your preferences, level and week start. */
@@ -223,6 +227,38 @@ function volumeFor(prog, o, ws){
   return {level:lv, stage, qualifying:q, fresh, held:!!c.rampHold};
 }
 
+/* ---------- program blocks ----------
+   A program runs in blocks of 5 schedule weeks (bridge weeks count as weeks), counted from the day it started. Main
+   lifts stay the same across blocks so their progress stays measurable; accessories rotate at block boundaries
+   (ROTATE in plan.js, by the variety setting). Research basis: variety across exercises helps regional growth and
+   motivation, constant random swapping costs skill on main lifts (Kassiano 2022, Baz-Valle 2019); block length and
+   rotation cadence are coaching convention (RP, Helms), not trial results. With nothing saved there are no blocks.
+   Returns {n (0-based block), week (0-based week in it), len, start, next} or null. */
+function blockOf(prog, date){
+  const c=configOn(prog, date); if(c.implicit) return null;
+  const len=c.blockWeeks||BLOCK_WEEKS, ws=weekOf(prog, date).ws, anchor=c.startedOn||c.levelSince;
+  if(!anchor) return {n:0, week:0, len, start:null, next:null};
+  const starts=[]; let w=weekOf(prog, anchor).ws;
+  if(ws<w) return {n:0, week:0, len, start:w, next:null};
+  for(let g=0; w<ws && g<2000; g++){ starts.push(w); w=nextWeekOf(prog, w) }
+  const k=starts.length, n=Math.floor(k/len), week=k%len;
+  let next=ws; for(let i=week; i<len; i++) next=nextWeekOf(prog, next);
+  return {n, week, len, start: n*len<k ? starts[n*len] : ws, next};
+}
+/* The exercise a rotating slot uses in block n. k = how many earlier workouts this week have the same slot, so a
+   slot trained twice a week gets two different exercises (A/B). Tier 2 changes every 2 blocks on Balanced, tier 3
+   every block; Varied changes both every block. Avoided exercises and names already in the workout are skipped.
+   Null = the slot's own exercise. */
+function rotPick(id, k, n, variety, avoid, names){
+  const r=ROTATE[id]; if(!r || variety==='consistent') return null;
+  const period = variety==='varied' ? 1 : r.t===2 ? 2 : 1;
+  const pool=[id, ...r.pool.map(nm=>altId(id,nm))].filter(x=>EXMAP[x] && !avoid.includes(x));
+  if(pool.length<2) return null;
+  const start=(Math.floor(n/period)+k)%pool.length;
+  for(let i=0;i<pool.length;i++){ const x=pool[(start+i)%pool.length]; if(x===id) return null; if(!names.has(EXMAP[x].name)) return x }
+  return null;
+}
+
 /* ---------- resolving a program into workouts ---------- */
 function structureOf(id, settings){ const b=EXMAP[id]; return (settings&&settings[id]&&settings[id].structure) || (b&&b.prog&&b.prog.s) || 'straight' }
 /* One exercise of a workout at a volume stage. Pyramid and top-set lifts keep their structure: Returning starts the
@@ -251,17 +287,27 @@ function exDef(id, sets, opt, stage, prefs, settings, edit){
   return d;
 }
 /* Every workout of a program at a volume, with your edits and exercise preferences. */
-function workoutsFor(cfg, vol, settings){
-  const c=normalize(cfg), t=TEMPLATES[c.template], f=t.freq[c.lifts], out={};
-  f.w.forEach(key=>{
+function workoutsFor(cfg, vol, settings, block){
+  const c=normalize(cfg), t=TEMPLATES[c.template], f=t.freq[c.lifts], out={}, seen={};
+  const variety = block ? c.variety : 'consistent';
+  const lists=f.w.map(key=>{
     const adj=(f.adjust||{})[key]||{}, ed=c.edits[key]||{};
     let list=W[key].ex.map(([id,n,opt])=>[id, (adj.sets||{})[id]!=null?adj.sets[id]:n, opt]).filter(([id])=>!(adj.remove||[]).includes(id));
     (adj.add||[]).forEach(([id,n,opt,after])=>{ const i=list.findIndex(x=>x[0]===after); list.splice(i<0?list.length:i+1,0,[id,n,opt]) });
     list=list.filter(([id])=>!(ed.remove||[]).includes(id));
     (ed.add||[]).forEach(a=>{ if(!EXMAP[a.id] || list.some(x=>x[0]===a.id)) return; const i=a.after?list.findIndex(x=>x[0]===a.after):-1; list.splice(i<0?list.length:i+1, 0, [a.id, a.sets||3, 0]) });   // after: optional position
-    const ex=list.map(([id,n,opt])=>{
+    return list;
+  });
+  // Every exercise name in the week, so a rotation never repeats an exercise that is already done another day.
+  const names=new Set(lists.flat().map(([id])=>{ const u=c.prefs.use[id]; return (EXMAP[u]||EXMAP[id]||{}).name }));
+  f.w.forEach((key,wi)=>{
+    const ed=c.edits[key]||{};
+    const ex=lists[wi].map(([id,n,opt])=>{
       const g=GROUP_OF[primaries(id)[0]], st = vol && vol.fresh && vol.fresh[g] && (vol.stage==='reg'||vol.stage==='hi') ? 'r1' : (vol?vol.stage:'reg');
-      return exDef(id, n, opt, st, c.prefs, settings, {sets:(ed.sets||{})[id], keep:(ed.add||[]).some(a=>a.id===id)});
+      const d=exDef(id, n, opt, st, c.prefs, settings, {sets:(ed.sets||{})[id], keep:(ed.add||[]).some(a=>a.id===id)});
+      const k=seen[id]||0; seen[id]=k+1;
+      if(d && !d.use && !c.prefs.use[id]){ const r=rotPick(id, k, block?block.n:0, variety, c.prefs.avoid, names); if(r){ d.use=r; d.rot=true; names.add(EXMAP[r].name) } }
+      return d;
     }).filter(Boolean);
     out[key]={key, name:W[key].name, type:'lift', ex};
   });
@@ -310,8 +356,8 @@ function reduceWorkout(workout, only){
    o = {prog, changes, sessions, today, weekStart?, date?, settings?} */
 function weekSchedule(o){
   const {ws, we}=weekOf(o.prog, o.weekStart || o.date || o.today);
-  const cfg=configOn(o.prog, ws), vol=volumeFor(o.prog, o, ws), workouts=workoutsFor(cfg, vol, o.settings);
-  const all={...classicWorkouts(), ...workoutsFor(cfg, vol, o.settings)};
+  const cfg=configOn(o.prog, ws), vol=volumeFor(o.prog, o, ws), block=blockOf(o.prog, ws), workouts=workoutsFor(cfg, vol, o.settings, block);
+  const all={...classicWorkouts(), ...workouts};
   let occs=baseWeek(cfg, ws, workouts, we);
   changeList(o.changes, ws).forEach(({id, change:ch})=>{
     if(ch.add){ if(occs.some(x=>x.occ===id)) return;
@@ -347,7 +393,7 @@ function weekSchedule(o){
   });
   occs.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:a.type==='lift'?-1:1);
   const done=ss.filter(s=>s.type==='lift');
-  const sched={weekStart:ws, weekEnd:we, config:cfg, volume:vol, workouts:all, occs, extras, actual:volumeOf(done)};
+  const sched={weekStart:ws, weekEnd:we, config:cfg, volume:vol, block, workouts:all, occs, extras, actual:volumeOf(done)};
   sched.warnings=warningsFor(sched, cfg.level);
   // A long run or intervals on the day of, or the day after, a "very sore legs" check-in.
   checkinsOf(o.changes).filter(c=>c.readiness==='very' && (c.area||'legs')!=='upper').forEach(c=>{
@@ -565,7 +611,7 @@ function planSwitch(o){
     const rows=kept.map(x=>({id:`${ws}:m:${x.key}:1`, change:{week:ws, add:true, key:x.key, date:x.date, type:x.type, name:x.name, ex:x.ex||null, runKind:x.runKind, source:'manual'}}));
     return {mode, startNow:true, weekStart:ws, prog:nextProg, rows, conflicts, kept:kept.map(x=>x.occ), held, before, days:previewDays(old, sched, ws, today), nextWeek:nextWeek.occs, warnings:sched.warnings};
   }
-  const vol=volumeFor(nextProg, o, addDays(we,1)), workouts=workoutsFor(next, vol, o.settings);
+  const vol=volumeFor(nextProg, o, addDays(we,1)), workouts=workoutsFor(next, vol, o.settings, blockOf(nextProg, addDays(we,1)));
   const order=TEMPLATES[next.template].freq[next.lifts].w;
   const target=emptyCredits(); order.forEach(k=>{ const v=plannedVolume(workouts[k]).credits; MUSCLE_LIST.forEach(m=>target[m]=r1(target[m]+v[m])) });
   const credit={...before.credits};
@@ -737,7 +783,7 @@ function bestRotation(cfg){
   return 0;
 }
 
-const P = {MUSCLE_LIST, MAJOR, GROUPS, SPACE, DEMANDING, LEG_CAP, LEVELS, RUN_KINDS, TEMPLATES, WORKOUTS:W, DOW_NAME,
+const P = {MUSCLE_LIST, MAJOR, GROUPS, SPACE, DEMANDING, LEG_CAP, LEVELS, VARIETY, BLOCK_WEEKS, blockOf, RUN_KINDS, TEMPLATES, WORKOUTS:W, DOW_NAME,
   defaultConfig, normalize, configFor, configOn, addDays, dow, daysBetween, weekStartOf, weekOf, nextWeekOf, baseKey, sessList,
   volumeOf, plannedVolume, groupLoads, exList, volumeFor, weekQualifies, workoutsFor, classicWorkouts, baseWeek,
   reduceWorkout, weekSchedule, warningsFor, itemsOf, blockedOn, readiness, moveTarget, planSwitch, plansFor, serve,

@@ -51,16 +51,16 @@ const ALTS = {
   bench:['Barbell bench press','Machine chest press','Smith machine bench'],
   row:['Barbell row','Seated cable row','T-bar row','One-arm dumbbell row'],
   'ohp-db':['Machine shoulder press','Arnold press','Barbell overhead press'],
-  pulldown:['Pull-ups','Assisted pull-ups','Close-grip pulldown'],
+  pulldown:['Pull-ups','Assisted pull-ups','Close-grip pulldown','Single-arm cable pulldown'],
   pushdown:['Seated triceps press machine','Rope pushdown','Overhead triceps extension','Dips'],
-  'db-curl':['EZ-bar curl','Cable curl','Hammer curl'],
+  'db-curl':['EZ-bar curl','Cable curl','Hammer curl','Incline dumbbell curl'],
   squat:['Leg press','Hack squat','Goblet squat','Smith machine squat'],
   rdl:['Dumbbell RDL','Good morning','Back extension'],
   lunge:['Walking lunge','Step-up','Reverse lunge'],
   'leg-curl':['Seated leg curl','Lying leg curl','Nordic curl'],
   'calf-st':['Leg press calf raise','Smith calf raise'],
   'inc-db':['Incline barbell press','Incline machine press','Dumbbell bench press'],
-  'cable-row':['Chest-supported row','Machine row','Barbell row'],
+  'cable-row':['Chest-supported row','Machine row','Barbell row','Single-arm cable row'],
   ohp:['Machine shoulder press','Seated dumbbell press','Landmine press'],
   pullup:['Assisted pull-ups','Lat pulldown','Chin-ups'],
   fly:['Pec deck','Dumbbell fly','Cable crossover'],
@@ -86,6 +86,35 @@ ALTS['lat-raise'] = ['Cable lateral raise','Machine lateral raise'];
 ALTS['chest-press'] = ['Plate-loaded chest press','Smith machine bench press','Dips'];
 ALTS['cable-crunch'] = ['Machine crunch','Weighted decline sit-up'];
 ALTS['ab-wheel'] = ['Hanging leg raise','Dead bug'];
+/* Exercise rotation (programs.js): each accessory slot's pool, in order, starting with the slot's own exercise. Every
+   pick is meaningfully different (another angle, grip, implement or muscle length), never a near-duplicate. Tier 2 =
+   secondary compounds (rotated every 2 blocks on Balanced), tier 3 = accessories and isolation work (every block).
+   Main lifts (pyramid / top-set structure) are not listed: they stay fixed so their progress stays measurable. */
+const ROTATE = {
+  row:{t:2, pool:['One-arm dumbbell row','T-bar row']},
+  'ohp-db':{t:2, pool:['Arnold press','Machine shoulder press']},
+  pulldown:{t:2, pool:['Close-grip pulldown','Single-arm cable pulldown']},
+  'cable-row':{t:2, pool:['Machine row','Single-arm cable row']},
+  pullup:{t:2, pool:['Chin-ups']},
+  rdl:{t:2, pool:['Dumbbell RDL','Good morning']},
+  lunge:{t:2, pool:['Walking lunge','Reverse lunge','Step-up']},
+  'front-sq':{t:2, pool:['Hack squat','Leg press']},
+  'hip-thrust':{t:2, pool:['Glute bridge','Cable pull-through']},
+  'chest-press':{t:2, pool:['Plate-loaded chest press','Smith machine bench press']},
+  pushdown:{t:3, pool:['Rope pushdown','Dips']},
+  'ss-tri':{t:3, pool:['Skull crushers']},
+  'db-curl':{t:3, pool:['Hammer curl','Incline dumbbell curl']},
+  'ss-curl':{t:3, pool:['Preacher curl','Cable curl']},
+  fly:{t:3, pool:['Pec deck','Cable crossover','Dumbbell fly']},
+  rear:{t:3, pool:['Reverse pec deck','Face pull']},
+  'lat-raise':{t:3, pool:['Cable lateral raise','Machine lateral raise']},
+  'leg-curl':{t:3, pool:['Seated leg curl']},
+  'calf-st':{t:3, pool:['Leg press calf raise']},
+  'knee-raise':{t:3, pool:['Hanging leg raise','Decline sit-up']},
+  plank:{t:3, pool:['Side plank','Hollow hold']},
+  'cable-crunch':{t:3, pool:['Machine crunch']},
+  'ab-wheel':{t:3, pool:['Dead bug']}
+};
 /* Muscles each exercise trains, for weekly volume (programs.js): 1 = a main muscle, 0.5 = a supporting one.
    One working set of bench press counts 1 chest + 0.5 triceps + 0.5 shoulders. Alternatives count as the
    exercise they replace. Muscles: chest back shoulders triceps biceps quads glutes hamstrings calves core. */
@@ -105,5 +134,5 @@ const EXMAP = {};
   (ALTS[e.id]||[]).forEach(n=>{ const id=altId(e.id,n); EXMAP[id]={...e,id,name:n,slot:e.id,note:undefined,alt:true,eq:undefined,prog:undefined,timed:e.timed&&/plank|hold/i.test(n)?1:undefined,noW:e.noW&&/hanging|leg raise|ab wheel|dead bug/i.test(n)?1:undefined} });
 }));
 
-if(typeof module!=='undefined' && module.exports) module.exports={PLAN,ALTS,slug,altId,EXMAP,MUSCLES,EXTRA};
-globalThis.WorkoutPlan={PLAN,ALTS,slug,altId,EXMAP,MUSCLES,EXTRA};
+if(typeof module!=='undefined' && module.exports) module.exports={PLAN,ALTS,slug,altId,EXMAP,MUSCLES,EXTRA,ROTATE};
+globalThis.WorkoutPlan={PLAN,ALTS,slug,altId,EXMAP,MUSCLES,EXTRA,ROTATE};

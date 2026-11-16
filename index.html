@@ -302,6 +302,11 @@ main{padding-top:2px}
 nav button{padding:8px 0 6px;gap:3px;font-size:11px}
 nav button svg{width:23px;height:23px}
 .subhd{display:flex;align-items:center;gap:10px;margin:4px 0 6px}.subhd b{font-size:18px}
+.blk{padding:12px 14px;margin:6px 0}.blkhd{display:flex;justify-content:space-between;align-items:baseline}.blkhd span{color:var(--mute);font-size:13px}
+.blkbar{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:4px;margin:8px 0 6px}.blkbar i{height:6px;border-radius:3px;background:var(--line)}
+.blkbar i.on{background:var(--acc)}.blkbar i.now{background:var(--acc);opacity:.45}
+.wkttl h3 .blkp{display:block;font-size:12px;font-weight:500;color:var(--mute);margin-top:1px}
+.blkl{display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:5px 0;border-top:1px solid var(--line)}.blkl:first-of-type{margin-top:6px}.blkl b{white-space:nowrap}.blkl b.up{color:var(--acc2)}
 .pcardb{display:flex;width:100%;align-items:center;justify-content:space-between;gap:10px;text-align:left;color:var(--text);font:inherit;margin:6px 0}
 .pcardb small,.lrow small{display:block;color:var(--mute);font-size:13px;margin-top:2px}.pcardb small.nxt{color:var(--acc2)}
 .card.list{padding:2px 14px}
@@ -538,9 +543,9 @@ details[open]>summary .chev{transform:rotate(90deg)}
 <div class="toast" id="toast"></div>
 <div class="undo" id="undo" hidden><span></span><button id="undoBtn">Undo</button></div>
 
-<script src="plan.js?v=2026-11-16.3"></script>
-<script src="progression.js?v=2026-11-16.3"></script>
-<script src="programs.js?v=2026-11-16.3"></script>
+<script src="plan.js?v=2026-11-16.4"></script>
+<script src="progression.js?v=2026-11-16.4"></script>
+<script src="programs.js?v=2026-11-16.4"></script>
 <script>
 const SESS_KEYS = ['upperA','run','lowerA','upperB','lowerB','run2','yoga','rest'];
 const sessBase = k => Programs.baseKey(k);
@@ -567,7 +572,7 @@ const EFFORT = {easy:'Easy', medium:'Medium', hard:'Hard'};
 const effortSeg = (act,cur) => `<div class="segc">${Object.entries(EFFORT).map(([v,l])=>`<button class="${v===cur?'on':''}" data-act="${act}" data-v="${v}">${l}</button>`).join('')}</div>`;
 const kindOf = x => x.yoga ? 'yoga' : x.other ? 'other' : x.run ? 'run' : 'lift';
 const CHEERS = ['Nice one','Solid set','Strong','Locked in','Clean rep','Beast mode','Smooth'];
-const APP_VERSION='2026-11-16.3';
+const APP_VERSION='2026-11-16.4';
 
 
 /* ---------- helpers ---------- */
@@ -1003,7 +1008,7 @@ const stepsFor = () => {
     // The occurrence's own list (a reduced or adjusted workout) or the whole workout; a preferred alternative
     // (Plan > exercise preferences) unless swapped for this session. Anything logged stays visible.
     const d=getDraft(), ex=d.only ? Programs.exList(S, d.only) : S.ex;
-    const steps=ex.map(e=>{ const a=d.swaps[e.id]??e.use; return a&&a!==e.id&&EXMAP[a] ? {...EXMAP[a], sets:e.sets, reps:e.reps} : e });
+    const steps=ex.map(e=>{ const a=d.swaps[e.id]??e.use; return a&&a!==e.id&&EXMAP[a] ? {...EXMAP[a], sets:e.sets, reps:e.reps, rot:e.rot&&a===e.use} : e });
     Object.keys(d.ex).forEach(id=>{ if((d.ex[id]||[]).length && EXMAP[id] && !steps.some(x=>x.id===id) && !ex.some(e=>e.id===EXMAP[id].slot && (d.swaps[e.id]??e.use)===id)) steps.push(EXMAP[id]) });
     return steps;
   }
@@ -1327,7 +1332,8 @@ function weekList(wp){
   }).join('');
   const extras = sc.extras.map(s=>doneRow(s, logged&&logged.id===s.id)).join('');
   const pct = wp.goal ? Math.min(100, Math.round(wp.doneN/wp.goal*100)) : 0;
-  return `<div class="wkttl"><h3>${cur?'This week':'That week'}</h3><span>${wp.doneN} of ${wp.goal} done${wp.rest?` · ${wp.rest} recovery`:''}</span></div>
+  const bk=sc.block&&sc.block.start ? `<small class="blkp">Block ${sc.block.n+1} · Week ${sc.block.week+1} of ${sc.block.len}</small>` : '';
+  return `<div class="wkttl"><h3>${cur?'This week':'That week'}${bk}</h3><span>${wp.doneN} of ${wp.goal} done${wp.rest?` · ${wp.rest} recovery`:''}</span></div>
     <div class="wbar"><i style="width:${pct}%"></i></div>
     <div class="wl2">${rows||'<div class="note" style="padding:10px">Nothing scheduled this week.</div>'}${extras?`<div class="wsub">Also this week</div>${extras}`:''}</div>
 `;
@@ -1547,7 +1553,7 @@ function viewWorkout(){
   const rated=(d.diff||{})[e.id];
   h+=`<div class="${cls}"><div class="whead"><div class="kicker">Exercise ${wk.step+1} of ${n}</div><button class="btn ghost xs" data-act="swapopen">⇄ Swap</button></div>
     <h2 class="wname">${esc(e.name)}</h2>
-    <div class="chips3">${sp!=null?`<span class="chip ss">Superset · ${esc(steps[sp].name.split(/ [\/(]/)[0])}</span>`:''}<span class="chip">${esc(scheme)}</span><span class="chip">Rest ${esc(e.rest)}${sp!=null?' per pair':''}</span>${wk.prs[e.id]?'<span class="chip pr">🏆 New PR</span>':''}</div>
+    <div class="chips3">${sp!=null?`<span class="chip ss">Superset · ${esc(steps[sp].name.split(/ [\/(]/)[0])}</span>`:''}<span class="chip">${esc(scheme)}</span><span class="chip">Rest ${esc(e.rest)}${sp!=null?' per pair':''}</span>${e.rot?'<span class="chip" title="Accessories change each block of your program">This block\'s pick</span>':''}${wk.prs[e.id]?'<span class="chip pr">🏆 New PR</span>':''}</div>
     ${note?`<div class="wnote">${esc(note)}</div>`:''}
     ${last?`<details class="lastd"><summary><span>Last ${esc(shortDate(last.date))}</span>${esc(workSets(last.sets).map(x=>fmtSet(x,e)).join(' · '))}</summary>${fullLast(last)}</details>`:''}
     ${box}
@@ -2213,15 +2219,36 @@ function planMain(){
   return `<div class="schhd"><b>Program</b><button class="link inl" data-act="pview" data-v="settings">⚙ Settings</button></div>
     <button class="card pcardb" data-act="pview" data-v="program"><span><b class="pname">${esc(CT.name)}</b><small>${cur.lifts} lifts · ${runsTxt(cur)} · ${Programs.LEVELS[cur.level]}</small>
       ${ps.upcoming?`<small class="nxt">Next: ${esc(T.name)} from ${esc(day(starts))}, ${esc(shortDate(starts))}</small>`:''}${ps.adapted?`<small>Adapted this week</small>`:''}</span><span class="chev">›</span></button>
-    ${cloudNote}
+    ${blockCard()}${cloudNote}
     <div class="schhd"><b>This week</b><span>${esc(shortDate(sc.weekStart))} – ${esc(shortDate(sc.weekEnd))}</span></div>
     <div class="card" style="padding:4px 6px">${rows}</div>${warns}`;
 }
+const VARIETY_NOTE = {consistent:'The same exercises every week', balanced:'Accessories change each 5-week block; main lifts stay', varied:'Accessories and secondary lifts change every block'};
+/* The program as blocks: where you are in this one, when accessories change, and how your main lifts have moved
+   since the program started (best set by estimated max, first session vs latest). */
+function blockCard(){
+  const t=todayStr(), sc=sched(t), b=sc.block, c=progCfg(); if(!b || !b.start) return '';
+  const day = d => Programs.DOW_NAME[Programs.dow(d)];
+  const segs=[...Array(b.len)].map((_,i)=>`<i class="${i<b.week?'on':i===b.week?'now':''}"></i>`).join('');
+  const since=(configOnStart())||b.start, main=[...new Set(Object.values(sc.workouts).filter(w=>Programs.TEMPLATES[c.template].freq[c.lifts].w.includes(w.key)).flatMap(w=>w.ex.filter(e=>e.prog&&e.prog.s!=='straight').map(e=>e.use||e.id)))];
+  const e1=x=>(+x.w||0)*(1+(+x.r||0)/30);
+  const rows=main.map(id=>{
+    const ss=allSessions().filter(s=>s.date>=since && s.entries).sort((a,b2)=>a.date<b2.date?-1:1).map(s=>s.entries.find(e=>e.id===id)).filter(Boolean)
+      .map(e=>workSets(e.sets).filter(x=>x.r>0).sort((x,y)=>e1(y)-e1(x))[0]).filter(Boolean);
+    if(!ss.length) return '';
+    const a=ss[0], z=ss[ss.length-1], en=EXMAP[id]||{id}, up=ss.length>1 && e1(z)>e1(a)+1e-9;
+    return `<div class="blkl"><span>${esc((EXMAP[id]||{}).name||id)}</span><b class="${up?'up':''}">${ss.length>1?`${esc(fmtSet(a,en))} → ${esc(fmtSet(z,en))}`:`${esc(fmtSet(a,en))} · start`}</b></div>`;
+  }).join('');
+  return `<div class="card blk"><div class="blkhd"><b>Block ${b.n+1}</b><span>Week ${b.week+1} of ${b.len}</span></div><div class="blkbar" aria-hidden="true">${segs}</div>
+    <div class="note">${c.variety==='consistent' ? 'Same exercises every block.' : `Main lifts stay the same. New accessories from ${esc(day(b.next))}, ${esc(shortDate(b.next))}.`}</div>
+    ${rows?`<div class="note" style="margin-top:8px">Main lifts since you started ${esc(Programs.TEMPLATES[c.template].name)}</div>${rows}`:''}</div>`;
+}
+const configOnStart = () => { const c=progCfg(); return c.startedOn || c.levelSince || null };
 function planProgram(){
   const {c, sc, vol, ps, cur, CT, T, starts, runsTxt, day, cloudNote}=planCtx();
   const stage = cur.level!=='returning' ? '' : vol.stage==='reg' ? 'Built back up to regular volume' : `Building back up: stage ${vol.stage==='r1'?1:2} of 3`;
   const pv=Programs.volumeFor(st.prog, {sessions:allSessions(), changes:st.changes}, starts||sc.weekStart);
-  const wks=Programs.workoutsFor(c, pv, st.settings), order=T.freq[c.lifts].w;
+  const wks=Programs.workoutsFor(c, pv, st.settings, ps.upcoming ? Programs.blockOf({config:c}, starts) : sched(todayStr()).block), order=T.freq[c.lifts].w;
   return subHead('Program') + `<div class="card"><small class="kick">This week</small><b class="pname">${esc(CT.name)}</b>
       <div class="note">${cur.lifts} lifts · ${runsTxt(cur)} · ${Programs.LEVELS[cur.level]}</div>
       ${ps.adapted?`<div class="note">Adapted this week from ${esc(Programs.TEMPLATES[ps.from.template].name)}</div>`:''}
@@ -2269,6 +2296,7 @@ function planSettings(){
     <div class="note">Easy runs fit any day. Long runs and intervals are kept away from demanding leg days.</div>
     <div class="sep"></div><label class="f">Training level</label>${seg('plevel',c.level,[['returning','Returning'],['regular','Regular'],['higher','Higher volume']])}
     <div class="note">${c.level==='returning'?'Fewer sets to start. Volume steps up after two good weeks at a time, and holds when recovery is poor.':c.level==='higher'?'One more set on most exercises.':'The program as written.'}</div>
+    <div class="sep"></div><div class="row2"><div><b>Exercise variety</b><div class="note">${esc(VARIETY_NOTE[c.variety])}</div></div><select id="pvar" style="width:auto">${Object.entries(Programs.VARIETY).map(([k,v])=>`<option value="${k}" ${c.variety===k?'selected':''}>${v}</option>`).join('')}</select></div>
     <div class="sep"></div><div class="row2"><div><b>Readiness check</b><div class="note">A quick "how do you feel?" before each lift</div></div><button class="sw ${c.readiness?'on':''}" role="switch" aria-checked="${!!c.readiness}" aria-label="Readiness check" data-act="pready"><i></i></button></div>
     <div class="sep"></div><div class="row2"><div><b>Week starts on</b><div class="note">For your schedule and weekly stats</div></div><select id="pweek" style="width:auto">${[1,0,6].map(d=>`<option value="${d}" ${c.weekStart===d?'selected':''}>${['Sunday','Monday','','','','','Saturday'][d]}</option>`).join('')}</select></div>
     <div class="sep"></div><label class="f">Exercise preferences</label>${prefRows||'<div class="note">None yet. Use ⇄ on an exercise to always use something else, or to never use it.</div>'}
@@ -2439,6 +2467,7 @@ ui.addEventListener('change',e=>{
   else if(t.dataset.prun){ const dw=+t.dataset.prun; editCfg(c=>{ const r=c.runs.find(x=>x.dow===dw); if(r) r.kind=t.value }) }
   else if(t.dataset.prunadd && t.value!==''){ editCfg(c=>{ c.runs.push({dow:+t.value, kind:'easy', optional:true}) }, 'Run added') }
   else if(t.id==='pweek') setWeekStart(+t.value);
+  else if(t.id==='pvar') editCfg(c=>{ c.variety=t.value }, 'Exercise variety: '+Programs.VARIETY[t.value]);
   else if(t.id==='bw'){ const v=num(t.value); if(v&&v>=50&&v<=600) SS('wt.bw',v); else { try{localStorage.removeItem('wt.bw')}catch(e){} t.value='' } toast(v?'Body weight saved':'Body weight cleared') }
 });
 function fldObj(f){ return (f==='dist'||f==='min') ? getDraft().run : st.wk.cur }
