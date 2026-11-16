@@ -258,7 +258,7 @@ function workoutsFor(cfg, vol, settings){
     let list=W[key].ex.map(([id,n,opt])=>[id, (adj.sets||{})[id]!=null?adj.sets[id]:n, opt]).filter(([id])=>!(adj.remove||[]).includes(id));
     (adj.add||[]).forEach(([id,n,opt,after])=>{ const i=list.findIndex(x=>x[0]===after); list.splice(i<0?list.length:i+1,0,[id,n,opt]) });
     list=list.filter(([id])=>!(ed.remove||[]).includes(id));
-    (ed.add||[]).forEach(a=>{ if(EXMAP[a.id] && !list.some(x=>x[0]===a.id)) list.push([a.id, a.sets||3, 0]) });
+    (ed.add||[]).forEach(a=>{ if(!EXMAP[a.id] || list.some(x=>x[0]===a.id)) return; const i=a.after?list.findIndex(x=>x[0]===a.after):-1; list.splice(i<0?list.length:i+1, 0, [a.id, a.sets||3, 0]) });   // after: optional position
     const ex=list.map(([id,n,opt])=>{
       const g=GROUP_OF[primaries(id)[0]], st = vol && vol.fresh && vol.fresh[g] && (vol.stage==='reg'||vol.stage==='hi') ? 'r1' : (vol?vol.stage:'reg');
       return exDef(id, n, opt, st, c.prefs, settings, {sets:(ed.sets||{})[id], keep:(ed.add||[]).some(a=>a.id===id)});

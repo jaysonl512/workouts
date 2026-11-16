@@ -77,14 +77,16 @@ const ALTS = {
 };
 /* Exercises that only appear in program templates (programs.js), not in the original four workouts. */
 const EXTRA = [
-  {id:'lat-raise',eq:'dumbbell',name:'Lateral raise',sets:3,reps:[12,15],rest:'1 min',small:1}
+  {id:'lat-raise',eq:'dumbbell',name:'Lateral raise',sets:3,reps:[12,15],rest:'1 min',small:1},
+  {id:'chest-press',eq:'machine',name:'Machine chest press',sets:3,reps:[8,12],rest:'90 sec'}
 ];
 ALTS['lat-raise'] = ['Cable lateral raise','Machine lateral raise'];
+ALTS['chest-press'] = ['Plate-loaded chest press','Smith machine bench press','Dips'];
 /* Muscles each exercise trains, for weekly volume (programs.js): 1 = a main muscle, 0.5 = a supporting one.
    One working set of bench press counts 1 chest + 0.5 triceps + 0.5 shoulders. Alternatives count as the
    exercise they replace. Muscles: chest back shoulders triceps biceps quads glutes hamstrings calves core. */
 const MUSCLES = {
-  bench:{chest:1,triceps:.5,shoulders:.5}, 'inc-db':{chest:1,shoulders:.5,triceps:.5}, fly:{chest:1},
+  bench:{chest:1,triceps:.5,shoulders:.5}, 'inc-db':{chest:1,shoulders:.5,triceps:.5}, fly:{chest:1}, 'chest-press':{chest:1,triceps:.5,shoulders:.5},
   ohp:{shoulders:1,triceps:.5}, 'ohp-db':{shoulders:1,triceps:.5}, 'lat-raise':{shoulders:1}, rear:{shoulders:1},
   row:{back:1,biceps:.5}, 'cable-row':{back:1,biceps:.5}, pulldown:{back:1,biceps:.5}, pullup:{back:1,biceps:.5},
   pushdown:{triceps:1}, 'ss-tri':{triceps:1}, 'db-curl':{biceps:1}, 'ss-curl':{biceps:1},

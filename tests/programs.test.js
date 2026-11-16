@@ -287,6 +287,11 @@ test('F2 your own set counts and added exercises stay', () => {
   assert.equal(ua.ex.find(e => e.id === 'row').sets, 5);
   assert.ok(!ua.ex.some(e => e.id === 'db-curl'));
   assert.equal(ua.ex.find(e => e.id === 'lat-raise').sets, 3);
+  // an added exercise can name its place; machine chest press counts as chest volume
+  const pc = { ...P.configFor('ppl', 4), prefs: { use: {}, avoid: ['lat-raise', 'lat-raise~cable-lateral-raise', 'lat-raise~machine-lateral-raise'] }, edits: { pushA: { add: [{ id: 'chest-press', sets: 3, after: 'ohp-db' }] } } };
+  const pa = P.workoutsFor(pc, { stage: 'reg', fresh: {} }).pushA;
+  assert.deepEqual(pa.ex.map(e => e.id), ['bench', 'ohp-db', 'chest-press', 'fly', 'pushdown']);
+  assert.equal(P.plannedVolume(pa).credits.chest, 4 + 3 + 2);
 });
 
 /* ---------- history and progression across programs ---------- */
