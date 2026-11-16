@@ -73,7 +73,7 @@ const ALTS = {
   'leg-ext':['Sissy squat','Single-leg extension'],
   'calf-seat':['Standing calf raise','Leg press calf raise'],
   'knee-raise':['Hanging leg raise','Cable crunch','Ab wheel','Decline sit-up'],
-  plank:['Side plank','Dead bug','Hollow hold']
+  plank:['Side plank','Hollow hold']
 };
 /* Exercises that only appear in program templates (programs.js), not in the original four workouts. */
 const EXTRA = [
@@ -85,7 +85,7 @@ const EXTRA = [
 ALTS['lat-raise'] = ['Cable lateral raise','Machine lateral raise'];
 ALTS['chest-press'] = ['Plate-loaded chest press','Smith machine bench press','Dips'];
 ALTS['cable-crunch'] = ['Machine crunch','Weighted decline sit-up'];
-ALTS['ab-wheel'] = ['Hanging leg raise','Dead bug'];
+ALTS['ab-wheel'] = ['Hanging leg raise','Kneeling ab wheel'];
 /* Exercise rotation (programs.js): each accessory slot's pool, in order, starting with the slot's own exercise. Every
    pick is meaningfully different (another angle, grip, implement or muscle length), never a near-duplicate. Tier 2 =
    secondary compounds (rotated every 2 blocks on Balanced), tier 3 = accessories and isolation work (every block).
@@ -113,7 +113,7 @@ const ROTATE = {
   'knee-raise':{t:3, pool:['Hanging leg raise','Decline sit-up']},
   plank:{t:3, pool:['Side plank','Hollow hold']},
   'cable-crunch':{t:3, pool:['Machine crunch']},
-  'ab-wheel':{t:3, pool:['Dead bug']}
+  'ab-wheel':{t:3, pool:['Hanging leg raise']}
 };
 /* Muscles each exercise trains, for weekly volume (programs.js): 1 = a main muscle, 0.5 = a supporting one.
    One working set of bench press counts 1 chest + 0.5 triceps + 0.5 shoulders. Alternatives count as the
@@ -131,7 +131,7 @@ const MUSCLES = {
 const EXMAP = {};
 [...Object.values(PLAN.sessions), {ex:EXTRA}].forEach(S=>(S.ex||[]).forEach(e=>{
   EXMAP[e.id]={...e,slot:e.id};
-  (ALTS[e.id]||[]).forEach(n=>{ const id=altId(e.id,n); EXMAP[id]={...e,id,name:n,slot:e.id,note:undefined,alt:true,eq:undefined,prog:undefined,timed:e.timed&&/plank|hold/i.test(n)?1:undefined,noW:e.noW&&/hanging|leg raise|ab wheel|dead bug/i.test(n)?1:undefined} });
+  (ALTS[e.id]||[]).forEach(n=>{ const id=altId(e.id,n); EXMAP[id]={...e,id,name:n,slot:e.id,note:undefined,alt:true,eq:undefined,prog:undefined,timed:e.timed&&/plank|hold/i.test(n)?1:undefined,noW:e.noW&&/hanging|leg raise|ab wheel/i.test(n)?1:undefined} });
 }));
 
 if(typeof module!=='undefined' && module.exports) module.exports={PLAN,ALTS,slug,altId,EXMAP,MUSCLES,EXTRA,ROTATE};

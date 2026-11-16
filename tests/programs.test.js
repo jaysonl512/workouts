@@ -29,7 +29,7 @@ test('V1 weekly volume per program (sets and credits kept separate)', () => {
     Object.values(ws).forEach(w => { const v = P.plannedVolume(w); sets += v.sets; for (const m in v.credits) cr[m] = Math.round(((cr[m] || 0) + v.credits[m]) * 10) / 10 });
     return { sets, cr };
   };
-  const expect = { 'upperLower 4': [50, 82, 103], 'balanced 3': [33, 49, 63], 'ppl 3': [29, 49, 63], 'ppl 4': [38, 58, 76], 'ppl 5': [44, 67, 88], 'ppl 6': [46, 68, 88], 'strengthRun 2': [25, 37, 46], 'strengthRun 3': [27, 41, 52] };
+  const expect = { 'upperLower 4': [50, 82, 103], 'balanced 3': [33, 49, 63], 'ppl 3': [29, 49, 63], 'ppl 4': [42, 64, 84], 'ppl 5': [44, 67, 88], 'ppl 6': [46, 68, 88], 'strengthRun 2': [25, 37, 46], 'strengthRun 3': [27, 41, 52] };
   for (const [k, v] of Object.entries(expect)) { const [t, n] = k.split(' '); assert.deepEqual(['returning', 'regular', 'higher'].map(l => tot(t, +n, l).sets), v, k) }
   assert.deepEqual(tot('upperLower', 4, 'regular').cr, { chest: 11, back: 15.5, shoulders: 13, triceps: 12, biceps: 12, quads: 13, glutes: 12.5, hamstrings: 10.5, calves: 7, core: 6 });
   assert.deepEqual(tot('balanced', 3, 'regular').cr, { chest: 8, back: 10.5, shoulders: 9, triceps: 7.5, biceps: 6.5, quads: 8, glutes: 9, hamstrings: 6.5, calves: 3, core: 4 });
@@ -290,8 +290,10 @@ test('F2 your own set counts and added exercises stay', () => {
   // an added exercise can name its place; machine chest press counts as chest volume
   const pc = { ...P.configFor('ppl', 4), prefs: { use: {}, avoid: ['lat-raise', 'lat-raise~cable-lateral-raise', 'lat-raise~machine-lateral-raise'] }, edits: { pushA: { add: [{ id: 'chest-press', sets: 3, after: 'ohp-db' }] } } };
   const pa = P.workoutsFor(pc, { stage: 'reg', fresh: {} }).pushA;
-  assert.deepEqual(pa.ex.map(e => e.id), ['bench', 'ohp-db', 'chest-press', 'fly', 'pushdown']);
+  assert.deepEqual(pa.ex.map(e => e.id), ['bench', 'ohp-db', 'chest-press', 'fly', 'pushdown', 'leg-ext']);
   assert.equal(P.plannedVolume(pa).credits.chest, 4 + 3 + 2);
+  // 4-day PPL trains legs twice: quads on push day, glutes and hamstrings on pull day
+  assert.ok(P.workoutsFor(pc, { stage: 'reg', fresh: {} }).pullA.ex.some(e => e.id === 'hip-thrust'));
 });
 
 /* ---------- history and progression across programs ---------- */
@@ -639,7 +641,7 @@ test('B2 blocks are 5 schedule weeks from the start date; nothing saved means no
 
 test('B3 main lifts never rotate; accessories change each block, secondary compounds every 2 blocks (Balanced)', () => {
   const prog = rotProg(), b0 = exOf(prog, '2026-11-16', 'pushA'), b1 = exOf(prog, '2026-12-21', 'pushA'), b2 = exOf(prog, '2027-01-25', 'pushA');
-  assert.deepEqual(b0, ['bench', 'ohp-db', 'fly', 'lat-raise', 'pushdown']);
+  assert.deepEqual(b0, ['bench', 'ohp-db', 'fly', 'lat-raise', 'pushdown', 'leg-ext']);
   assert.equal(b1[0], 'bench'); assert.equal(b2[0], 'bench');                    // main lift fixed
   assert.equal(b1[1], 'ohp-db'); assert.equal(b2[1], 'ohp-db~arnold-press');      // tier 2: every 2 blocks
   assert.equal(b1[2], 'fly~pec-deck'); assert.equal(b2[2], 'fly~cable-crossover'); // tier 3: every block
@@ -664,7 +666,7 @@ test('B4 a slot trained twice a week gets a different exercise each time (A/B), 
 });
 
 test('B5 Consistent never rotates; Varied rotates secondary compounds every block; preferences and avoids win', () => {
-  assert.deepEqual(exOf(rotProg({ variety: 'consistent' }), '2027-01-25', 'pushA'), ['bench', 'ohp-db', 'fly', 'lat-raise', 'pushdown']);
+  assert.deepEqual(exOf(rotProg({ variety: 'consistent' }), '2027-01-25', 'pushA'), ['bench', 'ohp-db', 'fly', 'lat-raise', 'pushdown', 'leg-ext']);
   assert.equal(exOf(rotProg({ variety: 'varied' }), '2026-12-21', 'pushA')[1], 'ohp-db~arnold-press');
   const pref = rotProg({ prefs: { use: { pushdown: 'pushdown~seated-triceps-press-machine' }, avoid: ['fly~pec-deck'] } });
   const b1 = exOf(pref, '2026-12-21', 'pushA');

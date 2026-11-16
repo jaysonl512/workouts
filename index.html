@@ -543,9 +543,9 @@ details[open]>summary .chev{transform:rotate(90deg)}
 <div class="toast" id="toast"></div>
 <div class="undo" id="undo" hidden><span></span><button id="undoBtn">Undo</button></div>
 
-<script src="plan.js?v=2026-11-16.4"></script>
-<script src="progression.js?v=2026-11-16.4"></script>
-<script src="programs.js?v=2026-11-16.4"></script>
+<script src="plan.js?v=2026-11-16.5"></script>
+<script src="progression.js?v=2026-11-16.5"></script>
+<script src="programs.js?v=2026-11-16.5"></script>
 <script>
 const SESS_KEYS = ['upperA','run','lowerA','upperB','lowerB','run2','yoga','rest'];
 const sessBase = k => Programs.baseKey(k);
@@ -572,7 +572,7 @@ const EFFORT = {easy:'Easy', medium:'Medium', hard:'Hard'};
 const effortSeg = (act,cur) => `<div class="segc">${Object.entries(EFFORT).map(([v,l])=>`<button class="${v===cur?'on':''}" data-act="${act}" data-v="${v}">${l}</button>`).join('')}</div>`;
 const kindOf = x => x.yoga ? 'yoga' : x.other ? 'other' : x.run ? 'run' : 'lift';
 const CHEERS = ['Nice one','Solid set','Strong','Locked in','Clean rep','Beast mode','Smooth'];
-const APP_VERSION='2026-11-16.4';
+const APP_VERSION='2026-11-16.5';
 
 
 /* ---------- helpers ---------- */

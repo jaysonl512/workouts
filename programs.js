@@ -84,7 +84,9 @@ const TEMPLATES = {
     freq:{
       3:{w:['pushA','pullA','legsA'], days:[1,3,5], runs:runsOf([[2,'easy',1],[6,'long',1]])},
       4:{w:['pushA','pullA','legsA','upper'], days:[1,2,4,5], runs:runsOf([[3,'easy',1]]),
-        adjust:{pushA:{sets:{fly:2,pushdown:2}}, pullA:{sets:{'cable-row':2,'db-curl':2}}}},
+        // Legs get a second, lighter exposure (every major muscle twice a week: ACSM 2026; volume split across
+        // sessions: Pelland 2025): quads on push day, glutes and hamstrings on pull day, both well clear of Thursday.
+        adjust:{pushA:{sets:{fly:2,pushdown:2}, add:[['leg-ext',3,0,'pushdown']]}, pullA:{sets:{'cable-row':2,'db-curl':2}, add:[['hip-thrust',3,0,'db-curl']]}}},
       5:{w:['pushA','pullA','legsA','upper','legsB'], days:[1,2,3,5,6], runs:runsOf([[4,'easy',1]]),
         adjust:{pushA:{sets:{fly:2,pushdown:2}}, pullA:{sets:{'cable-row':2,'db-curl':2}}, legsA:{remove:['rdl','calf-st']}}},
       6:{w:['pushA','pullA','legsA','pushB','pullB','legsB'], days:[1,2,3,4,5,6], runs:[],
@@ -425,7 +427,8 @@ function warningsFor(sched, level){
     Object.keys(GROUPS).forEach(g=>{
       if(a.loads[g]>=dem && b.loads[g]>=dem && gap<SPACE[g])
         out.push({type:'spacing', group:g, occs:[a.occ,b.occ], text:`${a.name} and ${b.name} are ${gap===0?'on the same day':gap+' day'+(gap>1?'s':'')+' apart'}. Demanding ${GROUP_NAME[g]} days need ${SPACE[g]}.`});
-      else if(gap===1 && a.loads[g]>=4 && b.loads[g]>=4 && !(a.loads[g]>=dem && b.loads[g]>=dem))
+      // back-to-back only matters for the same muscles (quads one day and glutes the next is fine)
+      else if(gap===1 && GROUPS[g].reduce((t,m)=>t+Math.min(a.credits[m]||0, b.credits[m]||0),0)>=4 && !(a.loads[g]>=dem && b.loads[g]>=dem))
         out.push({type:'b2b', group:g, occs:[a.occ,b.occ], soft:true, text:`${a.name} and ${b.name} both train ${GROUP_NAME[g]} muscles on back-to-back days.`});
     });
   }
